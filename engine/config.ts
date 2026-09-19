@@ -29,6 +29,7 @@
 import type {
   BeastTurnResult,
   Difficulty,
+  Dragon,
   DragonBreed,
   DragonStage,
   LevelThreshold,
@@ -41,6 +42,7 @@ import type {
 export type {
   BeastTurnResult,
   Difficulty,
+  Dragon,
   DragonBreed,
   DragonStage,
   LevelThreshold,
@@ -539,4 +541,107 @@ export function resolveBeastTurn(
     dragonRemoved: !beastDefeated && dragonEnergyAfter <= CONFIG.energy.min,
     beastDefeated,
   };
+}
+
+// ---------- Dragon-instance helpers (pure, data-touching) ----------
+// Per the computed-not-stored contract these compose the primitive
+// formulas above with a stored `Dragon` anchor + `nowMs`. They never
+// mutate: callers persist the returned derived values only where the
+// contract allows (drain anchors, hatch writes, removals).
+
+/** Catalogue lookup by `DragonBreed.id`. Pure. */
+export function findBreed(breedId: string): DragonBreed | undefined {
+  return DRAGONS.find((b) => b.id === breedId);
+}
+
+/**
+ * Breed for a roster entry. Falls back to the first catalogue entry when
+ * the id is unknown so callers never crash on stale saves. Pure.
+ */
+export function breedForDragon(dragon: Dragon): DragonBreed {
+  return findBreed(dragon.breedId) ?? DRAGONS[0];
+}
+
+/** True once `hatchedAtMs` has been set (eggs excluded from actions). Pure. */
+export function isDragonHatched(dragon: Dragon): boolean {
+  return dragon.hatchedAtMs !== null;
+}
+
+/** Live energy at `nowMs` from the stored anchor (recovery derived). Pure. */
+export function liveEnergyForDragon(dragon: Dragon, nowMs: number): number {
+  return energyAt(dragon.energy, dragon.lastEnergyUpdateMs, nowMs);
+}
+
+/** Full age-days at `nowMs` (0 for eggs). Pure. */
+export function ageDaysForDragonInstance(dragon: Dragon, nowMs: number): number {
+  return ageDaysForDragon(dragon.hatchedAtMs, nowMs);
+}
+
+/** Lifespan countdown for the instance, floored at 0. Pure. */
+export function remainingLifespanForDragon(
+  dragon: Dragon,
+  nowMs: number,
+): number {
+  return remainingLifespanDays(breedForDragon(dragon), dragon.hatchedAtMs, nowMs);
+}
+
+/** True when a hatched dragon reached its breed lifespan. Pure. */
+export function isDragonInstanceExpired(dragon: Dragon, nowMs: number): boolean {
+  return isDragonExpired(
+    breedForDragon(dragon),
+    dragon.hatchedAtMs,
+    nowMs,
+  );
+}
+
+/** Display-only level tier for the instance. Pure. */
+export function levelForDragon(dragon: Dragon): number {
+  return levelForStrength(dragon.strength);
+}
+
+/** Current training cost for the instance's strength. Pure. */
+export function trainingCostForDragon(dragon: Dragon): number {
+  return trainingCost(dragon.strength);
+}
+
+/**
+ * Sale price for the instance. Derives age + live energy internally so
+ * callers cannot accidentally pass stored values. Pure.
+ */
+export function sellPriceForDragon(dragon: Dragon, nowMs: number): number {
+  const breed = breedForDragon(dragon);
+  return sellPrice(
+    dragon.strength,
+    ageDaysForDragonInstance(dragon, nowMs),
+    liveEnergyForDragon(dragon, nowMs),
+    breed.sellMultiplier,
+  );
+}
+
+/**
+ * A hatched dragon with live energy above 0 can Train / fight monsters /
+ * join Beast battles. Pure.
+ */
+export function canFightDragon(dragon: Dragon, nowMs: number): boolean {
+  return (
+    isDragonHatched(dragon) && canDragonFight(liveEnergyForDragon(dragon, nowMs))
+  );
+}
+
+/** Train gate for the instance (hatched + energy + coins). Pure. */
+export function canTrainDragon(
+  dragon: Dragon,
+  coins: number,
+  nowMs: number,
+): boolean {
+  if (!isDragonHatched(dragon)) return false;
+  return canTrain(liveEnergyForDragon(dragon, nowMs), coins, dragon.strength);
+}
+
+/**
+ * Beast-battle eligibility: hatched entries with live energy above 0, in
+ * roster order. Eggs never participate. Pure predicate for filtering.
+ */
+export function isBeastEligible(dragon: Dragon, nowMs: number): boolean {
+  return canFightDragon(dragon, nowMs);
 }

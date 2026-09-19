@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spritecut"
+version = "1.0.0"
+description = "Cut a grid sprite sheet (icons on white/transparent background) into individual, centred, transparent PNGs."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+keywords = ["sprite", "icon", "atlas", "sheet", "cli", "png"]
+classifiers = [
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Topic :: Multimedia :: Graphics :: Graphics Conversion",
+]
+dependencies = [
+  "Pillow>=9.0",
+  "numpy>=1.21",
+]
+
+[project.scripts]
+spritecut = "spritecut.cli:main"
+
+[tool.setuptools]
+packages = ["spritecut"]

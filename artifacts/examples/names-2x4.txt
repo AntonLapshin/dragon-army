@@ -1,0 +1,9 @@
+2 rows x 4 cols, left-to-right / top-to-bottom
+play
+pause
+stop
+record
+heart
+star
+bolt
+gear
