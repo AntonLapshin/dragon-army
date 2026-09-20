@@ -140,6 +140,16 @@ def resolve_names(
             "Part of the art may have been eaten as background (try --feather 0 or a higher "
             "--white-threshold) or the sheet layout differs from what you expect."
         )
+    if len(resolved) < len(boxes):
+        if options.auto_name:
+            for i in range(len(resolved), len(boxes)):
+                resolved.append(f"icon-{i + 1}")
+            log(f"auto-name: generated {len(boxes) - len(names)} name(s) for remaining icons")
+        else:
+            raise SystemExit(
+                f"error: {len(resolved)} name(s) given but {len(boxes)} icon(s) detected. "
+                "Use --auto-name to generate names for the remaining icons, or provide more names."
+            )
     taken: Set[str] = set()
     return [
         _unique(sanitize_name(name, f"icon-{index + 1}"), taken)
