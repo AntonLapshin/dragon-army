@@ -619,20 +619,32 @@ function renderDragon(width, view) {
 
 function renderRosterStrip(width) {
   // Bottom thumbnail navigation: tap a thumbnail to jump to that dragon/egg
-  // page. 30px left/right paddings; 5 slots fill the row exactly.
+  // page. 30px left/right paddings; always 5 slots fill the row exactly.
+  // Each slot uses the ornate misc/frame_72x72.png as its pill, with the
+  // 60x60 dragon/egg icon centered inside (6px pad). Empty slots render
+  // the frame alone so the row is stable even with no dragons/eggs.
   const list = roster();
-  if (list.length === 0) return;
+  const SLOT_N = 5;
   const thumbS = 60;
+  const frameS = 72;
   const left = 30;
   const y = DEVICE_HEIGHT - thumbS - 12;
+  const pad = Math.round((frameS - thumbS) / 2);
   let start = 0;
   let visible = list;
-  if (list.length > 5) {
+  if (list.length > SLOT_N) {
     const cur = Math.max(0, _screenIndex - 1);
-    start = Math.min(Math.max(0, cur - 2), list.length - 5);
-    visible = list.slice(start, start + 5);
+    start = Math.min(Math.max(0, cur - 2), list.length - SLOT_N);
+    visible = list.slice(start, start + SLOT_N);
   }
-  visible.forEach((d, i) => {
+  const step = (width - left * 2 - thumbS) / (SLOT_N - 1);
+  for (let i = 0; i < SLOT_N; i++) {
+    const x = Math.round(left + i * step);
+    const d = visible[i];
+    if (!d) {
+      addImg(x - pad, y - pad, frameS, frameS, 'misc/frame_72x72.png');
+      continue;
+    }
     const idx = start + i;
     let src = 'eggs/night_fury_60x60.png';
     try {
@@ -641,18 +653,10 @@ function renderRosterStrip(width) {
         ? 'eggs/' + v.breed.assetKey + '_60x60.png'
         : 'dragons/' + v.breed.assetKey + '_60x60.png';
     } catch (_) {}
-    // 5 slots: spread exactly from 30px to width-30px. Fewer: left-aligned.
-    // Each thumbnail sits on a dark pill so it stays readable over the
-    // bright bg-home artwork (72x72 overlay behind the 60x60 icon).
-    const n = visible.length;
-    const step = n >= 5 ? (width - left * 2 - thumbS) / 4 : thumbS + 8;
-    const x = Math.round(left + i * step);
-    const pillS = 72;
-    const pad = Math.round((pillS - thumbS) / 2);
     const tap = () => goTo(idx + 1);
-    addShade(x - pad, y - pad, pillS, pillS, tap);
+    addImg(x - pad, y - pad, frameS, frameS, 'misc/frame_72x72.png', tap);
     addImg(x, y, thumbS, thumbS, src, tap);
-  });
+  }
 }
 
 function renderNav(width) {
