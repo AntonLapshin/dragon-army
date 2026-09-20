@@ -3,11 +3,9 @@ import { DEVICE_WIDTH, DEVICE_HEIGHT } from '../utils/constants.js';
 import { storageAdapter } from '../utils/storageAdapter.js';
 import { timeAdapter } from '../utils/timeAdapter.js';
 import {
-  MODAL_DIM_COLOR,
   PANEL_COLOR,
   BTN_GREEN,
   BTN_GREEN_PRESS,
-  TEXT_PILL_COLOR,
   PANEL_W,
   PANEL_H,
   PANEL_X,
@@ -191,6 +189,15 @@ function addText(x, y, w, h, text, size, color, alignH) {
   );
 }
 
+// Zepp OS ignores FILL_RECT alpha, so every translucent surface (text
+// pills, modal dim, bg dimming) uses the pre-baked translucent PNG
+// misc/overlay.png instead of a semi-transparent color. The IMG widget
+// stretches it to the requested box; the source is a flat shade so any
+// target size keeps the same translucency.
+function addShade(x, y, w, h, onTap) {
+  return addImg(x, y, w, h, 'misc/overlay.png', onTap);
+}
+
 // Dark pill behind a text line so it stays readable over bright backgrounds.
 // The pill wraps the text (auto-sized + centered) instead of stretching full width.
 function addBadgeText(x, y, w, h, text, size, color, alignH) {
@@ -211,8 +218,8 @@ function addBadgeText(x, y, w, h, text, size, color, alignH) {
     pillX = Math.round(x + (w - pillW) / 2);
     textX = pillX + pad;
   }
-  push(hmUI.createWidget(hmUI.widget.FILL_RECT, {
-    x: Math.max(0, pillX), y, w: pillW, h, color: TEXT_PILL_COLOR, radius: Math.floor(h / 2),
+  push(hmUI.createWidget(hmUI.widget.IMG, {
+    x: Math.max(0, pillX), y, w: pillW, h, src: 'misc/overlay.png',
   }));
   return addText(textX, y, textW, h, str, fs, color, alignH);
 }
@@ -229,9 +236,7 @@ function addCoinRow(width, y, coins, size) {
   const pillW = totalW + pad * 2;
   const startX = Math.floor((width - pillW) / 2);
   const rowH = 32;
-  push(hmUI.createWidget(hmUI.widget.FILL_RECT, {
-    x: startX, y: y - 2, w: pillW, h: rowH, color: TEXT_PILL_COLOR, radius: 16,
-  }));
+  addShade(startX, y - 2, pillW, rowH);
   addImg(startX + pad, y, iconS, iconS, 'ui/coin.png');
   addText(startX + pad + iconS + gap, y, textW, iconS, text, size || 22, 0xffffff, hmUI.align.LEFT);
 }
@@ -285,13 +290,14 @@ function addButton(x, y, w, h, text, onTap, opts) {
 function addBar(x, y, w, value, max) {
   const pct = clamp(value / max, 0, 1);
   const fillW = Math.round(pct * (w - 6));
+  const barH = 30; // 1.5x the old 20px bar
   let color = 0xff0000;
   if (pct > 0.7) color = 0x00cc00;
   else if (pct > 0.4) color = 0xc25a2b;
-  push(hmUI.createWidget(hmUI.widget.FILL_RECT, { x, y, w, h: 20, color: 0xffffff, radius: 4 }));
+  push(hmUI.createWidget(hmUI.widget.FILL_RECT, { x, y, w, h: barH, color: 0xffffff, radius: 4 }));
   if (fillW > 0) {
     push(hmUI.createWidget(hmUI.widget.FILL_RECT, {
-      x: x + 3, y: y + 2, w: fillW, h: 16, color, radius: 3,
+      x: x + 3, y: y + 3, w: fillW, h: barH - 6, color, radius: 3,
     }));
   }
 }
@@ -488,14 +494,14 @@ function renderMain(width) {
 
   if (count > 0) {
     addBadgeText(0, 190, width, 28, 'Swipe to see dragons', 18, 0xffeeaa);
-  } else {
-    addBadgeText(0, 190, width, 24, 'Buy your first egg!', 18, 0xffffff);
   }
 
-  // Earn Coins — bottom-left, only when collectible coins exist.
+  // Earn Coins — centered horizontally, slightly below the screen center,
+  // only when collectible coins exist.
   if (economy.hasCollectible) {
-    addBadgeText(12, 326, 110, 24, '+' + economy.collectible + ' coins', 17, 0xffee88, hmUI.align.LEFT);
-    addIconButton(12, 352, 64, 'ui/coin.png', () => {
+    const coinS = 64;
+    addBadgeText(0, 236, width, 24, '+' + economy.collectible + ' coins', 17, 0xffee88);
+    addIconButton(Math.floor((width - coinS) / 2), 264, coinS, 'ui/coin.png', () => {
       openModal({ kind: 'coin-summary', amount: engine.getEconomyView().collectible });
     }, false);
   }
@@ -507,6 +513,8 @@ function renderDragon(width, view) {
   const breed = view.breed;
   const egg = view.stage === 'egg';
   addImg(0, 0, width, DEVICE_HEIGHT, 'bg/bg-dragon.png');
+  // Dim the bright bg artwork so the dragon and UI stay visible.
+  addShade(0, 0, width, DEVICE_HEIGHT);
   // Swipe layer first so it never covers tappable icons.
   addSwipeNav(width);
 
@@ -517,26 +525,35 @@ function renderDragon(width, view) {
   } else {
     addBadgeText(0, 8, width, 30, breed.name, 24, 0xffffff);
     addBadgeText(0, 42, width, 26, 'Lv ' + view.level + '  ·  Age ' + view.ageDays + 'd', 18, 0xffeeaa);
-    // Energy + strength row: both icons same size, aligned horizontally
-    // as one centered group. No dark pill behind the strength icon.
-    const statIconS = 78;
-    const statGap = 8;
+    // Energy and Strength live on their own lines, each centered
+    // horizontally as a group. The strength value gets a dark pill.
+    const barH = 30;
+    const eIconS = 56;
+    const eGap = 8;
     const eBarW = 120;
-    const strTextW = 60;
-    const strGap = 6;
-    const statTotalW = statIconS + statGap + eBarW + statGap + statIconS + strGap + strTextW;
-    const statX = Math.floor((width - statTotalW) / 2);
-    const statY = 60;
-    addImg(statX, statY, statIconS, statIconS, 'ui/energy.png');
-    addBar(statX + statIconS + statGap, statY + Math.floor((statIconS - 20) / 2), eBarW, view.energy, CONFIG.energy.max);
-    const strIconX = statX + statIconS + statGap + eBarW + statGap;
-    addImg(strIconX, statY, statIconS, statIconS, 'ui/strength.png');
-    addText(strIconX + statIconS + strGap, statY, strTextW, statIconS, String(view.strength), 22, 0xffffff, hmUI.align.LEFT);
+    const eRowW = eIconS + eGap + eBarW;
+    const eX = Math.floor((width - eRowW) / 2);
+    const eY = 70;
+    addImg(eX, eY, eIconS, eIconS, 'ui/energy.png');
+    addBar(eX + eIconS + eGap, eY + Math.floor((eIconS - barH) / 2), eBarW, view.energy, CONFIG.energy.max);
+    const sIconS = 56;
+    const sGap = 6;
+    const sPillW = 84;
+    const sPillH = 30;
+    const sRowW = sIconS + sGap + sPillW;
+    const sX = Math.floor((width - sRowW) / 2);
+    const sY = 132;
+    addImg(sX, sY, sIconS, sIconS, 'ui/strength.png');
+    addBadgeText(sX + sIconS + sGap, sY + Math.floor((sIconS - sPillH) / 2), sPillW, sPillH, String(view.strength), 22, 0xffffff, hmUI.align.LEFT);
   }
 
   const imgSize = 240;
   const imgX = Math.floor((width - imgSize) / 2);
-  const imgY = 154;
+  const imgY = 194;
+  // Ground shadow under the egg / dragon (drawn first so it stays behind).
+  const shW = 114;
+  const shH = 28;
+  addImg(Math.floor((width - shW) / 2), imgY + imgSize - 14, shW, shH, 'misc/shadow.png');
   if (egg) {
     addImg(imgX, imgY, imgSize, imgSize, 'eggs/' + breed.assetKey + '.png');
   } else {
@@ -546,7 +563,7 @@ function renderDragon(width, view) {
   // Bottom row — Home is pinned bottom-right so it never moves, even when
   // other icons are hidden. Eggs show just Home; hatched dragons show
   // Train / Sell / (Danger) on the left, with Danger hidden when no monsters wait.
-  const rowY = DEVICE_HEIGHT - 96;
+  const rowY = DEVICE_HEIGHT - 96 + 5;
   const iconS = 84;
   const homeX = width - iconS - 12;
   const homeY = rowY - 24;
@@ -584,9 +601,11 @@ function renderNav(width) {
 function renderModalShell(title, locked) {
   const width = DEVICE_WIDTH;
   // Dim overlay with a no-op tap so it also swallows clicks in the web
-  // runner (where a non-clickable FILL_RECT has pointer-events:none and
+  // runner (where a non-clickable layer has pointer-events:none and
   // would let clicks fall through to icons behind the modal).
-  addRect(0, 0, width, DEVICE_HEIGHT, MODAL_DIM_COLOR, 0, () => {});
+  // Uses misc/overlay.png: Zepp OS ignores FILL_RECT alpha, so a
+  // pre-baked translucent image does the dimming instead.
+  addShade(0, 0, width, DEVICE_HEIGHT, () => {});
   addRect(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, PANEL_COLOR, 20);
   addText(PANEL_X, PANEL_Y + 12, PANEL_W, 34, title, 22, 0xffffff);
   if (!locked) {

@@ -55,6 +55,11 @@ function imageUrl(src) {
 
 function renderIMG(widget) {
   const p = widget._props;
+  // misc/overlay.png is a flat shade stretched over FILL_RECT-sized boxes
+  // (text pills, modal dim) because Zepp OS ignores FILL_RECT alpha. The
+  // device stretches IMG to w/h, so preview it with fill; every other
+  // asset keeps contain.
+  const isShade = typeof p.src === "string" && p.src.indexOf("overlay") !== -1;
   return (
     <img
       key={widget._id}
@@ -62,7 +67,7 @@ function renderIMG(widget) {
       alt=""
       style={{
         ...baseStyle(p),
-        objectFit: "contain",
+        objectFit: isShade ? "fill" : "contain",
         pointerEvents: widget._events.click ? "auto" : "none",
         userSelect: "none",
       }}
