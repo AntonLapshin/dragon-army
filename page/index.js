@@ -493,9 +493,10 @@ function renderMain(width) {
     openModal({ kind: 'beast-intro' });
   }, false);
 
-  addBadgeText(0, 190, width, 28, 'Swipe to see dragons', 18, 0xffeeaa);
-  if (count === 0) {
-    addBadgeText(0, 222, width, 24, 'Buy your first egg!', 18, 0xffffff);
+  if (count > 0) {
+    addBadgeText(0, 190, width, 28, 'Swipe to see dragons', 18, 0xffeeaa);
+  } else {
+    addBadgeText(0, 190, width, 24, 'Buy your first egg!', 18, 0xffffff);
   }
 
   // Earn Coins — bottom-left, only when collectible coins exist.
@@ -585,7 +586,7 @@ function renderModalShell(title, locked) {
 function renderEggSpin() {
   const modal = _modal;
   if (modal.blocked) {
-    renderModalShell('Get a New Egg', false);
+    renderModalShell('Get a New Egg', true);
     const full = modal.reason === 'roster-full';
     addText(PANEL_X + 20, PANEL_Y + 90, PANEL_W - 40, 40, full ? 'Roster is full' : 'Not enough coins', 22, 0xff8888);
     if (!full) {
@@ -594,12 +595,11 @@ function renderEggSpin() {
     addButton(PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'OK', null, { normal: 0x555555 });
     return;
   }
-  renderModalShell('Get a New Egg', false);
+  renderModalShell('Get a New Egg', true);
   if (modal.spinning) {
-    const symbols = CONFIG.ui.eggSpinSymbols;
-    addText(PANEL_X + 20, PANEL_Y + 80, PANEL_W - 40, 90, symbols[modal.symbolIdx] || '?', 64, 0xffee88);
-    addText(PANEL_X + 20, PANEL_Y + 180, PANEL_W - 40, 30, 'Tap Stop to lock breed', 19, 0xdddddd);
-    addButton(PANEL_X + 90, PANEL_Y + 220, 160, 48, 'Stop', stopEggSpin);
+    addText(PANEL_X + 20, PANEL_Y + 80, PANEL_W - 40, 90, '?', 64, 0xffee88);
+    addText(PANEL_X + 20, PANEL_Y + 180, PANEL_W - 40, 30, 'Tap Reveal to see breed', 19, 0xdddddd);
+    addButton(PANEL_X + 90, PANEL_Y + 220, 160, 48, 'Reveal', stopEggSpin);
   } else {
     const breed = breedForIndex(modal.breedIndex);
     addImg(PANEL_X + 130, PANEL_Y + 60, 80, 80, 'eggs/' + breed.assetKey + '.png');
@@ -725,7 +725,7 @@ function renderBeastIntro() {
   const team = engine.getBeastParticipants();
   addText(
     PANEL_X + 20, PANEL_Y + 212, PANEL_W - 40, 30,
-    team.length === 0 ? 'No dragons ready (0 energy)' : team.length + ' dragon(s) ready',
+    team.length === 0 ? 'No dragons ready' : team.length + ' dragon(s) ready',
     18, team.length === 0 ? 0xff8888 : 0xaaffaa,
   );
   if (team.length > 0) {
