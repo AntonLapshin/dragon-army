@@ -11,8 +11,8 @@ import {
   PANEL_X,
   PANEL_Y,
 } from './index.style.js';
-import { CONFIG, MONSTERS, breedForIndex, clamp } from '../engine/config';
-import { createGameEngine, createNewGameState } from '../engine/engine';
+import { CONFIG, MONSTERS, breedForIndex, clamp } from '../engine/config.js';
+import { createGameEngine, createNewGameState } from '../engine/engine.js';
 
 /**
  * Dragon Army — thin UI layer (screens + modals, see docs/interface.md).

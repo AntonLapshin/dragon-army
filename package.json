@@ -9,7 +9,8 @@
     "test": "vitest run --config vitest.config.mjs",
     "test:watch": "vitest --config vitest.config.mjs",
     "lint": "npx -y prettier --check shared/ web/src/",
-    "optimize": "node optimize/optimize.mjs"
+    "optimize": "node optimize/optimize.mjs",
+    "build:engine": "node scripts/build-engine.mjs"
   },
   "devDependencies": {
     "@zeppos/device-types": "^3.0.0",
