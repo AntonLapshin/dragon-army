@@ -113,13 +113,13 @@ describe("rollIntInclusive", () => {
 
 describe("economy", () => {
   describe("maxUncollectedCoins", () => {
-    it("equals hourlyCoins * maxUncollectedHours (12 * 12 = 144)", () => {
+    it("equals hourlyCoins * maxUncollectedHours (2 * 12 = 24)", () => {
       expect(maxUncollectedCoins()).toBe(
         CONFIG.economy.hourlyCoins *
           (CONFIG.economy.maxUncollectedMs /
             CONFIG.economy.coinAccrualIntervalMs),
       );
-      expect(maxUncollectedCoins()).toBe(144);
+      expect(maxUncollectedCoins()).toBe(24);
     });
   });
 
@@ -140,9 +140,9 @@ describe("economy", () => {
       expect(collectibleCoins(5 * HOUR)).toBe(5 * CONFIG.economy.hourlyCoins);
     });
     it("caps at maxUncollectedCoins", () => {
-      expect(collectibleCoins(12 * HOUR)).toBe(144);
-      expect(collectibleCoins(24 * HOUR)).toBe(144);
-      expect(collectibleCoins(1000 * HOUR)).toBe(144);
+      expect(collectibleCoins(12 * HOUR)).toBe(maxUncollectedCoins());
+      expect(collectibleCoins(24 * HOUR)).toBe(maxUncollectedCoins());
+      expect(collectibleCoins(1000 * HOUR)).toBe(maxUncollectedCoins());
     });
     it("returns 0 for non-positive elapsed", () => {
       expect(collectibleCoins(-1000)).toBe(0);
@@ -600,8 +600,8 @@ describe("battle", () => {
       expect(rollSpawnedMonsters(() => 0.999)).toHaveLength(0);
     });
     it("rolls independently per difficulty (sequence stub)", () => {
-      // Easy 0.65 pass, Medium 0.28 fail, Hard 0.12 fail
-      const seq = [0.5, 0.5, 0.5];
+      // Easy 0.33 pass, Medium 0.20 fail, Hard 0.10 fail
+      const seq = [0.1, 0.5, 0.5];
       let i = 0;
       const spawned = rollSpawnedMonsters(() => seq[i++ % seq.length]);
       expect(spawned.map((m) => m.difficulty)).toEqual(["Easy"]);

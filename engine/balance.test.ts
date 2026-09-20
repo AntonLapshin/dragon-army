@@ -114,17 +114,18 @@ describe("orientir: energy recovery", () => {
     expect(recoverEnergy(0, 8 * HOUR)).toBeCloseTo(80);
   });
 
-  it("recovers a typical Easy-fight wound (avg ~9) in about 1h", () => {
-    // Easy win loss avg = (6+12)/2 = 9
-    const afterEasyWin = 100 - 9;
-    expect(recoverEnergy(afterEasyWin, HOUR)).toBe(100);
+  it("recovers a typical Easy-fight wound (avg ~85 win) in about a day-shift (8-10h)", () => {
+    // Easy win loss avg = (70+100)/2 = 85 -> 100-85 = 15 left
+    const afterEasyWin = 100 - 85;
+    expect(recoverEnergy(afterEasyWin, 9 * HOUR)).toBe(100);
+    expect(recoverEnergy(afterEasyWin, 8 * HOUR)).toBeGreaterThanOrEqual(90);
   });
 
-  it("recovers a typical Hard-fight wound (avg ~18 win / ~28 lose) in 2-3h", () => {
-    const afterHardWin = 100 - 18;
-    const afterHardLoss = 100 - 28;
-    expect(recoverEnergy(afterHardWin, 2 * HOUR)).toBe(100);
-    expect(recoverEnergy(afterHardLoss, 3 * HOUR)).toBe(100);
+  it("recovers even the heaviest wounds (95-100) within a day", () => {
+    const afterHardLoss = 100 - 97;
+    expect(recoverEnergy(afterHardLoss, 10 * HOUR)).toBe(100);
+    // full 0 -> 100 takes exactly 10h at 10/h — well within a day
+    expect(recoverEnergy(0, 24 * HOUR)).toBe(100);
   });
 
   it("energyAt() derives the same curve from stored anchors (no tick writes)", () => {
@@ -141,36 +142,42 @@ describe("orientir: coin pacing -> egg", () => {
     );
   });
 
-  it("a broke player earns an egg (100 coins) after 9h of passive income", () => {
-    // discrete hourly accrual: 8h -> 96 < 100, 9h -> 108 >= 100
-    expect(collectibleCoins(8 * HOUR)).toBeLessThan(CONFIG.egg.price);
-    expect(collectibleCoins(9 * HOUR)).toBeGreaterThanOrEqual(
+  it("a broke player earns an egg (100 coins) after ~50h of passive income (2/h)", () => {
+    // diligent taps (no cap hit): 49h -> 98 < 100, 50h -> 100 >= 100
+    expect(49 * CONFIG.economy.hourlyCoins).toBeLessThan(CONFIG.egg.price);
+    expect(50 * CONFIG.economy.hourlyCoins).toBeGreaterThanOrEqual(
       CONFIG.egg.price,
     );
+    // single-tap accrual caps at 12h (24 coins) — the player must tap along
+    // the way; design target: casual play (half collected, sleep/school
+    // misses) stretches this to ~5 days — see finetune.test.ts scenario 3
+    expect(collectibleCoins(50 * HOUR)).toBe(maxUncollectedCoins());
   });
 
-  it("uncollected coins cap at 12h (144) — a full day offline still yields one egg + change", () => {
-    expect(maxUncollectedCoins()).toBe(144);
-    expect(collectibleCoins(24 * HOUR)).toBe(144);
-    expect(collectibleCoins(24 * HOUR)).toBeGreaterThanOrEqual(
-      CONFIG.egg.price,
-    );
+  it("uncollected coins cap at 12h (24) — passive alone is a slow trickle", () => {
+    expect(maxUncollectedCoins()).toBe(24);
+    expect(collectibleCoins(24 * HOUR)).toBe(24);
+    expect(collectibleCoins(24 * HOUR)).toBeLessThan(CONFIG.egg.price);
   });
 
-  it("hourly income funds ~0.7 trainings/h early, ~0.2-0.3 late (matches balanceTargets)", () => {
+  it("hourly income (2/h) covers only a fraction of a training — fights fund training", () => {
     const earlyCost = trainingCost(11); // fresh common hatch
     const lateCost = trainingCost(55); // hard-ready
     expect(earlyCost).toBe(16);
     expect(lateCost).toBe(52);
-    expect(CONFIG.economy.hourlyCoins / earlyCost).toBeCloseTo(0.75, 1);
+    // passive-only rate: ~0.125 trainings/h early, ~0.04 late
+    expect(CONFIG.economy.hourlyCoins / earlyCost).toBeCloseTo(0.125, 2);
     const lateRate = CONFIG.economy.hourlyCoins / lateCost;
-    expect(lateRate).toBeGreaterThan(0.15);
-    expect(lateRate).toBeLessThan(0.35);
+    expect(lateRate).toBeGreaterThan(0.02);
+    expect(lateRate).toBeLessThan(0.08);
+    // one Easy win (~20 avg) ≈ 10h of passive income
+    const easyAvg = (MONSTERS[0].rewardMin + MONSTERS[0].rewardMax) / 2;
+    expect(easyAvg / CONFIG.economy.hourlyCoins).toBeCloseTo(10, 0);
   });
 });
 
 describe("orientir: monster spawn distribution", () => {
-  it("long-run spawn rates match spawnChance (Easy ~65%, Medium ~28%, Hard ~12%)", () => {
+  it("long-run spawn rates match spawnChance (Easy ~33%, Medium ~20%, Hard ~10%)", () => {
     const rng = mulberry32(42);
     const N = 20_000;
     const counts = [0, 0, 0];
@@ -180,18 +187,18 @@ describe("orientir: monster spawn distribution", () => {
       }
     }
     const [easy, medium, hard] = counts.map((c) => c / N);
-    expect(easy).toBeGreaterThan(0.62);
-    expect(easy).toBeLessThan(0.68);
-    expect(medium).toBeGreaterThan(0.25);
-    expect(medium).toBeLessThan(0.31);
-    expect(hard).toBeGreaterThan(0.10);
-    expect(hard).toBeLessThan(0.14);
+    expect(easy).toBeGreaterThan(0.3);
+    expect(easy).toBeLessThan(0.36);
+    expect(medium).toBeGreaterThan(0.17);
+    expect(medium).toBeLessThan(0.23);
+    expect(hard).toBeGreaterThan(0.08);
+    expect(hard).toBeLessThan(0.12);
     // ordering: easy shows up most often
     expect(easy).toBeGreaterThan(medium);
     expect(medium).toBeGreaterThan(hard);
   });
 
-  it("shows ~1 monster on average, empty ~22% of the time", () => {
+  it("shows ~0.6 monsters on average, empty ~48% of the time (hourly roll)", () => {
     const rng = mulberry32(7);
     const N = 20_000;
     let total = 0;
@@ -202,11 +209,18 @@ describe("orientir: monster spawn distribution", () => {
       total += shown;
       if (shown === 0) empty++;
     }
-    // expected mean = 0.65+0.28+0.12 = 1.05; P(empty) = .35*.72*.88 ≈ .22
-    expect(total / N).toBeGreaterThan(0.95);
-    expect(total / N).toBeLessThan(1.15);
-    expect(empty / N).toBeGreaterThan(0.19);
-    expect(empty / N).toBeLessThan(0.25);
+    // expected mean = 0.33+0.20+0.10 = 0.63; P(empty) = .67*.80*.90 ≈ .48
+    expect(total / N).toBeGreaterThan(0.55);
+    expect(total / N).toBeLessThan(0.72);
+    expect(empty / N).toBeGreaterThan(0.44);
+    expect(empty / N).toBeLessThan(0.52);
+  });
+
+  it("Easy shows up ~6-8 times a day on hourly rolls", () => {
+    // 24 hourly rolls * 0.33 ≈ 7.9/day
+    expect(24 * MONSTERS[0].spawnChance).toBeGreaterThan(6);
+    expect(24 * MONSTERS[0].spawnChance).toBeLessThan(10);
+    expect(CONFIG.monsterSpawn.refreshIntervalMs).toBe(HOUR);
   });
 });
 
@@ -220,13 +234,24 @@ describe("orientir: training progression -> Easy / Medium / Hard", () => {
     }
   });
 
-  it("fresh common hatch (~11) needs ~1-2 trainings for Easy (target: hatch + 1-2)", () => {
-    // Easy strength 15: strength 11 wins only with bonus>=4 (~64%),
-    // strength 16+ (one avg training) always wins (16+0 >= 15).
-    expect(monsterWinRate(11, 0, 3000, 1)).toBeGreaterThan(0.5);
-    expect(monsterWinRate(11, 0, 3000, 1)).toBeLessThan(0.8);
-    expect(monsterWinRate(16, 0, 500, 2)).toBe(1);
-    expect(monsterWinRate(21, 0, 500, 3)).toBe(1);
+  it("fresh common hatch (~11) usually LOSES to Easy-19 (~25% win); reliable after 2-3 trainings", () => {
+    // Easy strength 19: strength 11 wins only with bonus>=8 (3/11 ≈ 27%)
+    const freshRate = monsterWinRate(11, 0, 3000, 1);
+    expect(freshRate).toBeGreaterThan(0.15);
+    expect(freshRate).toBeLessThan(0.4);
+    // weakest hatch (8) can never win (needs bonus>=11, max 10)
+    expect(monsterWinRate(8, 0, 500, 9)).toBe(0);
+    // after ~2 avg trainings (11 -> 21) the dragon beats Easy reliably
+    expect(monsterWinRate(21, 0, 500, 3)).toBeGreaterThan(0.9);
+    // a win costs almost all energy (70-100 loss -> 0-30 left)
+    const rng = mulberry32(21);
+    for (let i = 0; i < 200; i++) {
+      const r = resolveMonsterFight(21, 100, MONSTERS[0], rng(), rng(), rng());
+      if (r.won) {
+        expect(r.energyAfter).toBeLessThanOrEqual(30);
+        expect(r.energyAfter).toBeGreaterThanOrEqual(0);
+      }
+    }
   });
 
   it("Medium (~32) becomes favored at strength ~30 after ~3-5 trainings", () => {
@@ -326,15 +351,17 @@ describe("orientir: Bewilder Beast (boss)", () => {
 });
 
 describe("orientir: ideal-playthrough cost model (egg -> beast-ready)", () => {
-  it("reaching Medium-ready (~30 str) costs < 150 passive coins (~4 trainings from hatch)", () => {
+  it("reaching Medium-ready (~30 str) costs < 150 coins (~4 trainings from hatch)", () => {
     // 11->16 (16) + 16->21 (20) + 21->26 (24) + 26->31 (28) = 88
     const costs = [11, 16, 21, 26].map(trainingCost);
     const total = costs.reduce((a, b) => a + b, 0);
     expect(total).toBeLessThan(150);
-    expect(total / CONFIG.economy.hourlyCoins).toBeLessThan(13); // <13h passive
+    // at 2/h passive this is ~44h of idle income — active Easy wins (~20
+    // each, minus a ~10h recovery) are the intended accelerator
+    expect(total / CONFIG.economy.hourlyCoins).toBeLessThan(50);
   });
 
-  it("reaching Hard-ready (~55 str) costs < 400 passive coins (~9 trainings)", () => {
+  it("reaching Hard-ready (~55 str) costs < 400 coins (~9 trainings)", () => {
     let strength = 11;
     let total = 0;
     for (let i = 0; i < 9; i++) {
@@ -343,8 +370,8 @@ describe("orientir: ideal-playthrough cost model (egg -> beast-ready)", () => {
     }
     expect(strength).toBeGreaterThanOrEqual(55);
     expect(total).toBeLessThan(400);
-    // ~2 Medium wins (≈90) + ~20h passive covers it — active play matters
-    expect(total).toBeLessThan(2 * 55 + 20 * CONFIG.economy.hourlyCoins);
+    // ~2 Medium wins (≈90) + ~100h passive trickle (200) covers it
+    expect(total).toBeLessThan(2 * 55 + 100 * CONFIG.economy.hourlyCoins);
   });
 
   it("a 3-dragon beast roster fits comfortably inside the 30-45d lifespan", () => {
