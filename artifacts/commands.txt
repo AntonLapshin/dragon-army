@@ -5,8 +5,7 @@ Eggs
 venv/bin/python -m spritecut.cli ../raw/eggs.png -s 300x300 -n "night_fury light_fury light_night night_light wooly_howl deadly_nadder razorwhip triple_stryke stormcutter songwing monstrous_nightmare skrill gronkle hideous_zippleback windwalker snowtail" -o ../assets/eggs -g 4x4 --margin 0
 
 Dragons
-venv/bin/python -m spritecut.cli ../raw/dragons.png -s 300x300 -n "night_fury light_fury light_night night_light wooly_howl deadly_nadder razorwhip tr
-iple_stryke stormcutter songwing monstrous_nightmare skrill gronkle hideous_zippleback windwalker snowtail" -o ../assets/dragons -g 4x4 --margin 0
+venv/bin/python -m spritecut.cli ../raw/dragons.png -s 300x300 -n "night_fury light_fury light_night night_light wooly_howl deadly_nadder razorwhip triple_stryke stormcutter songwing monstrous_nightmare skrill gronkle hideous_zippleback windwalker snowtail" -o ../assets/dragons -g 4x4 --margin 0
 
 Monsters
 venv/bin/python -m spritecut.cli ../raw/monsters.png -s 128x128 -n "bewilder_beast gronkle deadly_nadder monstrous_nightmare" -o ../assets/monsters -g

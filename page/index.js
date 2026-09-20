@@ -465,7 +465,7 @@ function openLockedFight(base, lines, outcome) {
 function renderMain(width) {
   const economy = engine.getEconomyView();
   const count = roster().length;
-  addImg(0, 0, width, DEVICE_HEIGHT, 'ui/bg-home.png');
+  addImg(0, 0, width, DEVICE_HEIGHT, 'bg/bg-home.png');
   // Swipe layer first so it never covers tappable icons.
   addSwipeNav(width);
   addBadgeText(0, 8, width, 30, 'Dragons: ' + engine.hatchedCount(), 24, 0xffffff);
@@ -501,7 +501,7 @@ function renderMain(width) {
 function renderDragon(width, view) {
   const breed = view.breed;
   const egg = view.stage === 'egg';
-  addImg(0, 0, width, DEVICE_HEIGHT, 'ui/bg-dragon.png');
+  addImg(0, 0, width, DEVICE_HEIGHT, 'bg/bg-dragon.png');
   // Swipe layer first so it never covers tappable icons.
   addSwipeNav(width);
 
