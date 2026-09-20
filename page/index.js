@@ -232,7 +232,7 @@ function addCoinRow(width, y, coins, size) {
   push(hmUI.createWidget(hmUI.widget.FILL_RECT, {
     x: startX, y: y - 2, w: pillW, h: rowH, color: TEXT_PILL_COLOR, radius: 16,
   }));
-  addImg(startX + pad, y, iconS, iconS, 'coin.png');
+  addImg(startX + pad, y, iconS, iconS, 'ui/coin.png');
   addText(startX + pad + iconS + gap, y, textW, iconS, text, size || 22, 0xffffff, hmUI.align.LEFT);
 }
 
@@ -297,18 +297,6 @@ function addBar(x, y, w, value, max) {
 }
 
 function addIconButton(x, y, size, src, onTap, dimmed) {
-  // Dark pill behind the icon so it stays readable over bright backgrounds.
-  const pad = 8;
-  const pillX = Math.max(0, x - pad);
-  const pillY = Math.max(0, y - pad);
-  const pillS = size + pad * 2;
-  if (dimmed) {
-    push(hmUI.createWidget(hmUI.widget.FILL_RECT, {
-      x: pillX, y: pillY, w: pillS, h: pillS, color: TEXT_PILL_COLOR, radius: 20,
-    }));
-  } else {
-    addRect(pillX, pillY, pillS, pillS, TEXT_PILL_COLOR, 20, onTap);
-  }
   addImg(x, y, size, size, src, dimmed ? null : onTap);
   if (dimmed) {
     push(hmUI.createWidget(hmUI.widget.FILL_RECT, {
@@ -477,7 +465,7 @@ function openLockedFight(base, lines, outcome) {
 function renderMain(width) {
   const economy = engine.getEconomyView();
   const count = roster().length;
-  addImg(0, 0, width, DEVICE_HEIGHT, 'bg-home.png');
+  addImg(0, 0, width, DEVICE_HEIGHT, 'ui/bg-home.png');
   // Swipe layer first so it never covers tappable icons.
   addSwipeNav(width);
   addBadgeText(0, 8, width, 30, 'Dragons: ' + engine.hatchedCount(), 24, 0xffffff);
@@ -486,10 +474,10 @@ function renderMain(width) {
   addCoinRow(width, 42, economy.coins, 22);
 
   // Buy Egg — top-left, icon only (no label). Dimmed when coins insufficient.
-  addIconButton(12, 84, 64, 'egg.png', startEggSpin, !economy.canAffordEgg);
+  addIconButton(12, 84, 64, 'ui/egg.png', startEggSpin, !economy.canAffordEgg);
 
   // Bewilder Beast — top-right, icon only, always visible.
-  addIconButton(width - 76, 84, 64, 'monsters/bewilder_beast.png', () => {
+  addIconButton(width - 76, 84, 64, 'ui/bewilder_beast.png', () => {
     openModal({ kind: 'beast-intro' });
   }, false);
 
@@ -502,7 +490,7 @@ function renderMain(width) {
   // Earn Coins — bottom-left, only when collectible coins exist.
   if (economy.hasCollectible) {
     addBadgeText(12, 326, 110, 24, '+' + economy.collectible + ' coins', 17, 0xffee88, hmUI.align.LEFT);
-    addIconButton(12, 352, 64, 'coin.png', () => {
+    addIconButton(12, 352, 64, 'ui/coin.png', () => {
       openModal({ kind: 'coin-summary', amount: engine.getEconomyView().collectible });
     }, false);
   }
@@ -513,7 +501,7 @@ function renderMain(width) {
 function renderDragon(width, view) {
   const breed = view.breed;
   const egg = view.stage === 'egg';
-  addImg(0, 0, width, DEVICE_HEIGHT, 'bg-dragon.png');
+  addImg(0, 0, width, DEVICE_HEIGHT, 'ui/bg-dragon.png');
   // Swipe layer first so it never covers tappable icons.
   addSwipeNav(width);
 
@@ -522,7 +510,7 @@ function renderDragon(width, view) {
     addBadgeText(0, 42, width, 26, 'Egg', 18, 0xffeeaa);
   } else {
     addBadgeText(0, 42, width, 26, 'Lv ' + view.level + '  ·  Age ' + view.ageDays + 'd', 18, 0xffeeaa);
-    addImg(24, 72, 26, 26, 'energy.png');
+    addImg(24, 72, 26, 26, 'ui/energy.png');
     addBar(56, 75, 200, view.energy, CONFIG.energy.max);
     addBadgeText(262, 70, 104, 28, Math.round(view.energy) + '', 18, 0xffffff, hmUI.align.LEFT);
     addBadgeText(0, 102, width, 26, 'Strength ' + view.strength, 20, 0xffffff);
@@ -540,22 +528,18 @@ function renderDragon(width, view) {
   // Bottom row — hatched dragons only, icon-only buttons equally spaced.
   if (!egg) {
     const rowY = DEVICE_HEIGHT - 96;
-    const cellW = Math.floor(width / 3);
+    const cellW = Math.floor(width / 4);
     const iconS = 56;
     const cells = [
-      { src: 'training.png', dimmed: view.energy <= 0 },
-      { src: 'sell.png', dimmed: false },
-      { src: 'monster.png', dimmed: view.energy <= 0 },
+      { src: 'ui/training.png', dimmed: view.energy <= 0, tap: () => openModal({ kind: 'train', dragonId: view.dragon.id }) },
+      { src: 'ui/sell.png', dimmed: false, tap: () => openModal({ kind: 'sell', dragonId: view.dragon.id }) },
+      { src: 'ui/danger.png', dimmed: view.energy <= 0, tap: () => openMonsterSelect(view.dragon.id) },
+      { src: 'ui/home.png', dimmed: false, tap: () => goTo(0) },
     ];
     cells.forEach((cell, i) => {
       const cx = i * cellW;
       const ix = cx + Math.floor((cellW - iconS) / 2);
-      const tap = i === 0
-        ? () => openModal({ kind: 'train', dragonId: view.dragon.id })
-        : i === 1
-          ? () => openModal({ kind: 'sell', dragonId: view.dragon.id })
-          : () => openMonsterSelect(view.dragon.id);
-      addIconButton(ix, rowY + 4, iconS, cell.src, tap, cell.dimmed);
+      addIconButton(ix, rowY + 4, iconS, cell.src, cell.tap, cell.dimmed);
     });
   }
 
@@ -579,7 +563,7 @@ function renderModalShell(title, locked) {
   addRect(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, PANEL_COLOR, 20);
   addText(PANEL_X, PANEL_Y + 12, PANEL_W, 34, title, 22, 0xffffff);
   if (!locked) {
-    addImg(PANEL_X + PANEL_W - 46, PANEL_Y + 8, 36, 36, 'close.png', closeModal);
+    addImg(PANEL_X + PANEL_W - 46, PANEL_Y + 8, 36, 36, 'ui/close.png', closeModal);
   }
 }
 
@@ -597,7 +581,7 @@ function renderEggSpin() {
   }
   renderModalShell('Get a New Egg', true);
   if (modal.spinning) {
-    addText(PANEL_X + 20, PANEL_Y + 80, PANEL_W - 40, 90, '?', 64, 0xffee88);
+    addImg(PANEL_X + 130, PANEL_Y + 80, 80, 80, 'ui/dice.png');
     addText(PANEL_X + 20, PANEL_Y + 180, PANEL_W - 40, 30, 'Tap Reveal to see breed', 19, 0xdddddd);
     addButton(PANEL_X + 90, PANEL_Y + 220, 160, 48, 'Reveal', stopEggSpin);
   } else {
@@ -638,7 +622,7 @@ function renderTrain() {
 
 function renderTrainResult() {
   renderModalShell('Training', false);
-  addImg(PANEL_X + 140, PANEL_Y + 70, 60, 60, 'victory.png');
+  addImg(PANEL_X + 140, PANEL_Y + 70, 60, 60, 'ui/victory.png');
   addText(PANEL_X + 20, PANEL_Y + 150, PANEL_W - 40, 60, _modal.text || '', 20, 0xaaffaa);
   addButton(PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'OK', closeModal);
 }
@@ -701,7 +685,7 @@ function renderMonsterFight() {
   }
   renderFightLines();
   if (!modal.locked && modal.outcome) {
-    addImg(PANEL_X + 140, PANEL_Y + PANEL_H - 140, 60, 60, modal.outcome.won ? 'victory.png' : 'loss.png');
+    addImg(PANEL_X + 140, PANEL_Y + PANEL_H - 140, 60, 60, modal.outcome.won ? 'ui/victory.png' : 'ui/loss.png');
     addText(
       PANEL_X + 20, PANEL_Y + PANEL_H - 76, PANEL_W - 40, 28,
       modal.outcome.won ? '+' + modal.outcome.reward + ' coins' : '0 energy? rest to recover',
@@ -713,7 +697,7 @@ function renderMonsterFight() {
 function renderBeastIntro() {
   const beast = engine.getState().beast;
   renderModalShell(CONFIG.beast.name, false);
-  addImg(PANEL_X + 110, PANEL_Y + 56, 120, 90, 'monsters/bewilder_beast.png');
+  addImg(PANEL_X + 110, PANEL_Y + 56, 120, 90, 'ui/bewilder_beast.png');
   if (beast.status !== 'alive') {
     const now = timeAdapter.getTime();
     const hrs = Math.max(1, Math.ceil(((beast.respawnAtMs || now) - now) / CONFIG.economy.coinAccrualIntervalMs));
@@ -739,7 +723,7 @@ function renderBeastFight() {
   const modal = _modal;
   const beast = engine.getState().beast;
   renderModalShell('Beast Battle', modal.locked);
-  addImg(PANEL_X + 30, PANEL_Y + 56, 72, 72, 'monsters/bewilder_beast.png');
+  addImg(PANEL_X + 30, PANEL_Y + 56, 72, 72, 'ui/bewilder_beast.png');
   const hp = modal.outcome && modal.revealed >= modal.lines.length
     ? modal.outcome.hpAfter
     : beast.currentHp;
@@ -764,7 +748,7 @@ function renderBeastFight() {
 
 function renderCoinSummary() {
   renderModalShell('Coins', false);
-  addImg(PANEL_X + 140, PANEL_Y + 70, 60, 60, 'coin.png');
+  addImg(PANEL_X + 140, PANEL_Y + 70, 60, 60, 'ui/coin.png');
   addText(
     PANEL_X + 20, PANEL_Y + 150, PANEL_W - 40, 60,
     '+' + _modal.amount + ' coins added',
