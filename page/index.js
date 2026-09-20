@@ -512,9 +512,9 @@ function renderDragon(width, view) {
   // Swipe layer first so it never covers tappable icons.
   addSwipeNav(width);
 
-if (egg) {
+  if (egg) {
      // Still hatching: hide the breed so the dragon stays a surprise.
-     addBadgeText(0, 8, width, 30, 'Egg', 24, 0xffffff);
+     // addBadgeText(0, 8, width, 30, 'Egg', 24, 0xffffff);
    } else {
      addBadgeText(0, 8, width, 30, breed.name, 24, 0xffffff);
      addBadgeText(0, 42, width, 26, 'Lv ' + view.level + '  ·  Age ' + view.ageDays + 'd', 18, 0xffeeaa);
@@ -526,7 +526,7 @@ if (egg) {
    // Ground shadow under the egg / dragon (drawn first so it stays behind).
    const shW = 114;
    const shH = 28;
-   addImg(Math.floor((width - shW) / 2), imgY + imgSize - 14, shW, shH, 'misc/shadow.png');
+   addImg(Math.floor((width - shW) / 2), imgY + imgSize - 22, shW, shH, 'misc/shadow.png');
    if (egg) {
      addImg(imgX, imgY, imgSize, imgSize, 'eggs/' + breed.assetKey + '.png');
    } else {

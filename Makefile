@@ -1,0 +1,53 @@
+.PHONY: data bg misc sprites optimize zepp clean help
+
+# Full data pipeline: raw/ -> assets/ -> assets/default.{b,r,s}
+data: bg misc sprites optimize zepp
+
+# 1) Backgrounds: raw/ -> assets/bg/
+bg:
+	mkdir -p assets/bg
+	cp raw/bg-dragon.png assets/bg/bg-dragon.png
+	cp raw/bg-home.png assets/bg/bg-home.png
+
+# 2) Overlay + shadow: raw/ -> assets/misc/
+misc:
+	mkdir -p assets/misc
+	cp raw/overlay.png assets/misc/overlay.png
+	cp raw/shadow.png assets/misc/shadow.png
+
+# 3) Sprite sheets -> individual PNGs (must run from sprites/ dir),
+# then drop unused "_" placeholders.
+sprites:
+	cd sprites && venv/bin/python -m spritecut.cli ../raw/ui-icons.png -s 96x96 -n "egg _coin energy sell victory loss danger training strength dice home coin _shop _monster bewilder_beast close" -o ../assets/ui -g 4x4 --margin 0
+	cd sprites && venv/bin/python -m spritecut.cli ../raw/eggs.png -s 300x300 -n "night_fury light_fury light_night night_light wooly_howl deadly_nadder razorwhip triple_stryke stormcutter songwing monstrous_nightmare skrill gronkle hideous_zippleback windwalker snowtail" -o ../assets/eggs -g 4x4 --margin 0
+	cd sprites && venv/bin/python -m spritecut.cli ../raw/dragons.png -s 300x300 -n "night_fury light_fury light_night night_light wooly_howl deadly_nadder razorwhip triple_stryke stormcutter songwing monstrous_nightmare skrill gronkle hideous_zippleback windwalker snowtail" -o ../assets/dragons -g 4x4 --margin 0
+	cd sprites && venv/bin/python -m spritecut.cli ../raw/monsters.png -s 128x128 -n "bewilder_beast gronkle deadly_nadder monstrous_nightmare" -o ../assets/monsters -g 2x2 --margin 0
+	rm -f assets/ui/_*.png assets/eggs/_*.png assets/dragons/_*.png assets/monsters/_*.png
+
+# 4) Optimize all PNGs in place (sharp-based, see optimize/README.md).
+optimize:
+	node optimize/optimize.mjs assets
+
+# 5) Zepp OS per-device variants (mirrors koala: identical
+# assets/default.b, assets/default.r, assets/default.s).
+zepp:
+	rm -rf assets/default.b assets/default.r assets/default.s
+	mkdir -p assets/default.b assets/default.r assets/default.s
+	for d in assets/default.b assets/default.r assets/default.s; do \
+		cp -r assets/bg assets/dragons assets/eggs assets/misc assets/monsters assets/ui "$$d/"; \
+		cp icon.png "$$d/icon.png"; \
+	done
+
+clean:
+	rm -rf assets/bg assets/misc assets/ui assets/eggs assets/dragons assets/monsters
+	rm -rf assets/default.b assets/default.r assets/default.s
+
+help:
+	@echo "Targets:"
+	@echo "  make data      - full pipeline: bg + misc + sprites + optimize + zepp"
+	@echo "  make bg        - copy backgrounds raw/ -> assets/bg/"
+	@echo "  make misc      - copy overlay/shadow raw/ -> assets/misc/"
+	@echo "  make sprites   - cut sprite sheets raw/ -> assets/{ui,eggs,dragons,monsters}/"
+	@echo "  make optimize  - optimize PNGs in assets/ in place"
+	@echo "  make zepp      - build assets/default.{b,r,s} device variants"
+	@echo "  make clean     - remove generated assets"
