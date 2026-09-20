@@ -1,8 +1,8 @@
 UI Icons
-venv/bin/python -m spritecut.cli ../raw/ui-icons.png -s 64x64 -n "egg coin energy sell victory loss _danger training close dice home _coin _shop monster _training _dice" -o ../assets -g 4x4 --margin 0 --remove-bg
+venv/bin/python -m spritecut.cli ../raw/ui-icons.png -s 64x64 -n "egg coin energy sell victory loss _danger training close dice home _coin _shop monster _training _dice" -o ../assets/ui -g 4x4 --margin 0 --remove-bg
 
 Eggs
-venv/bin/python -m spritecut.cli ../raw/eggs.png -s 300x300 -n "night_fury light_fury light_night night_light wooly_howl deadly_nadder razorwhip triple_stryke stormcutter songwing monstrous_nightmare skrill gronkle hideous_zippleback windwalker snowtail" -o ../assets/eggs -g 4x4 --margin 0 --remove-bg
+venv/bin/python -m spritecut.cli ../raw/eggs.png -s 300x300 -n "night_fury light_fury light_night night_light wooly_howl deadly_nadder razorwhip triple_stryke stormcutter songwing monstrous_nightmare skrill gronkle hideous_zippleback windwalker snowtail" -o ../assets/eggs -g 4x4 --margin 0
 
 Dragons
 venv/bin/python -m spritecut.cli ../raw/dragons.png -s 300x300 -n "night_fury light_fury light_night night_light wooly_howl deadly_nadder razorwhip triple_stryke stormcutter songwing monstrous_nightmare skrill gronkle hideous_zippleback windwalker snowtail" -o ../assets/dragons -g 4x4 --margin 0 --remove-bg
