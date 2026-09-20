@@ -1,7 +1,7 @@
-.PHONY: data bg misc sprites optimize zepp clean help
+.PHONY: data bg misc sprites scale optimize zepp clean help
 
 # Full data pipeline: raw/ -> assets/ -> assets/default.{b,r,s}
-data: icon bg misc sprites optimize zepp
+data: icon bg misc sprites scale optimize zepp
 
 # 0) Icon raw/ -> assets/
 icon:
@@ -28,11 +28,18 @@ sprites:
 	cd sprites && venv/bin/python -m spritecut.cli ../raw/monsters.png -s 128x128 -n "bewilder_beast gronkle deadly_nadder monstrous_nightmare" -o ../assets/monsters -g 2x2 --margin 0
 	rm -f assets/ui/_*.png assets/eggs/_*.png assets/dragons/_*.png assets/monsters/_*.png
 
-# 4) Optimize all PNGs in place (sharp-based, see optimize/README.md).
+# 4) Scale all PNGs to their exact widget sizes per assets.json
+# (e.g. dragons/songwing.png -> songwing_60x60.png + songwing_240x240.png),
+# deleting the originals. Must run before optimize so optimize compresses
+# the final exact-size images (Zepp OS draws IMG 1:1, no runtime scaling).
+scale:
+	node optimize/resize.mjs assets assets.json
+
+# 5) Optimize all PNGs in place (sharp-based, see optimize/README.md).
 optimize:
 	node optimize/optimize.mjs assets
 
-# 5) Zepp OS per-device variants (mirrors koala: identical
+# 6) Zepp OS per-device variants (mirrors koala: identical
 # assets/default.b, assets/default.r, assets/default.s).
 zepp:
 	rm -rf assets/default.b assets/default.r assets/default.s
@@ -48,11 +55,12 @@ clean:
 
 help:
 	@echo "Targets:"
-	@echo "  make data      - full pipeline: icon + bg + misc + sprites + optimize + zepp"
+	@echo "  make data      - full pipeline: icon + bg + misc + sprites + scale + optimize + zepp"
 	@echo "  make icon      - copy icon raw/ -> assets/"
 	@echo "  make bg        - copy backgrounds raw/ -> assets/bg/"
 	@echo "  make misc      - copy overlay/shadow raw/ -> assets/misc/"
 	@echo "  make sprites   - cut sprite sheets raw/ -> assets/{ui,eggs,dragons,monsters}/"
+	@echo "  make scale     - scale PNGs to exact widget sizes per assets.json (deletes originals)"
 	@echo "  make optimize  - optimize PNGs in assets/ in place"
 	@echo "  make zepp      - build assets/default.{b,r,s} device variants"
 	@echo "  make clean     - remove generated assets"

@@ -7,178 +7,130 @@
   ],
   "dragons/deadly_nadder.png": [
     "60x60",
-    "72x72",
-    "160x160",
     "240x240"
   ],
   "dragons/gronkle.png": [
     "60x60",
-    "72x72",
-    "160x160",
     "240x240"
   ],
   "dragons/hideous_zippleback.png": [
     "60x60",
-    "72x72",
-    "160x160",
     "240x240"
   ],
   "dragons/light_fury.png": [
     "60x60",
-    "72x72",
-    "160x160",
     "240x240"
   ],
   "dragons/light_night.png": [
     "60x60",
-    "72x72",
-    "160x160",
     "240x240"
   ],
   "dragons/monstrous_nightmare.png": [
     "60x60",
-    "72x72",
-    "160x160",
     "240x240"
   ],
   "dragons/night_fury.png": [
     "60x60",
-    "72x72",
-    "160x160",
     "240x240"
   ],
   "dragons/night_light.png": [
     "60x60",
-    "72x72",
-    "160x160",
     "240x240"
   ],
   "dragons/razorwhip.png": [
     "60x60",
-    "72x72",
-    "160x160",
     "240x240"
   ],
   "dragons/skrill.png": [
     "60x60",
-    "72x72",
-    "160x160",
     "240x240"
   ],
   "dragons/snowtail.png": [
     "60x60",
-    "72x72",
-    "160x160",
     "240x240"
   ],
   "dragons/songwing.png": [
     "60x60",
-    "72x72",
-    "160x160",
     "240x240"
   ],
   "dragons/stormcutter.png": [
     "60x60",
-    "72x72",
-    "160x160",
     "240x240"
   ],
   "dragons/triple_stryke.png": [
     "60x60",
-    "72x72",
-    "160x160",
     "240x240"
   ],
   "dragons/windwalker.png": [
     "60x60",
-    "72x72",
-    "160x160",
     "240x240"
   ],
   "dragons/wooly_howl.png": [
     "60x60",
-    "72x72",
-    "160x160",
     "240x240"
   ],
   "eggs/deadly_nadder.png": [
     "60x60",
-    "160x160",
     "240x240"
   ],
   "eggs/gronkle.png": [
     "60x60",
-    "160x160",
     "240x240"
   ],
   "eggs/hideous_zippleback.png": [
     "60x60",
-    "160x160",
     "240x240"
   ],
   "eggs/light_fury.png": [
     "60x60",
-    "160x160",
     "240x240"
   ],
   "eggs/light_night.png": [
     "60x60",
-    "160x160",
     "240x240"
   ],
   "eggs/monstrous_nightmare.png": [
     "60x60",
-    "160x160",
     "240x240"
   ],
   "eggs/night_fury.png": [
     "60x60",
-    "160x160",
     "240x240"
   ],
   "eggs/night_light.png": [
     "60x60",
-    "160x160",
     "240x240"
   ],
   "eggs/razorwhip.png": [
     "60x60",
-    "160x160",
     "240x240"
   ],
   "eggs/skrill.png": [
     "60x60",
-    "160x160",
     "240x240"
   ],
   "eggs/snowtail.png": [
     "60x60",
-    "160x160",
     "240x240"
   ],
   "eggs/songwing.png": [
     "60x60",
-    "160x160",
     "240x240"
   ],
   "eggs/stormcutter.png": [
     "60x60",
-    "160x160",
     "240x240"
   ],
   "eggs/triple_stryke.png": [
     "60x60",
-    "160x160",
     "240x240"
   ],
   "eggs/windwalker.png": [
     "60x60",
-    "160x160",
     "240x240"
   ],
   "eggs/wooly_howl.png": [
     "60x60",
-    "160x160",
     "240x240"
   ],
   "misc/overlay.png": [
@@ -211,32 +163,27 @@
   ],
   "monsters/bewilder_beast.png": [],
   "monsters/deadly_nadder.png": [
-    "60x60",
     "72x72"
   ],
   "monsters/gronkle.png": [
-    "60x60",
     "72x72"
   ],
   "monsters/monstrous_nightmare.png": [
-    "60x60",
     "72x72"
   ],
   "ui/bewilder_beast.png": [
     "72x72",
-    "120x90",
     "128x128"
   ],
   "ui/close.png": [
     "36x36"
   ],
   "ui/coin.png": [
-    "28x28",
-    "60x60",
+    "32x32",
     "64x64"
   ],
   "ui/danger.png": [
-    "72x72"
+    "84x84"
   ],
   "ui/dice.png": [
     "80x80"
@@ -245,26 +192,21 @@
     "128x128"
   ],
   "ui/energy.png": [
-    "36x36",
     "56x56"
   ],
   "ui/home.png": [
-    "72x72",
     "84x84"
   ],
   "ui/loss.png": [
     "60x60"
   ],
   "ui/sell.png": [
-    "72x72",
     "84x84"
   ],
   "ui/strength.png": [
-    "22x22",
     "56x56"
   ],
   "ui/training.png": [
-    "72x72",
     "84x84"
   ],
   "ui/victory.png": [

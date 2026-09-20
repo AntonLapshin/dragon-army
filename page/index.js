@@ -190,12 +190,40 @@ function addText(x, y, w, h, text, size, color, alignH) {
 }
 
 // Zepp OS ignores FILL_RECT alpha, so every translucent surface (text
-// pills, modal dim, bg dimming) uses the pre-baked translucent PNG
-// misc/overlay.png instead of a semi-transparent color. The IMG widget
-// stretches it to the requested box; the source is a flat shade so any
-// target size keeps the same translucency.
+// pills, modal dim, bg dimming) uses a pre-baked translucent PNG from
+// assets/misc/ (see assets.json) instead of a semi-transparent color.
+// Zepp OS draws IMG 1:1 (no runtime scaling), so widgets must reference
+// pre-scaled files at exact w/h. Overlay is a flat shade, so a larger
+// source cropped to a smaller box looks identical — overlaySrc() picks the
+// smallest available size that covers the requested box.
+const OVERLAY_SIZES = [
+  '30x30', '43x30', '56x30', '84x32', '92x32', '103x30', '103x32',
+  '106x32', '108x24', '117x30', '120x32', '132x30', '134x32', '146x30',
+  '148x32', '160x30', '175x30', '178x26', '189x26', '204x30', '276x30',
+  '290x30', '390x450',
+];
+
+function overlaySrc(w, h) {
+  let best = null;
+  let bestArea = Infinity;
+  for (const dim of OVERLAY_SIZES) {
+    const parts = dim.split('x');
+    const bw = Number(parts[0]);
+    const bh = Number(parts[1]);
+    if (bw >= w && bh >= h) {
+      const area = bw * bh;
+      if (area < bestArea) {
+        bestArea = area;
+        best = dim;
+      }
+    }
+  }
+  if (!best) best = '390x450';
+  return 'misc/overlay_' + best + '.png';
+}
+
 function addShade(x, y, w, h, onTap) {
-  return addImg(x, y, w, h, 'misc/overlay.png', onTap);
+  return addImg(x, y, w, h, overlaySrc(w, h), onTap);
 }
 
 // Dark pill behind a text line so it stays readable over bright backgrounds.
@@ -219,14 +247,17 @@ function addBadgeText(x, y, w, h, text, size, color, alignH) {
     textX = pillX + pad;
   }
   push(hmUI.createWidget(hmUI.widget.IMG, {
-    x: Math.max(0, pillX), y, w: pillW, h, src: 'misc/overlay.png',
+    x: Math.max(0, pillX), y, w: pillW, h, src: overlaySrc(pillW, h),
   }));
   return addText(textX, y, textW, h, str, fs, color, alignH);
 }
 
 // Horizontally centered "coin icon + value" row with a dark pill behind it.
+// Coin icon is 64x64 (the only ui/coin.png size in assets.json); it is
+// centered vertically on the 32px pill, and the pill uses the smallest
+// overlay that covers it (flat shade, so cropping a larger source is exact).
 function addCoinRow(width, y, coins, size) {
-  const iconS = 28;
+  const iconS = 32;
   const gap = 6;
   const text = String(coins);
   const charW = Math.ceil((size || 22) * 0.62);
@@ -237,8 +268,8 @@ function addCoinRow(width, y, coins, size) {
   const startX = Math.floor((width - pillW) / 2);
   const rowH = 32;
   addShade(startX, y - 2, pillW, rowH);
-  addImg(startX + pad, y, iconS, iconS, 'ui/coin.png');
-  addText(startX + pad + iconS + gap, y, textW, iconS, text, size || 22, 0xffffff, hmUI.align.LEFT);
+  addImg(startX + pad, y - 2, iconS, iconS, 'ui/coin_32x32.png');
+  addText(startX + pad + iconS + gap, y - 2, textW, rowH, text, size || 22, 0xffffff, hmUI.align.LEFT);
 }
 
 // Full-screen swipe navigation. Must be created FIRST (bottom z-layer) so the
@@ -472,7 +503,7 @@ function openLockedFight(base, lines, outcome) {
 
 function renderMain(width) {
   const economy = engine.getEconomyView();
-  addImg(0, 0, width, DEVICE_HEIGHT, 'bg/bg-home.png');
+  addImg(0, 0, width, DEVICE_HEIGHT, 'bg/bg-home_390x450.png');
   // Swipe layer first so it never covers tappable icons.
   addSwipeNav(width);
 
@@ -482,11 +513,11 @@ function renderMain(width) {
   // Buy Egg — top-left, icon only (no label). Hidden when a purchase
   // isn't available (broke or roster full).
   if (engine.canBuyEgg()) {
-    addIconButton(12, 84, 128, 'ui/egg.png', startEggSpin, false);
+    addIconButton(12, 84, 128, 'ui/egg_128x128.png', startEggSpin, false);
   }
 
   // Bewilder Beast — top-right, icon only, always visible.
-  addIconButton(width - 140, 84, 128, 'ui/bewilder_beast.png', () => {
+  addIconButton(width - 140, 84, 128, 'ui/bewilder_beast_128x128.png', () => {
     openModal({ kind: 'beast-intro' });
   }, false);
 
@@ -495,7 +526,7 @@ function renderMain(width) {
   if (economy.hasCollectible) {
     const coinS = 64;
     addBadgeText(0, 236, width, 24, '+' + economy.collectible + ' coins', 17, 0xffee88);
-    addIconButton(Math.floor((width - coinS) / 2), 264, coinS, 'ui/coin.png', () => {
+    addIconButton(Math.floor((width - coinS) / 2), 264, coinS, 'ui/coin_64x64.png', () => {
       openModal({ kind: 'coin-summary', amount: engine.getEconomyView().collectible });
     }, false);
   }
@@ -506,7 +537,7 @@ function renderMain(width) {
 function renderDragon(width, view) {
   const breed = view.breed;
   const egg = view.stage === 'egg';
-  addImg(0, 0, width, DEVICE_HEIGHT, 'bg/bg-dragon.png');
+  addImg(0, 0, width, DEVICE_HEIGHT, 'bg/bg-dragon_390x450.png');
   // Dim the bright bg artwork so the dragon and UI stay visible.
   addShade(0, 0, width, DEVICE_HEIGHT);
   // Swipe layer first so it never covers tappable icons.
@@ -526,12 +557,12 @@ function renderDragon(width, view) {
    // Ground shadow under the egg / dragon (drawn first so it stays behind).
    const shW = 114;
    const shH = 28;
-   addImg(Math.floor((width - shW) / 2), imgY + imgSize - 22, shW, shH, 'misc/shadow.png');
-   if (egg) {
-     addImg(imgX, imgY, imgSize, imgSize, 'eggs/' + breed.assetKey + '.png');
-   } else {
-     addImg(imgX, imgY, imgSize, imgSize, 'dragons/' + breed.assetKey + '.png');
-   }
+    addImg(Math.floor((width - shW) / 2), imgY + imgSize - 22, shW, shH, 'misc/shadow_114x28.png');
+    if (egg) {
+      addImg(imgX, imgY, imgSize, imgSize, 'eggs/' + breed.assetKey + '_240x240.png');
+    } else {
+      addImg(imgX, imgY + 20, imgSize, imgSize, 'dragons/' + breed.assetKey + '_240x240.png');
+    }
 
    // Energy and Strength on top of the dragon (drawn after so they sit above).
    if (!egg) {
@@ -541,7 +572,7 @@ function renderDragon(width, view) {
      const eBarW = 120;
      const eX = 12;
      const eY = 70;
-     addImg(eX, eY, eIconS, eIconS, 'ui/energy.png');
+      addImg(eX, eY, eIconS, eIconS, 'ui/energy_56x56.png');
      addBar(eX + eIconS + eGap, eY + Math.floor((eIconS - barH) / 2), eBarW, view.energy, CONFIG.energy.max);
      const sIconS = 56;
      const sGap = 6;
@@ -549,38 +580,39 @@ function renderDragon(width, view) {
      const sPillH = 30;
      const sX = 12;
      const sY = 132;
-     addImg(sX, sY, sIconS, sIconS, 'ui/strength.png');
+      addImg(sX, sY, sIconS, sIconS, 'ui/strength_56x56.png');
      addBadgeText(sX + sIconS + sGap, sY + Math.floor((sIconS - sPillH) / 2), sPillW, sPillH, String(view.strength), 22, 0xffffff, hmUI.align.LEFT);
    }
 
 // Bottom action row — pinned to the very bottom (no roster strip on this
    // page). Eggs show just Home at bottom-right; hatched dragons show
-   // Home / Train / Sell / (Danger) evenly spread with 30px side paddings.
-   // Danger is hidden when no monsters wait.
-   const sidePad = 30;
+   // Home / Sell / (Danger) / Training evenly spread with 20px side paddings.
+   // Danger is hidden when no monsters wait. Each icon uses its exact
+   // pre-scaled size (home/sell/training 84x84, danger 72x72), bottom-aligned.
+   const sidePad = 20;
+   const bottom = DEVICE_HEIGHT - 12;
    if (egg) {
      const eggIconS = 84;
-     const eggY = DEVICE_HEIGHT - eggIconS - 12;
-     addIconButton(width - sidePad - eggIconS, eggY, eggIconS, 'ui/home.png', () => goTo(0), false);
+     const eggY = bottom - eggIconS;
+     addIconButton(width - sidePad - eggIconS, eggY, eggIconS, 'ui/home_84x84.png', () => goTo(0), false);
    } else {
      const hasMonsters = engine.getSpawnedMonsters().length > 0;
      const others = [
-       { src: 'ui/sell.png', dimmed: false, tap: () => openModal({ kind: 'sell', dragonId: view.dragon.id }) },
+       { src: 'ui/sell_84x84.png', size: 84, dimmed: false, tap: () => openModal({ kind: 'sell', dragonId: view.dragon.id }) },
      ];
      if (hasMonsters) {
-       others.push({ src: 'ui/danger.png', dimmed: view.energy <= 0, tap: () => openMonsterSelect(view.dragon.id) });
+       others.push({ src: 'ui/danger_84x84.png', size: 84, dimmed: view.energy <= 0, tap: () => openMonsterSelect(view.dragon.id) });
      }
-     others.push({ src: 'ui/training.png', dimmed: view.energy <= 0, tap: () => openModal({ kind: 'train', dragonId: view.dragon.id }) });
-     // 4 icons of 84px would overlap in 330px, so shrink when Danger is shown.
-     const iconS = others.length >= 3 ? 72 : 84;
-     const rowY = DEVICE_HEIGHT - iconS - 12;
+     others.push({ src: 'ui/training_84x84.png', size: 84, dimmed: view.energy <= 0, tap: () => openModal({ kind: 'train', dragonId: view.dragon.id }) });
      const cells = [
-       { src: 'ui/home.png', dimmed: false, tap: () => goTo(0) },
+       { src: 'ui/home_84x84.png', size: 84, dimmed: false, tap: () => goTo(0) },
      ].concat(others);
-     const step = (width - sidePad * 2 - iconS) / (cells.length - 1);
+     const maxS = 84;
+     const step = (width - sidePad * 2 - maxS) / (cells.length - 1);
      cells.forEach((cell, i) => {
        const ix = Math.round(sidePad + i * step);
-       addIconButton(ix, rowY, iconS, cell.src, cell.tap, cell.dimmed);
+       const iy = bottom - cell.size;
+       addIconButton(ix, iy, cell.size, cell.src, cell.tap, cell.dimmed);
      });
    }
 }
@@ -602,12 +634,12 @@ function renderRosterStrip(width) {
   }
   visible.forEach((d, i) => {
     const idx = start + i;
-    let src = 'ui/egg.png';
+    let src = 'eggs/night_fury_60x60.png';
     try {
       const v = engine.getDragonView(d.id);
       if (v) src = v.stage === 'egg'
-        ? 'eggs/' + v.breed.assetKey + '.png'
-        : 'dragons/' + v.breed.assetKey + '.png';
+        ? 'eggs/' + v.breed.assetKey + '_60x60.png'
+        : 'dragons/' + v.breed.assetKey + '_60x60.png';
     } catch (_) {}
     // 5 slots: spread exactly from 30px to width-30px. Fewer: left-aligned.
     const n = visible.length;
@@ -631,13 +663,15 @@ function renderModalShell(title, locked) {
   // Dim overlay with a no-op tap so it also swallows clicks in the web
   // runner (where a non-clickable layer has pointer-events:none and
   // would let clicks fall through to icons behind the modal).
-  // Uses misc/overlay.png: Zepp OS ignores FILL_RECT alpha, so a
-  // pre-baked translucent image does the dimming instead.
+  // Uses a pre-scaled misc/overlay_WxH.png via addShade: Zepp OS ignores
+  // FILL_RECT alpha, so a pre-baked translucent image does the dimming
+  // instead. Zepp OS draws IMG 1:1, so the source must cover the box
+  // (overlay is flat, so cropping a larger source is exact).
   addShade(0, 0, width, DEVICE_HEIGHT, () => {});
   addRect(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, PANEL_COLOR, 20);
   addText(PANEL_X, PANEL_Y + 12, PANEL_W, 34, title, 22, 0xffffff);
   if (!locked) {
-    addImg(PANEL_X + PANEL_W - 46, PANEL_Y + 8, 36, 36, 'ui/close.png', closeModal);
+    addImg(PANEL_X + PANEL_W - 46, PANEL_Y + 8, 36, 36, 'ui/close_36x36.png', closeModal);
   }
 }
 
@@ -657,14 +691,14 @@ function renderEggSpin() {
   if (modal.spinning) {
     // The dice is tappable too: rapid re-renders can swallow a button click
     // mid-press, so tapping anywhere on the dice also stops the spin.
-    addImg(PANEL_X + 130, PANEL_Y + 80, 80, 80, 'ui/dice.png', stopEggSpin);
+    addImg(PANEL_X + 130, PANEL_Y + 80, 80, 80, 'ui/dice_80x80.png', stopEggSpin);
     addText(PANEL_X + 20, PANEL_Y + 180, PANEL_W - 40, 30, 'Tap Reveal to see your egg', 19, 0xdddddd);
     addButton(PANEL_X + 90, PANEL_Y + 220, 160, 48, 'Reveal', stopEggSpin);
   } else {
     // Breed stays hidden until it hatches — show the egg, not its name.
     const breed = breedForIndex(modal.breedIndex);
-    const eggS = 160;
-    addImg(PANEL_X + Math.floor((PANEL_W - eggS) / 2), PANEL_Y + 56, eggS, eggS, 'eggs/' + breed.assetKey + '.png');
+    const eggS = 60;
+    addImg(PANEL_X + Math.floor((PANEL_W - eggS) / 2), PANEL_Y + 56, eggS, eggS, 'eggs/' + breed.assetKey + '_60x60.png');
     addCoinRow(DEVICE_WIDTH, PANEL_Y + 232, CONFIG.egg.price, 20);
     addButton(PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'OK', confirmEgg);
   }
@@ -694,7 +728,7 @@ function renderTrain() {
 
 function renderTrainResult() {
   renderModalShell('Training', false);
-  addImg(PANEL_X + 140, PANEL_Y + 70, 60, 60, 'ui/victory.png');
+  addImg(PANEL_X + 140, PANEL_Y + 70, 60, 60, 'ui/victory_60x60.png');
   const gainLine = _modal.text
     || ('Strength +' + _modal.gain + ' (' + _modal.strengthAfter + ')');
   addText(PANEL_X + 20, PANEL_Y + 150, PANEL_W - 40, 30, gainLine, 20, 0xaaffaa);
@@ -715,7 +749,7 @@ function renderSell() {
     return;
   }
   renderModalShell('Sell ' + view.breed.name, false);
-  addImg(PANEL_X + Math.floor((PANEL_W - 160) / 2), PANEL_Y + 50, 160, 160, 'dragons/' + view.breed.assetKey + '.png');
+  addImg(PANEL_X + Math.floor((PANEL_W - 60) / 2), PANEL_Y + 50, 60, 60, 'dragons/' + view.breed.assetKey + '_60x60.png');
   addText(PANEL_X + 20, PANEL_Y + 216, PANEL_W - 40, 28, 'Will receive:', 20, 0xffffff);
   addCoinRow(DEVICE_WIDTH, PANEL_Y + 248, price, 22);
   addButton(PANEL_X + 40, PANEL_Y + PANEL_H - 70, 120, 48, 'Sell', () => confirmSell(view.dragon.id), { normal: 0xb71c1c });
@@ -736,12 +770,12 @@ function renderMonsterSelect() {
   }
 list.forEach((m, i) => {
      const rowY = PANEL_Y + 64 + i * 92;
-     if (rowY + 84 > PANEL_Y + PANEL_H - 10) return;
-     addImg(PANEL_X + 24, rowY, 60, 60, m.image);
-     addText(PANEL_X + 92, rowY, 120, 30, m.difficulty, 19, 0xffffff, hmUI.align.LEFT);
-     const strIconS = 22;
-     addImg(PANEL_X + 92, rowY + 34, strIconS, strIconS, 'ui/strength.png');
-     addText(PANEL_X + 92 + strIconS + 4, rowY + 32, 120, 26, String(m.strength), 17, 0xdddddd, hmUI.align.LEFT);
+     if (rowY + 90 > PANEL_Y + PANEL_H - 10) return;
+     addImg(PANEL_X + 24, rowY, 72, 72, m.image.replace('.png', '_72x72.png'));
+     addText(PANEL_X + 100, rowY, 100, 30, m.difficulty, 19, 0xffffff, hmUI.align.LEFT);
+     const strIconS = 56;
+     addImg(PANEL_X + 100, rowY + 34, strIconS, strIconS, 'ui/strength_56x56.png');
+     addText(PANEL_X + 100 + strIconS + 4, rowY + 49, 40, 26, String(m.strength), 17, 0xdddddd, hmUI.align.LEFT);
      addButton(PANEL_X + 210, rowY + 12, 100, 44, 'Fight', () => startMonsterFight(view.dragon.id, m.id), { size: 19 });
    });
 }
@@ -760,15 +794,15 @@ function renderMonsterFight() {
   const view = engine.getDragonView(modal.dragonId);
   const monster = engine.getSpawnedMonsters().find((m) => m.id === modal.monsterId);
   renderModalShell('Fight', modal.locked);
-  if (monster) addImg(PANEL_X + 30, PANEL_Y + 56, 72, 72, monster.image);
-  if (view) addImg(PANEL_X + PANEL_W - 102, PANEL_Y + 56, 72, 72, 'dragons/' + view.breed.assetKey + '.png');
+  if (monster) addImg(PANEL_X + 30, PANEL_Y + 56, 72, 72, monster.image.replace('.png', '_72x72.png'));
+  if (view) addImg(PANEL_X + PANEL_W - 102, PANEL_Y + 56, 60, 60, 'dragons/' + view.breed.assetKey + '_60x60.png');
   if (monster && view) {
     addText(PANEL_X + 108, PANEL_Y + 66, PANEL_W - 216, 26, 'vs', 20, 0xffee88);
     addText(PANEL_X + 108, PANEL_Y + 94, PANEL_W - 216, 26, 'STR ' + view.strength, 17, 0xdddddd);
   }
   renderFightLines();
   if (!modal.locked && modal.outcome) {
-    addImg(PANEL_X + 140, PANEL_Y + PANEL_H - 140, 60, 60, modal.outcome.won ? 'ui/victory.png' : 'ui/loss.png');
+    addImg(PANEL_X + 140, PANEL_Y + PANEL_H - 140, 60, 60, modal.outcome.won ? 'ui/victory_60x60.png' : 'ui/loss_60x60.png');
     addText(
       PANEL_X + 20, PANEL_Y + PANEL_H - 76, PANEL_W - 40, 28,
       modal.outcome.won ? '+' + modal.outcome.reward + ' coins' : '0 energy? rest to recover',
@@ -780,7 +814,7 @@ function renderMonsterFight() {
 function renderBeastIntro() {
   const beast = engine.getState().beast;
   renderModalShell(CONFIG.beast.name, false);
-  addImg(PANEL_X + 110, PANEL_Y + 56, 120, 90, 'ui/bewilder_beast.png');
+  addImg(PANEL_X + 134, PANEL_Y + 56, 72, 72, 'ui/bewilder_beast_72x72.png');
   if (beast.status !== 'alive') {
     const now = timeAdapter.getTime();
     const hrs = Math.max(1, Math.ceil(((beast.respawnAtMs || now) - now) / CONFIG.economy.coinAccrualIntervalMs));
@@ -788,15 +822,15 @@ function renderBeastIntro() {
     return;
   }
   const beastBarY = PANEL_Y + 156;
-  const beastIconS = 36;
+  const beastIconS = 56;
   const beastGap = 8;
   const beastBarX = PANEL_X + 20 + beastIconS + beastGap;
   const beastBarW = 260 - beastIconS - beastGap;
-  addImg(PANEL_X + 20, beastBarY - 3, beastIconS, beastIconS, 'ui/energy.png');
+  addImg(PANEL_X + 20, beastBarY - 13, beastIconS, beastIconS, 'ui/energy_56x56.png');
   addBar(beastBarX, beastBarY, beastBarW, beast.currentHp, beast.maxHp);
   const team = engine.getBeastParticipants();
   addText(
-    PANEL_X + 20, PANEL_Y + 196, PANEL_W - 40, 30,
+    PANEL_X + 20, PANEL_Y + 206, PANEL_W - 40, 30,
     team.length === 0 ? 'No dragons ready' : team.length + ' dragon(s) ready',
     18, team.length === 0 ? 0xff8888 : 0xaaffaa,
   );
@@ -811,7 +845,7 @@ function renderBeastFight() {
   const modal = _modal;
   const beast = engine.getState().beast;
   renderModalShell('Beast Battle', modal.locked);
-  addImg(PANEL_X + 30, PANEL_Y + 56, 72, 72, 'ui/bewilder_beast.png');
+  addImg(PANEL_X + 30, PANEL_Y + 56, 72, 72, 'ui/bewilder_beast_72x72.png');
   const hp = modal.outcome && modal.revealed >= modal.lines.length
     ? modal.outcome.hpAfter
     : beast.currentHp;
@@ -836,7 +870,7 @@ function renderBeastFight() {
 
 function renderCoinSummary() {
   renderModalShell('Coins', false);
-  addImg(PANEL_X + 140, PANEL_Y + 70, 60, 60, 'ui/coin.png');
+  addImg(PANEL_X + 138, PANEL_Y + 70, 64, 64, 'ui/coin_64x64.png');
   addText(
     PANEL_X + 20, PANEL_Y + 150, PANEL_W - 40, 60,
     '+' + _modal.amount + ' coins added',
