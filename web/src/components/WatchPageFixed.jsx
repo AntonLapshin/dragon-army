@@ -309,6 +309,14 @@ export function _setPageConfigFixed(config) {
     _reset();
     originalRender.call(config);
     const widgets = _collect();
+    // Stable per-position keys: the page rebuilds every widget on each
+    // render (every 120ms while the egg spins). The shim hands out ever
+    // increasing _ids, so without this React remounts the DOM on every
+    // frame and a click that spans a remount is lost — the user has to
+    // tap Reveal several times. Index keys keep the button mounted.
+    widgets.forEach((w, i) => {
+      w._id = i;
+    });
     if (_triggerRender) _triggerRender(widgets);
   };
 

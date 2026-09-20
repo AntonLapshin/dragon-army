@@ -373,8 +373,10 @@ function startTrain(dragonId) {
   openModal({
     kind: 'train-result',
     dragonId,
-    text: 'Strength +' + res.gain + ' (' + res.strengthAfter + ')'
-      + (res.levelAfter > res.levelBefore ? '  Level up! Lv ' + res.levelAfter : ''),
+    gain: res.gain,
+    strengthAfter: res.strengthAfter,
+    leveledUp: res.levelAfter > res.levelBefore,
+    levelAfter: res.levelAfter,
   });
 }
 
@@ -473,8 +475,11 @@ function renderMain(width) {
   // Balance row, horizontally centered as one pill.
   addCoinRow(width, 42, economy.coins, 22);
 
-  // Buy Egg — top-left, icon only (no label). Dimmed when coins insufficient.
-  addIconButton(12, 84, 64, 'ui/egg.png', startEggSpin, !economy.canAffordEgg);
+  // Buy Egg — top-left, icon only (no label). Hidden when a purchase
+  // isn't available (broke or roster full).
+  if (engine.canBuyEgg()) {
+    addIconButton(12, 84, 64, 'ui/egg.png', startEggSpin, false);
+  }
 
   // Bewilder Beast — top-right, icon only, always visible.
   addIconButton(width - 76, 84, 64, 'ui/bewilder_beast.png', () => {
@@ -505,15 +510,23 @@ function renderDragon(width, view) {
   // Swipe layer first so it never covers tappable icons.
   addSwipeNav(width);
 
-  addBadgeText(0, 8, width, 30, breed.name, 24, 0xffffff);
   if (egg) {
-    addBadgeText(0, 42, width, 26, 'Egg', 18, 0xffeeaa);
+    // Still hatching: hide the breed so the dragon stays a surprise.
+    addBadgeText(0, 8, width, 30, 'Egg', 24, 0xffffff);
+    addBadgeText(0, 42, width, 26, 'Hatching...', 18, 0xffeeaa);
   } else {
+    addBadgeText(0, 8, width, 30, breed.name, 24, 0xffffff);
     addBadgeText(0, 42, width, 26, 'Lv ' + view.level + '  ·  Age ' + view.ageDays + 'd', 18, 0xffeeaa);
-    addImg(24, 72, 26, 26, 'ui/energy.png');
-    addBar(56, 75, 200, view.energy, CONFIG.energy.max);
-    addBadgeText(262, 70, 104, 28, Math.round(view.energy) + '', 18, 0xffffff, hmUI.align.LEFT);
-    addBadgeText(0, 102, width, 26, 'Strength ' + view.strength, 20, 0xffffff);
+    // Energy row: large icon + bar, horizontally centered as one group.
+    const eIconS = 52;
+    const eGap = 8;
+    const eBarW = 200;
+    const eTotalW = eIconS + eGap + eBarW;
+    const eX = Math.floor((width - eTotalW) / 2);
+    const eY = 66;
+    addImg(eX, eY, eIconS, eIconS, 'ui/energy.png');
+    addBar(eX + eIconS + eGap, eY + Math.floor((eIconS - 20) / 2), eBarW, view.energy, CONFIG.energy.max);
+    addBadgeText(0, 122, width, 26, 'Strength ' + view.strength, 20, 0xffffff);
   }
 
   const imgSize = 240;
@@ -525,21 +538,28 @@ function renderDragon(width, view) {
     addImg(imgX, imgY, imgSize, imgSize, 'dragons/' + breed.assetKey + '.png');
   }
 
-  // Bottom row — hatched dragons only, icon-only buttons equally spaced.
-  if (!egg) {
-    const rowY = DEVICE_HEIGHT - 96;
-    const cellW = Math.floor(width / 4);
-    const iconS = 56;
+  // Bottom row — icon-only buttons equally spaced.
+  // Eggs show just Home (so the player can get back); hatched dragons show
+  // Train / Sell / Danger / Home, with Danger hidden when no monsters wait.
+  const rowY = DEVICE_HEIGHT - 96;
+  const iconS = 84;
+  if (egg) {
+    addIconButton(Math.floor((width - iconS) / 2), rowY - 24, iconS, 'ui/home.png', () => goTo(0), false);
+  } else {
+    const hasMonsters = engine.getSpawnedMonsters().length > 0;
     const cells = [
       { src: 'ui/training.png', dimmed: view.energy <= 0, tap: () => openModal({ kind: 'train', dragonId: view.dragon.id }) },
       { src: 'ui/sell.png', dimmed: false, tap: () => openModal({ kind: 'sell', dragonId: view.dragon.id }) },
-      { src: 'ui/danger.png', dimmed: view.energy <= 0, tap: () => openMonsterSelect(view.dragon.id) },
-      { src: 'ui/home.png', dimmed: false, tap: () => goTo(0) },
     ];
+    if (hasMonsters) {
+      cells.push({ src: 'ui/danger.png', dimmed: view.energy <= 0, tap: () => openMonsterSelect(view.dragon.id) });
+    }
+    cells.push({ src: 'ui/home.png', dimmed: false, tap: () => goTo(0) });
+    const cellW = Math.floor(width / cells.length);
     cells.forEach((cell, i) => {
       const cx = i * cellW;
       const ix = cx + Math.floor((cellW - iconS) / 2);
-      addIconButton(ix, rowY + 4, iconS, cell.src, cell.tap, cell.dimmed);
+      addIconButton(ix, rowY - 24, iconS, cell.src, cell.tap, cell.dimmed);
     });
   }
 
@@ -574,27 +594,26 @@ function renderEggSpin() {
     const full = modal.reason === 'roster-full';
     addText(PANEL_X + 20, PANEL_Y + 90, PANEL_W - 40, 40, full ? 'Roster is full' : 'Not enough coins', 22, 0xff8888);
     if (!full) {
-      addText(PANEL_X + 20, PANEL_Y + 130, PANEL_W - 40, 30, 'Price: ' + CONFIG.egg.price + ' coins', 19, 0xdddddd);
+      addCoinRow(DEVICE_WIDTH, PANEL_Y + 140, CONFIG.egg.price, 20);
     }
-    addButton(PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'OK', null, { normal: 0x555555 });
+    addButton(PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'OK', closeModal);
     return;
   }
   renderModalShell('Get a New Egg', true);
   if (modal.spinning) {
-    addImg(PANEL_X + 130, PANEL_Y + 80, 80, 80, 'ui/dice.png');
-    addText(PANEL_X + 20, PANEL_Y + 180, PANEL_W - 40, 30, 'Tap Reveal to see breed', 19, 0xdddddd);
+    // The dice is tappable too: rapid re-renders can swallow a button click
+    // mid-press, so tapping anywhere on the dice also stops the spin.
+    addImg(PANEL_X + 130, PANEL_Y + 80, 80, 80, 'ui/dice.png', stopEggSpin);
+    addText(PANEL_X + 20, PANEL_Y + 180, PANEL_W - 40, 30, 'Tap Reveal to see your egg', 19, 0xdddddd);
     addButton(PANEL_X + 90, PANEL_Y + 220, 160, 48, 'Reveal', stopEggSpin);
   } else {
+    // Breed stays hidden until it hatches — show the egg, not its name.
     const breed = breedForIndex(modal.breedIndex);
-    addImg(PANEL_X + 130, PANEL_Y + 80, 80, 80, 'eggs/' + breed.assetKey + '.png');
-    addText(PANEL_X + 20, PANEL_Y + 150, PANEL_W - 40, 36, breed.name, 22, 0xaaffaa);
-    addText(PANEL_X + 20, PANEL_Y + 186, PANEL_W - 40, 28, 'Price: ' + CONFIG.egg.price + ' coins', 19, 0xdddddd);
+    const eggS = 160;
+    addImg(PANEL_X + Math.floor((PANEL_W - eggS) / 2), PANEL_Y + 56, eggS, eggS, 'eggs/' + breed.assetKey + '.png');
+    addCoinRow(DEVICE_WIDTH, PANEL_Y + 232, CONFIG.egg.price, 20);
+    addButton(PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'OK', confirmEgg);
   }
-  addButton(
-    PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'OK',
-    modal.spinning ? null : confirmEgg,
-    modal.spinning ? { normal: 0x555555 } : {},
-  );
 }
 
 function renderTrain() {
@@ -605,8 +624,7 @@ function renderTrain() {
   }
   const preview = engine.trainPreview(view.dragon.id);
   renderModalShell('Train ' + view.breed.name, false);
-  addText(PANEL_X + 20, PANEL_Y + 70, PANEL_W - 40, 30, 'Cost: ' + preview.cost + ' coins', 20, 0xffffff);
-  addText(PANEL_X + 20, PANEL_Y + 104, PANEL_W - 40, 30, 'Strength: ' + view.strength, 19, 0xdddddd);
+  addCoinRow(DEVICE_WIDTH, PANEL_Y + 90, preview.cost, 22);
   if (!preview.canTrain) {
     const msg = preview.reason === 'no-energy'
       ? 'No energy - recover first'
@@ -623,7 +641,15 @@ function renderTrain() {
 function renderTrainResult() {
   renderModalShell('Training', false);
   addImg(PANEL_X + 140, PANEL_Y + 70, 60, 60, 'ui/victory.png');
-  addText(PANEL_X + 20, PANEL_Y + 150, PANEL_W - 40, 60, _modal.text || '', 20, 0xaaffaa);
+  const gainLine = _modal.text
+    || ('Strength +' + _modal.gain + ' (' + _modal.strengthAfter + ')');
+  addText(PANEL_X + 20, PANEL_Y + 150, PANEL_W - 40, 30, gainLine, 20, 0xaaffaa);
+  if (_modal.leveledUp || (typeof _modal.text === 'string' && _modal.text.indexOf('Level up') !== -1)) {
+    const lv = _modal.levelAfter !== undefined
+      ? _modal.levelAfter
+      : _modal.text.replace(/^.*Lv\s*/, '');
+    addText(PANEL_X + 20, PANEL_Y + 182, PANEL_W - 40, 30, 'Level up! Lv ' + lv, 20, 0xffee88);
+  }
   addButton(PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'OK', closeModal);
 }
 
@@ -636,7 +662,8 @@ function renderSell() {
   }
   renderModalShell('Sell ' + view.breed.name, false);
   addImg(PANEL_X + 130, PANEL_Y + 60, 80, 80, 'dragons/' + view.breed.assetKey + '.png');
-  addText(PANEL_X + 20, PANEL_Y + 150, PANEL_W - 40, 32, 'Will receive: ' + price + ' coins', 20, 0xffffff);
+  addText(PANEL_X + 20, PANEL_Y + 148, PANEL_W - 40, 28, 'Will receive:', 20, 0xffffff);
+  addCoinRow(DEVICE_WIDTH, PANEL_Y + 182, price, 22);
   addButton(PANEL_X + 40, PANEL_Y + PANEL_H - 70, 120, 48, 'Sell', () => confirmSell(view.dragon.id), { normal: 0xb71c1c });
   addButton(PANEL_X + 180, PANEL_Y + PANEL_H - 70, 120, 48, 'Keep', closeModal);
 }
