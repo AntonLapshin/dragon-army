@@ -69,7 +69,7 @@ export const CONFIG = {
   },
   egg: {
     price: 100,
-    breedCount: 15,
+    breedCount: 16,
     hatchMinMs: 24 * 60 * 60 * 1000,
     hatchMaxMs: 48 * 60 * 60 * 1000,
     showTimer: false,
@@ -174,21 +174,23 @@ export const CONFIG = {
 
 export const DRAGONS: DragonBreed[] = [
   // lifespanDays: cheaper/weaker breeds live longer (45d) down to epics (30d).
-  { id: "dragon-1", name: "dragon 1", rarity: "common", baseStrengthMin: 8, baseStrengthMax: 14, sellMultiplier: 1.0, lifespanDays: 45 },
-  { id: "dragon-2", name: "dragon 2", rarity: "common", baseStrengthMin: 8, baseStrengthMax: 14, sellMultiplier: 1.0, lifespanDays: 44 },
-  { id: "dragon-3", name: "dragon 3", rarity: "common", baseStrengthMin: 8, baseStrengthMax: 14, sellMultiplier: 1.0, lifespanDays: 43 },
-  { id: "dragon-4", name: "dragon 4", rarity: "common", baseStrengthMin: 9, baseStrengthMax: 14, sellMultiplier: 1.05, lifespanDays: 42 },
-  { id: "dragon-5", name: "dragon 5", rarity: "common", baseStrengthMin: 9, baseStrengthMax: 15, sellMultiplier: 1.05, lifespanDays: 41 },
-  { id: "dragon-6", name: "dragon 6", rarity: "uncommon", baseStrengthMin: 11, baseStrengthMax: 16, sellMultiplier: 1.15, lifespanDays: 40 },
-  { id: "dragon-7", name: "dragon 7", rarity: "uncommon", baseStrengthMin: 11, baseStrengthMax: 17, sellMultiplier: 1.15, lifespanDays: 39 },
-  { id: "dragon-8", name: "dragon 8", rarity: "uncommon", baseStrengthMin: 12, baseStrengthMax: 17, sellMultiplier: 1.2, lifespanDays: 38 },
-  { id: "dragon-9", name: "dragon 9", rarity: "uncommon", baseStrengthMin: 12, baseStrengthMax: 18, sellMultiplier: 1.2, lifespanDays: 37 },
-  { id: "dragon-10", name: "dragon 10", rarity: "uncommon", baseStrengthMin: 13, baseStrengthMax: 18, sellMultiplier: 1.25, lifespanDays: 36 },
-  { id: "dragon-11", name: "dragon 11", rarity: "rare", baseStrengthMin: 14, baseStrengthMax: 20, sellMultiplier: 1.3, lifespanDays: 35 },
-  { id: "dragon-12", name: "dragon 12", rarity: "rare", baseStrengthMin: 14, baseStrengthMax: 20, sellMultiplier: 1.3, lifespanDays: 34 },
-  { id: "dragon-13", name: "dragon 13", rarity: "rare", baseStrengthMin: 15, baseStrengthMax: 21, sellMultiplier: 1.35, lifespanDays: 33 },
-  { id: "dragon-14", name: "dragon 14", rarity: "epic", baseStrengthMin: 16, baseStrengthMax: 22, sellMultiplier: 1.45, lifespanDays: 31 },
-  { id: "dragon-15", name: "dragon 15", rarity: "epic", baseStrengthMin: 18, baseStrengthMax: 25, sellMultiplier: 1.6, lifespanDays: 30 },
+  // Night Fury is the strongest (epic, highest base strength).
+  { id: "dragon-1", name: "Gronkle", rarity: "common", baseStrengthMin: 8, baseStrengthMax: 14, sellMultiplier: 1.0, lifespanDays: 45 },
+  { id: "dragon-2", name: "Hideous Zippleback", rarity: "common", baseStrengthMin: 8, baseStrengthMax: 14, sellMultiplier: 1.0, lifespanDays: 44 },
+  { id: "dragon-3", name: "Snowtail", rarity: "common", baseStrengthMin: 8, baseStrengthMax: 14, sellMultiplier: 1.0, lifespanDays: 43 },
+  { id: "dragon-4", name: "Windwalker", rarity: "common", baseStrengthMin: 9, baseStrengthMax: 14, sellMultiplier: 1.05, lifespanDays: 42 },
+  { id: "dragon-5", name: "Deadly Nadder", rarity: "common", baseStrengthMin: 9, baseStrengthMax: 15, sellMultiplier: 1.05, lifespanDays: 41 },
+  { id: "dragon-6", name: "Wooly Howl", rarity: "uncommon", baseStrengthMin: 11, baseStrengthMax: 16, sellMultiplier: 1.15, lifespanDays: 40 },
+  { id: "dragon-7", name: "Monstrerous Nightmare", rarity: "uncommon", baseStrengthMin: 11, baseStrengthMax: 17, sellMultiplier: 1.15, lifespanDays: 39 },
+  { id: "dragon-8", name: "Razorwhip", rarity: "uncommon", baseStrengthMin: 12, baseStrengthMax: 17, sellMultiplier: 1.2, lifespanDays: 38 },
+  { id: "dragon-9", name: "Songwing", rarity: "uncommon", baseStrengthMin: 12, baseStrengthMax: 18, sellMultiplier: 1.2, lifespanDays: 37 },
+  { id: "dragon-10", name: "Triple Stryke", rarity: "uncommon", baseStrengthMin: 13, baseStrengthMax: 18, sellMultiplier: 1.25, lifespanDays: 36 },
+  { id: "dragon-11", name: "Stormcutter", rarity: "rare", baseStrengthMin: 14, baseStrengthMax: 20, sellMultiplier: 1.3, lifespanDays: 35 },
+  { id: "dragon-12", name: "Skrill", rarity: "rare", baseStrengthMin: 14, baseStrengthMax: 20, sellMultiplier: 1.3, lifespanDays: 34 },
+  { id: "dragon-13", name: "Light Night", rarity: "rare", baseStrengthMin: 15, baseStrengthMax: 21, sellMultiplier: 1.35, lifespanDays: 33 },
+  { id: "dragon-14", name: "Night Light", rarity: "epic", baseStrengthMin: 16, baseStrengthMax: 22, sellMultiplier: 1.45, lifespanDays: 32 },
+  { id: "dragon-15", name: "Light Fury", rarity: "epic", baseStrengthMin: 18, baseStrengthMax: 24, sellMultiplier: 1.55, lifespanDays: 31 },
+  { id: "dragon-16", name: "Night Fury", rarity: "epic", baseStrengthMin: 20, baseStrengthMax: 28, sellMultiplier: 1.7, lifespanDays: 30 },
 ];
 
 export const MONSTERS: MonsterDef[] = [
