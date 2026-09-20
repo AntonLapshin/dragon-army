@@ -1,10 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import {
-  _setPageConfig,
-  WatchPage,
+  _setPageConfigFixed as _setPageConfig,
+  WatchPageFixed as WatchPage,
   triggerRender,
-} from "zepp-web-runner/components/WatchPage";
+} from "./components/WatchPageFixed.jsx";
 import DebugPanel from "./components/DebugPanel.jsx";
 
 globalThis.Page = _setPageConfig;
