@@ -10,3 +10,13 @@ export const BTN_GREEN = 0x4caf50;
 export const BTN_GREEN_PRESS = 0x2e7d32;
 export const ICON_SIZE = 64;
 export const CENTER_IMG = 240;
+
+// Semi-transparent black pill drawn behind texts so they stay readable
+// over the bright bg-home / bg-dragon artwork.
+export const TEXT_PILL_COLOR = 0xcc000000;
+
+// Modal panel layout (fixed geometry for the 390x450 watch screen).
+export const PANEL_W = 340;
+export const PANEL_H = 370;
+export const PANEL_X = 25;
+export const PANEL_Y = 40;

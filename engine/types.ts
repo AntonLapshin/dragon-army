@@ -35,6 +35,11 @@ export interface DragonBreed {
   baseStrengthMax: number;
   sellMultiplier: number;
   /**
+   * Asset basename for `assets/dragons/<assetKey>.png` and
+   * `assets/eggs/<assetKey>.png`. Presentation-only; never enters formulas.
+   */
+  assetKey: string;
+  /**
    * Full lifespan in days counted from `hatchedAtMs`.
    * Cheaper/weaker breeds live longer (45d) than strong/epic ones (30d).
    * Death/expiry is computed: `ageDaysForDragon(...) >= lifespanDays`.
@@ -61,6 +66,11 @@ export interface MonsterDef {
   energyLossWinMax: number;
   energyLossLoseMin: number;
   energyLossLoseMax: number;
+  /**
+   * Image path relative to `assets/` (e.g. `monsters/gronkle.png`).
+   * Presentation-only; never enters formulas.
+   */
+  image: string;
 }
 
 /** Outcome of one monster fight (pure result of `resolveMonsterFight`). */

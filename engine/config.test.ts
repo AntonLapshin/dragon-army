@@ -59,6 +59,7 @@ const stubBreed = (over: Partial<DragonBreed> = {}): DragonBreed => ({
   baseStrengthMax: 14,
   sellMultiplier: 1.0,
   lifespanDays: 45,
+  assetKey: "test_breed",
   ...over,
 });
 
@@ -688,13 +689,17 @@ describe("catalogue invariants (CONFIG / DRAGONS / MONSTERS)", () => {
   });
   it("breeds have valid strength ranges, multipliers and lifespans", () => {
     const ids = new Set<string>();
+    const assetKeys = new Set<string>();
     for (const b of DRAGONS) {
       expect(b.baseStrengthMin).toBeLessThanOrEqual(b.baseStrengthMax);
       expect(b.sellMultiplier).toBeGreaterThan(0);
       expect(b.lifespanDays).toBeGreaterThanOrEqual(30);
       expect(b.lifespanDays).toBeLessThanOrEqual(45);
+      expect(b.assetKey).toMatch(/^[a-z0-9_]+$/);
       expect(ids.has(b.id)).toBe(false);
+      expect(assetKeys.has(b.assetKey)).toBe(false);
       ids.add(b.id);
+      assetKeys.add(b.assetKey);
     }
   });
   it("weaker breeds live longer than epics (design intent)", () => {
@@ -719,6 +724,9 @@ describe("catalogue invariants (CONFIG / DRAGONS / MONSTERS)", () => {
     expect(MONSTERS[0].strength).toBeLessThan(MONSTERS[1].strength);
     expect(MONSTERS[1].strength).toBeLessThan(MONSTERS[2].strength);
     expect(MONSTERS[0].rewardMax).toBeLessThan(MONSTERS[2].rewardMin);
+    for (const m of MONSTERS) {
+      expect(m.image).toMatch(/^monsters\/.+\.png$/);
+    }
   });
   it("balance targets reference reachable thresholds", () => {
     expect(CONFIG.balanceTargets.hourlyIncome).toBe(
