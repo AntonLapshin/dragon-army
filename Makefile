@@ -1,7 +1,11 @@
 .PHONY: data bg misc sprites optimize zepp clean help
 
 # Full data pipeline: raw/ -> assets/ -> assets/default.{b,r,s}
-data: bg misc sprites optimize zepp
+data: icon bg misc sprites optimize zepp
+
+# 0) Icon raw/ -> assets/
+icon:
+	cp raw/icon.png assets/icon.png
 
 # 1) Backgrounds: raw/ -> assets/bg/
 bg:
@@ -35,7 +39,7 @@ zepp:
 	mkdir -p assets/default.b assets/default.r assets/default.s
 	for d in assets/default.b assets/default.r assets/default.s; do \
 		cp -r assets/bg assets/dragons assets/eggs assets/misc assets/monsters assets/ui "$$d/"; \
-		cp icon.png "$$d/icon.png"; \
+		cp assets/icon.png "$$d/icon.png"; \
 	done
 
 clean:
@@ -44,7 +48,8 @@ clean:
 
 help:
 	@echo "Targets:"
-	@echo "  make data      - full pipeline: bg + misc + sprites + optimize + zepp"
+	@echo "  make data      - full pipeline: icon + bg + misc + sprites + optimize + zepp"
+	@echo "  make icon      - copy icon raw/ -> assets/"
 	@echo "  make bg        - copy backgrounds raw/ -> assets/bg/"
 	@echo "  make misc      - copy overlay/shadow raw/ -> assets/misc/"
 	@echo "  make sprites   - cut sprite sheets raw/ -> assets/{ui,eggs,dragons,monsters}/"
