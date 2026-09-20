@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "spritecut"
 version = "1.0.0"
-description = "Cut a grid sprite sheet (icons on white/transparent background) into individual, centred, transparent PNGs."
+description = "Cut a grid sprite sheet (icons on white/transparent background) into individual, centred PNGs (transparent with --remove-bg)."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }

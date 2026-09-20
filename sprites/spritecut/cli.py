@@ -26,7 +26,7 @@ examples:
   spritecut sheet.png -s 32 -g 4x4 -N names.txt --preview
 
   # dark sheet: light art on #101014
-  spritecut sheet.png -s 48 -N names.txt --bg-color '#101014' --color-tolerance 30
+  spritecut sheet.png -s 48 -N names.txt --remove-bg --bg-color '#101014' --color-tolerance 30
 
   # a manifest for your build script
   spritecut sheet.png -s 64 -N names.txt --manifest sprites/manifest.json --json
@@ -41,7 +41,9 @@ def build_parser() -> argparse.ArgumentParser:
         prog=PROG,
         description=(
             "Cut a grid sprite sheet (icons on a white or transparent background) into "
-            "individual, centred, transparent PNGs that all share one size."
+            "individual, centred PNGs that all share one size. "
+            "The sheet background is kept by default; pass --remove-bg to "
+            "replace white with transparency."
         ),
         epilog=EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -72,24 +74,40 @@ def build_parser() -> argparse.ArgumentParser:
                         help="extra source pixels kept around each icon before scaling (default: %(default)s)")
     layout.add_argument("--merge-distance", type=float, default=0.0, metavar="PX",
                         help="merge blobs closer than PX pixels - for multi-part icons (default: off)")
+    layout.add_argument("--merge-max-factor", type=float, default=1.6, metavar="FACTOR",
+                        help="never merge two blobs into a box wider/taller than FACTOR x the typical "
+                             "icon - keeps neighbours apart (default: %(default)s; 0 disables the guard)")
+    layout.add_argument("--no-split-merged", dest="split_merged", action="store_false",
+                        help="do not split boxes that swallowed several icons back apart")
+    layout.set_defaults(split_merged=True)
     layout.add_argument("--row-tolerance", type=float, default=None, metavar="PX",
                         help="vertical slack when grouping icons into rows (default: from icon height)")
     layout.add_argument("--min-area", type=int, default=8, metavar="PX",
                         help="ignore blobs with fewer than PX foreground pixels (default: %(default)s)")
     layout.add_argument("--min-size", type=int, default=2, metavar="PX",
                         help="ignore blobs narrower or shorter than PX pixels (default: %(default)s)")
+    layout.add_argument("--min-relative-area", type=float, default=0.15, metavar="FACTOR",
+                        help="ignore blobs smaller than FACTOR x the median icon area - "
+                             "icons on a sheet share one size, dust does not "
+                             "(default: %(default)s; 0 disables)")
 
-    bg = parser.add_argument_group("background removal")
+    bg = parser.add_argument_group("background removal (off by default)")
+    bg_toggle = bg.add_mutually_exclusive_group()
+    bg_toggle.add_argument("--remove-bg", dest="remove_bg", action="store_true", default=None,
+                    help="replace the sheet background with transparency")
+    bg_toggle.add_argument("--keep-bg", "--no-remove-bg", dest="remove_bg", action="store_false",
+                    help="keep the sheet background as-is (default)")
     bg.add_argument("--white-threshold", type=int, default=244, metavar="0-255",
-                    help="channel value from which a pixel counts as white (default: %(default)s)")
+                    help="channel value from which a pixel counts as white (default: %(default)s; "
+                         "implies --remove-bg when changed)")
     bg.add_argument("--alpha-threshold", type=int, default=8, metavar="0-255",
-                    help="alpha from which a pixel counts as transparent (default: %(default)s)")
+                    help="alpha below which a pixel counts as transparent (default: %(default)s)")
     bg.add_argument("--feather", type=int, default=8, metavar="0-255",
-                    help="softness of the cut edge, 0 = hard cut (default: %(default)s)")
+                    help="softness of the cut edge, 0 = hard cut (default: %(default)s; only with --remove-bg)")
     bg.add_argument("--no-defringe", action="store_true",
-                    help="keep the whitish halo on semi transparent edge pixels")
+                    help="keep the whitish halo on semi transparent edge pixels (only with --remove-bg)")
     bg.add_argument("--bg-color", metavar="#RRGGBB",
-                    help="use this colour instead of white as the sheet background")
+                    help="use this colour instead of white as the sheet background (implies --remove-bg)")
     bg.add_argument("--color-tolerance", type=int, default=24, metavar="0-255",
                     help="tolerance for --bg-color and for near-white greys (default: %(default)s)")
 
@@ -173,6 +191,23 @@ def make_options(args: argparse.Namespace) -> CutOptions:
         feather=max(0, args.feather),
         defringe=not args.no_defringe,
     )
+    # Background removal is OFF by default. Explicit --remove-bg turns it on,
+    # explicit --keep-bg/--no-remove-bg forces it off. For backward
+    # compatibility, tuning knobs that only make sense with removal also
+    # imply --remove-bg when the user changed them from their defaults.
+    if args.remove_bg is True:
+        remove_bg = True
+    elif args.remove_bg is False:
+        remove_bg = False
+    else:
+        remove_bg = bool(
+            args.bg_color is not None
+            or args.white_threshold != 244
+            or args.alpha_threshold != 8
+            or args.feather != 8
+            or args.color_tolerance != 24
+            or args.no_defringe
+        )
     preview: Optional[str] = None
     if args.preview is not None:
         preview = args.preview or os.path.join(args.out, "_preview.png")
@@ -184,10 +219,14 @@ def make_options(args: argparse.Namespace) -> CutOptions:
         margin=args.margin,
         fit=args.fit,
         resample=args.resample,
+        remove_bg=remove_bg,
         background=background,
         min_area=max(1, args.min_area),
         min_size=max(1, args.min_size),
+        min_relative_area=max(0.0, args.min_relative_area),
         merge_distance=max(0.0, args.merge_distance),
+        merge_max_factor=max(0.0, args.merge_max_factor),
+        split_merged=args.split_merged,
         row_tolerance=args.row_tolerance,
         out_bg=args.out_bg,
         template=args.template,

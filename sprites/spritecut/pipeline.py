@@ -26,7 +26,15 @@ from .imaging import (
     save_png,
     strip_background,
 )
-from .labeling import Box, connected_boxes, grid_boxes, merge_close_boxes, reading_order
+from .labeling import (
+    Box,
+    connected_boxes,
+    filter_tiny_boxes,
+    grid_boxes,
+    merge_close_boxes,
+    reading_order,
+    split_merged_boxes,
+)
 
 __all__ = [
     "CutOptions",
@@ -51,10 +59,14 @@ class CutOptions:
     margin: float = 0.05
     fit: str = "contain"
     resample: str = "lanczos"
+    remove_bg: bool = False
     background: BackgroundSpec = field(default_factory=BackgroundSpec)
     min_area: int = 8
     min_size: int = 2
+    min_relative_area: float = 0.15
     merge_distance: float = 0.0
+    merge_max_factor: float = 1.6
+    split_merged: bool = True
     row_tolerance: Optional[float] = None
     out_bg: str = "transparent"
     template: str = "{name}.png"
@@ -130,6 +142,47 @@ def render_preview(sheet: np.ndarray, boxes: Sequence[Box], names: Sequence[str]
     image.save(path, format="PNG")
 
 
+def _expand_without_overlap(
+    boxes: Sequence[Box], pad: int, img_w: int, img_h: int
+) -> List[Box]:
+    """Expand boxes by pad pixels but never let them overlap each other.
+
+    Plain expansion lets neighbouring boxes steal each other's edge pixels,
+    so the crop of one sprite ends up containing a sliver of the next. When
+    two expanded boxes overlap, the overlap is removed symmetrically: each
+    side gives up half (the smaller side first on odd pixels), so neither
+    sprite "thinks" the other's art is its own.
+    """
+    expanded = [box.expanded(pad, img_w, img_h) for box in boxes]
+    changed = True
+    guard = 0
+    while changed and guard < 10:
+        changed = False
+        guard += 1
+        for i in range(len(expanded)):
+            for j in range(i + 1, len(expanded)):
+                a, b = expanded[i], expanded[j]
+                overlap_w = min(a.x1, b.x1) - max(a.x0, b.x0)
+                overlap_h = min(a.y1, b.y1) - max(a.y0, b.y0)
+                if overlap_w <= 0 or overlap_h <= 0:
+                    continue
+                changed = True
+                # Resolve along the axis of least penetration so boxes
+                # keep as much of their padding as possible.
+                if overlap_w <= overlap_h:
+                    a_share = overlap_w // 2
+                    b_share = overlap_w - a_share
+                    a = Box(a.x0, a.y0, max(a.x0 + 1, a.x1 - a_share), a.y1, a.area, a.label)
+                    b = Box(min(b.x1 - 1, b.x0 + b_share), b.y0, b.x1, b.y1, b.area, b.label)
+                else:
+                    a_share = overlap_h // 2
+                    b_share = overlap_h - a_share
+                    a = Box(a.x0, a.y0, a.x1, max(a.y0 + 1, a.y1 - a_share), a.area, a.label)
+                    b = Box(b.x0, min(b.y1 - 1, b.y0 + b_share), b.x1, b.y1, b.area, b.label)
+                expanded[i], expanded[j] = a, b
+    return expanded
+
+
 def resolve_names(
     names: Sequence[str], boxes: Sequence[Box], options: CutOptions, log: Callable[[str], None]
 ) -> List[str]:
@@ -168,8 +221,12 @@ def cut_sprites(
     height, width = rgba.shape[:2]
     log(f"sheet {sheet_path}: {width}x{height}px")
 
-    background = background_mask(rgba, options.background)
-    foreground = ~background
+    # Detection always treats white/transparent/bg-colour as background so
+    # boxes hug the art. Whether that background is *removed* (made
+    # transparent) in the output is controlled by options.remove_bg
+    # (default: keep the original background).
+    detect_background = background_mask(rgba, options.background)
+    foreground = ~detect_background
     if not foreground.any():
         raise SystemExit(
             f"error: no foreground pixels found in {sheet_path!r}. "
@@ -178,7 +235,14 @@ def cut_sprites(
 
     if options.grid:
         rows, cols = options.grid
-        boxes = grid_boxes(foreground, rows, cols, options.min_area, options.padding)
+        boxes = grid_boxes(
+            foreground,
+            rows,
+            cols,
+            options.min_area,
+            options.padding,
+            min_relative_area=options.min_relative_area,
+        )
         log(f"grid {rows}x{cols}: {len(boxes)} non-empty cell(s) out of {rows * cols}")
     else:
         boxes = connected_boxes(
@@ -188,13 +252,29 @@ def cut_sprites(
             min_height=options.min_size,
         )
         log(f"auto-detect: {len(boxes)} blob(s) with area >= {options.min_area}")
+        if options.split_merged:
+            before = len(boxes)
+            boxes = split_merged_boxes(foreground, boxes)
+            if len(boxes) != before:
+                log(f"split-merged: {before} -> {len(boxes)} sprite(s)")
         if options.merge_distance > 0:
             before = len(boxes)
-            boxes = merge_close_boxes(boxes, options.merge_distance)
+            boxes = merge_close_boxes(
+                boxes, options.merge_distance, options.merge_max_factor
+            )
             log(f"merge-distance {options.merge_distance:g}: {before} -> {len(boxes)} sprite(s)")
+        if options.min_relative_area > 0:
+            before = len(boxes)
+            boxes = filter_tiny_boxes(boxes, options.min_relative_area)
+            dropped = before - len(boxes)
+            if dropped:
+                log(
+                    f"size-filter: dropped {dropped} tiny fragment(s) "
+                    f"(< {options.min_relative_area:g} x median area)"
+                )
         boxes = reading_order(boxes, options.row_tolerance)
         if options.padding:
-            boxes = [box.expanded(options.padding, width, height) for box in boxes]
+            boxes = _expand_without_overlap(boxes, options.padding, width, height)
 
     if not boxes:
         raise SystemExit(
@@ -220,8 +300,12 @@ def cut_sprites(
         target = os.path.join(options.out_dir, filename)
 
         crop = crop_box(rgba, box.as_tuple())
-        crop_background = crop_mask(background, box.as_tuple())
-        cleaned = strip_background(crop, crop_background, options.background)
+        if options.remove_bg:
+            crop_background = crop_mask(detect_background, box.as_tuple())
+            cleaned = strip_background(crop, crop_background, options.background)
+        else:
+            # Keep the sheet background as-is (white stays opaque).
+            cleaned = np.array(crop, dtype=np.uint8, copy=True)
         if solid_bg is not None:
             cleaned = flatten(cleaned, solid_bg)
         fitted = fit_center(cleaned, out_w, out_h, options.margin, resample, options.fit)

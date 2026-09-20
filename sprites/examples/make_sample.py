@@ -138,9 +138,9 @@ def main() -> int:
     print("now cut it:")
     size = 64
     if args.dark:
-        print(f"  spritecut {sheetpath} -s {size} -N {namespath} -o sprites/ -g {args.rows}x{args.cols} --bg-color '#101014' --preview")
+        print(f"  spritecut {sheetpath} -s {size} -N {namespath} -o sprites/ -g {args.rows}x{args.cols} --remove-bg --bg-color '#101014' --preview")
     else:
-        print(f"  spritecut {sheetpath} -s {size} -N {namespath} -o sprites/ -g {args.rows}x{args.cols} --preview")
+        print(f"  spritecut {sheetpath} -s {size} -N {namespath} -o sprites/ -g {args.rows}x{args.cols} --remove-bg --preview")
     return 0
 
 if name == "main":
