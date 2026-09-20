@@ -530,7 +530,7 @@ function renderDragon(width, view) {
 
   const imgSize = 240;
   const imgX = Math.floor((width - imgSize) / 2);
-  const imgY = 134;
+  const imgY = 154;
   if (egg) {
     addImg(imgX, imgY, imgSize, imgSize, 'eggs/' + breed.assetKey + '.png');
   } else {
@@ -602,7 +602,7 @@ function renderEggSpin() {
     addButton(PANEL_X + 90, PANEL_Y + 220, 160, 48, 'Reveal', stopEggSpin);
   } else {
     const breed = breedForIndex(modal.breedIndex);
-    addImg(PANEL_X + 130, PANEL_Y + 60, 80, 80, 'eggs/' + breed.assetKey + '.png');
+    addImg(PANEL_X + 130, PANEL_Y + 80, 80, 80, 'eggs/' + breed.assetKey + '.png');
     addText(PANEL_X + 20, PANEL_Y + 150, PANEL_W - 40, 36, breed.name, 22, 0xaaffaa);
     addText(PANEL_X + 20, PANEL_Y + 186, PANEL_W - 40, 28, 'Price: ' + CONFIG.egg.price + ' coins', 19, 0xdddddd);
   }
@@ -767,7 +767,7 @@ function renderCoinSummary() {
   addImg(PANEL_X + 140, PANEL_Y + 70, 60, 60, 'coin.png');
   addText(
     PANEL_X + 20, PANEL_Y + 150, PANEL_W - 40, 60,
-    '+' + _modal.amount + ' coins added (hourly generation)',
+    '+' + _modal.amount + ' coins added',
     20, 0xffee88,
   );
   addButton(PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'OK', () => {
