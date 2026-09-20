@@ -3,11 +3,14 @@ import { _reset, _collect } from "zepp-web-runner/shims/hmUI";
 import { DEVICE_WIDTH, DEVICE_HEIGHT } from "zepp-web-runner/constants";
 
 // ---------------------------------------------------------------------------
-// Local copy of zepp-web-runner WidgetRenderer with two dev-only fixes:
+// Local copy of zepp-web-runner WidgetRenderer with dev-only fixes:
 //  1. GESTURE supports mouse drag (pointer events), not just touch, so swipe
 //     navigation can be tested with `npm run dev` on a desktop browser.
 //  2. Fully transparent colors (alpha 0x00, e.g. 0x00000000) render as
 //     transparent instead of opaque black.
+//  3. IMG never scales (real Zepp OS device behavior): source PNG is drawn
+//     1:1 at (x, y) inside an overflow:hidden w/h box. objectFit contain/fill
+//     is forbidden — it hid asset/widget size mismatches.
 // ---------------------------------------------------------------------------
 
 function toCssColor(c) {
@@ -55,29 +58,49 @@ function imageUrl(src) {
 
 function renderIMG(widget) {
   const p = widget._props;
-  // misc/overlay.png is a flat shade stretched over FILL_RECT-sized boxes
-  // (text pills, modal dim) because Zepp OS ignores FILL_RECT alpha. The
-  // device stretches IMG to w/h, so preview it with fill; every other
-  // asset keeps contain.
-  const isShade = typeof p.src === "string" && p.src.indexOf("overlay") !== -1;
+  // Real Zepp OS device does NOT scale IMG widgets: the source PNG is drawn
+  // 1:1 at (x, y) and w/h only define the box (cropping when the source is
+  // larger, empty space when it is smaller). Never use objectFit contain/fill
+  // here — that hid size mismatches in desktop testing. This renderer keeps
+  // the <img> at its natural size inside an overflow:hidden box so the web
+  // preview shows exactly what the watch shows (top-left anchored, clipped).
+  // NOTE: misc/overlay.png is a flat shade, so cropping it to a smaller pill
+  // still looks the same; every other asset must match w/h exactly.
+  const clickable = Boolean(widget._events.click);
   return (
-    <img
+    <div
       key={widget._id}
-      src={imageUrl(p.src)}
-      alt=""
       style={{
         ...baseStyle(p),
-        objectFit: isShade ? "fill" : "contain",
-        pointerEvents: widget._events.click ? "auto" : "none",
+        overflow: "hidden",
+        pointerEvents: clickable ? "auto" : "none",
+        cursor: clickable ? "pointer" : "default",
         userSelect: "none",
       }}
-      draggable={false}
-      onClick={() => {
-        if (widget._events.click) {
-          widget._events.click.forEach((fn) => fn());
-        }
-      }}
-    />
+      onClick={
+        clickable
+          ? () => {
+              widget._events.click.forEach((fn) => fn());
+            }
+          : undefined
+      }
+    >
+      <img
+        src={imageUrl(p.src)}
+        alt=""
+        style={{
+          display: "block",
+          width: "auto",
+          height: "auto",
+          maxWidth: "none",
+          maxHeight: "none",
+          pointerEvents: "none",
+          userSelect: "none",
+          flexShrink: 0,
+        }}
+        draggable={false}
+      />
+    </div>
   );
 }
 
