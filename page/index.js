@@ -192,12 +192,29 @@ function addText(x, y, w, h, text, size, color, alignH) {
 }
 
 // Dark pill behind a text line so it stays readable over bright backgrounds.
+// The pill wraps the text (auto-sized + centered) instead of stretching full width.
 function addBadgeText(x, y, w, h, text, size, color, alignH) {
   const pad = 8;
+  const str = String(text);
+  const fs = size || 20;
+  const estTextW = Math.ceil(str.length * fs * 0.6);
+  const pillW = Math.max(24, Math.min(w, estTextW + pad * 2));
+  const isLeft = alignH !== undefined && alignH !== null
+    && (alignH === hmUI.align.LEFT || alignH === 'left' || alignH === 'LEFT');
+  let pillX;
+  let textX;
+  const textW = Math.max(10, pillW - pad * 2);
+  if (isLeft) {
+    pillX = x;
+    textX = x + pad;
+  } else {
+    pillX = Math.round(x + (w - pillW) / 2);
+    textX = pillX + pad;
+  }
   push(hmUI.createWidget(hmUI.widget.FILL_RECT, {
-    x: Math.max(0, x - pad), y, w: w + pad * 2, h, color: TEXT_PILL_COLOR, radius: Math.floor(h / 2),
+    x: Math.max(0, pillX), y, w: pillW, h, color: TEXT_PILL_COLOR, radius: Math.floor(h / 2),
   }));
-  return addText(x, y, w, h, text, size, color, alignH);
+  return addText(textX, y, textW, h, str, fs, color, alignH);
 }
 
 // Horizontally centered "coin icon + value" row with a dark pill behind it.
@@ -532,9 +549,7 @@ function renderDragon(width, view) {
 }
 
 function renderNav(width) {
-  // Swipe-only navigation (no arrow buttons): just a page indicator pill.
-  const y = DEVICE_HEIGHT - 40;
-  addBadgeText(0, y, width, 28, (_screenIndex + 1) + ' / ' + (1 + roster().length), 18, 0xffffff);
+  // Page indicator (1/2, 2/2) intentionally not rendered.
 }
 
 // ---------------------------------------------------------------------------
@@ -563,7 +578,7 @@ function renderEggSpin() {
     if (!full) {
       addText(PANEL_X + 20, PANEL_Y + 130, PANEL_W - 40, 30, 'Price: ' + CONFIG.egg.price + ' coins', 19, 0xdddddd);
     }
-    addButton(PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'Yo hoo', null, { normal: 0x555555 });
+    addButton(PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'OK', null, { normal: 0x555555 });
     return;
   }
   renderModalShell('Get a New Egg', false);
@@ -579,7 +594,7 @@ function renderEggSpin() {
     addText(PANEL_X + 20, PANEL_Y + 186, PANEL_W - 40, 28, 'Price: ' + CONFIG.egg.price + ' coins', 19, 0xdddddd);
   }
   addButton(
-    PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'Yo hoo',
+    PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'OK',
     modal.spinning ? null : confirmEgg,
     modal.spinning ? { normal: 0x555555 } : {},
   );
@@ -612,7 +627,7 @@ function renderTrainResult() {
   renderModalShell('Training', false);
   addImg(PANEL_X + 140, PANEL_Y + 70, 60, 60, 'victory.png');
   addText(PANEL_X + 20, PANEL_Y + 150, PANEL_W - 40, 60, _modal.text || '', 20, 0xaaffaa);
-  addButton(PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'Yo hoo', closeModal);
+  addButton(PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'OK', closeModal);
 }
 
 function renderSell() {
@@ -742,7 +757,7 @@ function renderCoinSummary() {
     '+' + _modal.amount + ' coins added (hourly generation)',
     20, 0xffee88,
   );
-  addButton(PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'Yo hoo', () => {
+  addButton(PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'OK', () => {
     engine.collectCoins();
     _modal = null;
     if (_page) _page.render();
