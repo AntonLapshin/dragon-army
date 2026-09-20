@@ -297,6 +297,18 @@ function addBar(x, y, w, value, max) {
 }
 
 function addIconButton(x, y, size, src, onTap, dimmed) {
+  // Dark pill behind the icon so it stays readable over bright backgrounds.
+  const pad = 8;
+  const pillX = Math.max(0, x - pad);
+  const pillY = Math.max(0, y - pad);
+  const pillS = size + pad * 2;
+  if (dimmed) {
+    push(hmUI.createWidget(hmUI.widget.FILL_RECT, {
+      x: pillX, y: pillY, w: pillS, h: pillS, color: TEXT_PILL_COLOR, radius: 20,
+    }));
+  } else {
+    addRect(pillX, pillY, pillS, pillS, TEXT_PILL_COLOR, 20, onTap);
+  }
   addImg(x, y, size, size, src, dimmed ? null : onTap);
   if (dimmed) {
     push(hmUI.createWidget(hmUI.widget.FILL_RECT, {
@@ -482,7 +494,9 @@ function renderMain(width) {
   }, false);
 
   addBadgeText(0, 190, width, 28, 'Swipe to see dragons', 18, 0xffeeaa);
-  addBadgeText(0, 222, width, 24, count === 0 ? 'Buy your first egg!' : (_screenIndex + 1) + ' / ' + (1 + count), 18, 0xffffff);
+  if (count === 0) {
+    addBadgeText(0, 222, width, 24, 'Buy your first egg!', 18, 0xffffff);
+  }
 
   // Earn Coins — bottom-left, only when collectible coins exist.
   if (economy.hasCollectible) {
@@ -518,7 +532,6 @@ function renderDragon(width, view) {
   const imgY = 134;
   if (egg) {
     addImg(imgX, imgY, imgSize, imgSize, 'eggs/' + breed.assetKey + '.png');
-    addBadgeText(0, imgY + imgSize + 4, width, 28, 'Hatching...', 22, 0xffffff);
   } else {
     addImg(imgX, imgY, imgSize, imgSize, 'dragons/' + breed.assetKey + '.png');
   }
