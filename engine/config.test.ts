@@ -683,7 +683,7 @@ describe("bewilder beast", () => {
 
 describe("catalogue invariants (CONFIG / DRAGONS / MONSTERS)", () => {
   it("breedCount matches the DRAGONS catalogue", () => {
-    expect(CONFIG.egg.breedCount).toBe(15);
+    expect(CONFIG.egg.breedCount).toBe(16);
     expect(DRAGONS).toHaveLength(CONFIG.egg.breedCount);
   });
   it("breeds have valid strength ranges, multipliers and lifespans", () => {

@@ -15,11 +15,13 @@ function toCssColor(c) {
   const r = (c >>> 16) & 0xff;
   const g = (c >>> 8) & 0xff;
   const b = c & 0xff;
-  if (a === 0) return "rgba(0,0,0,0)";
-  if (a < 255) {
-    return `rgba(${r},${g},${b},${(a / 255).toFixed(2)})`;
+  // 24-bit RGB literals (e.g. 0xffffff) carry no alpha byte (a === 0) and
+  // must render opaque; only an explicit 0x00000000 is transparent.
+  if (c === 0) return "rgba(0,0,0,0)";
+  if (a === 0 || a === 255) {
+    return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
   }
-  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+  return `rgba(${r},${g},${b},${(a / 255).toFixed(2)})`;
 }
 
 function alignToFlex(alignH, alignV) {

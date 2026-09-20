@@ -22,12 +22,24 @@ function hmUISingleton() {
   return {
     name: 'hmui-singleton',
     transform(code, id) {
-      if (!id.includes('zepp-web-runner/shims/hmUI')) return null;
+      // Patch by content, not just id: esbuild prebundles a second copy of
+      // the shim into .vite/deps/chunk-*.js (as `var _widgets`, id without
+      // 'zepp-web-runner/shims/hmUI'), which the old id check missed.
+      // That left page/index.js and WatchPageFixed.jsx talking to two
+      // separate widget arrays -> empty watch screen.
+      if (!code.includes('_widgets') || !code.includes('_nextId')) return null;
+      if (!id.includes('hmUI') && !id.includes('chunk-') && !id.includes('zepp-web-runner')) return null;
       let out = code
         .replace('let _widgets = [];', 'const __G = globalThis; __G.__zepp_hmUI_widgets ??= [];')
+        .replace('var _widgets = [];', 'const __G = globalThis; __G.__zepp_hmUI_widgets ??= [];')
         .replace('let _nextId = 0;', '__G.__zepp_hmUI_nextId ??= 0;')
+        .replace('var _nextId = 0;', '__G.__zepp_hmUI_nextId ??= 0;')
         .replace(/\b_widgets\b/g, '__G.__zepp_hmUI_widgets')
         .replace(/\b_nextId\b/g, '__G.__zepp_hmUI_nextId');
+      // NOTE: the \b guards above prevent matching inside the newly
+      // introduced __G.__zepp_hmUI_* keys (no word boundary between
+      // 'I' and '_'), so the transform is idempotent.
+      if (out === code) return null;
       return { code: out, map: null };
     },
   };
@@ -50,5 +62,11 @@ export default defineConfig({
     alias: {
       '@shared': path.resolve(root, 'shared'),
     },
+  },
+  optimizeDeps: {
+    // zepp-web-runner/shims/hmUI keeps widget state in module scope.
+    // Prebundling it into .vite/deps/chunk-*.js creates a second module
+    // instance that never sees page/index.js widgets (blank screen).
+    exclude: ['zepp-web-runner'],
   },
 });
