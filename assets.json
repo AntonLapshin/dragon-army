@@ -133,6 +133,9 @@
     "60x60",
     "240x240"
   ],
+  "misc/frame.png": [
+    "72x72"
+  ],
   "misc/overlay.png": [
     "30x30",
     "43x30",

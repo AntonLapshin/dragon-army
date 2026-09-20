@@ -317,9 +317,9 @@ describe("orientir: Bewilder Beast (boss)", () => {
     expect(beastWinRate([50, 50, 50, 50, 50], 200, 15)).toBe(1);
   });
 
-  it("boss reward (150-200) refunds ~1.5 eggs — worth the ~10h recovery", () => {
-    expect(CONFIG.beast.winRewardMin).toBe(150);
-    expect(CONFIG.beast.winRewardMax).toBe(200);
+  it("boss reward (300) refunds ~3 eggs — worth the ~10h recovery", () => {
+    expect(CONFIG.beast.winRewardMin).toBe(300);
+    expect(CONFIG.beast.winRewardMax).toBe(300);
     expect(CONFIG.beast.winRewardMin).toBeGreaterThan(CONFIG.egg.price);
     expect(CONFIG.beast.respawnAfterWinMs).toBe(24 * HOUR);
   });

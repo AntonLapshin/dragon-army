@@ -197,7 +197,7 @@ function addText(x, y, w, h, text, size, color, alignH) {
 // source cropped to a smaller box looks identical — overlaySrc() picks the
 // smallest available size that covers the requested box.
 const OVERLAY_SIZES = [
-  '30x30', '43x30', '56x30', '84x32', '92x32', '103x30', '103x32',
+  '30x30', '43x30', '56x30', '72x72', '84x32', '92x32', '103x30', '103x32',
   '106x32', '108x24', '117x30', '120x32', '132x30', '134x32', '146x30',
   '148x32', '160x30', '175x30', '178x26', '189x26', '204x30', '276x30',
   '290x30', '390x450',
@@ -267,7 +267,7 @@ function addCoinRow(width, y, coins, size) {
   const pillW = totalW + pad * 2;
   const startX = Math.floor((width - pillW) / 2);
   const rowH = 32;
-  addShade(startX, y - 2, pillW, rowH);
+  addShade(startX, y - 2, pillW + 18, rowH);
   addImg(startX + pad, y - 2, iconS, iconS, 'ui/coin_32x32.png');
   addText(startX + pad + iconS + gap, y - 2, textW, rowH, text, size || 22, 0xffffff, hmUI.align.LEFT);
 }
@@ -642,10 +642,16 @@ function renderRosterStrip(width) {
         : 'dragons/' + v.breed.assetKey + '_60x60.png';
     } catch (_) {}
     // 5 slots: spread exactly from 30px to width-30px. Fewer: left-aligned.
+    // Each thumbnail sits on a dark pill so it stays readable over the
+    // bright bg-home artwork (72x72 overlay behind the 60x60 icon).
     const n = visible.length;
     const step = n >= 5 ? (width - left * 2 - thumbS) / 4 : thumbS + 8;
     const x = Math.round(left + i * step);
-    addImg(x, y, thumbS, thumbS, src, () => goTo(idx + 1));
+    const pillS = 72;
+    const pad = Math.round((pillS - thumbS) / 2);
+    const tap = () => goTo(idx + 1);
+    addShade(x - pad, y - pad, pillS, pillS, tap);
+    addImg(x, y, thumbS, thumbS, src, tap);
   });
 }
 
@@ -833,6 +839,11 @@ function renderBeastIntro() {
     PANEL_X + 20, PANEL_Y + 206, PANEL_W - 40, 30,
     team.length === 0 ? 'No dragons ready' : team.length + ' dragon(s) ready',
     18, team.length === 0 ? 0xff8888 : 0xaaffaa,
+  );
+  addText(
+    PANEL_X + 20, PANEL_Y + 238, PANEL_W - 40, 44,
+    'Warning: you can lose dragons if defeated!',
+    16, 0xff8888,
   );
   if (team.length > 0) {
     addButton(PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'Fight', startBeastFight);

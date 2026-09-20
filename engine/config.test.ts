@@ -630,9 +630,9 @@ describe("bewilder beast", () => {
       expect(rollBeastReward(0)).toBe(CONFIG.beast.winRewardMin);
       expect(rollBeastReward(0.999999)).toBe(CONFIG.beast.winRewardMax);
     });
-    it("stays in [150, 200]", () => {
-      expect(rollBeastReward(0.5)).toBeGreaterThanOrEqual(150);
-      expect(rollBeastReward(0.5)).toBeLessThanOrEqual(200);
+    it("stays in [300, 300]", () => {
+      expect(rollBeastReward(0.5)).toBeGreaterThanOrEqual(300);
+      expect(rollBeastReward(0.5)).toBeLessThanOrEqual(300);
     });
   });
 

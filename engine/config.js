@@ -88,8 +88,8 @@ const CONFIG = {
     participants: "all-hatched-dragons-with-energy-above-0 (eggs excluded)",
     zeroEnergyBehaviour: "removed-from-roster",
     loseCondition: "all-dragons-removed-before-hp-0",
-    winRewardMin: 150,
-    winRewardMax: 200,
+    winRewardMin: 300,
+    winRewardMax: 300,
     respawnAfterWinMs: 24 * 60 * 60 * 1e3
   },
   timers: {

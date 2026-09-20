@@ -1,7 +1,11 @@
 .PHONY: data bg misc sprites scale optimize zepp clean help
 
 # Full data pipeline: raw/ -> assets/ -> assets/default.{b,r,s}
-data: icon bg misc sprites scale optimize zepp
+data: frame icon bg misc sprites scale optimize zepp
+
+# frame
+frame:
+	cp raw/frame.png assets/misc/frame.png
 
 # 0) Icon raw/ -> assets/
 icon:
@@ -34,6 +38,7 @@ sprites:
 # the final exact-size images (Zepp OS draws IMG 1:1, no runtime scaling).
 scale:
 	node optimize/resize.mjs assets assets.json
+	node optimize/round-overlay.mjs assets assets.json
 
 # 5) Optimize all PNGs in place (sharp-based, see optimize/README.md).
 optimize:
@@ -56,6 +61,7 @@ clean:
 help:
 	@echo "Targets:"
 	@echo "  make data      - full pipeline: icon + bg + misc + sprites + scale + optimize + zepp"
+	@echo "  make icon      - copy icon raw/ -> assets/"
 	@echo "  make icon      - copy icon raw/ -> assets/"
 	@echo "  make bg        - copy backgrounds raw/ -> assets/bg/"
 	@echo "  make misc      - copy overlay/shadow raw/ -> assets/misc/"
