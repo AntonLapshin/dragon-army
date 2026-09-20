@@ -1,0 +1,19 @@
+{
+  "name": "png-optimizer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Recursive PNG optimizer CLI (sharp-based, palette + max compression).",
+  "bin": {
+    "optimize-png": "./optimize.mjs"
+  },
+  "scripts": {
+    "optimize": "node optimize.mjs --help"
+  },
+  "dependencies": {
+    "sharp": "^0.35.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
