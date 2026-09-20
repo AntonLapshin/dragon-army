@@ -478,11 +478,11 @@ function renderMain(width) {
   // Buy Egg — top-left, icon only (no label). Hidden when a purchase
   // isn't available (broke or roster full).
   if (engine.canBuyEgg()) {
-    addIconButton(12, 84, 64, 'ui/egg.png', startEggSpin, false);
+    addIconButton(12, 84, 128, 'ui/egg.png', startEggSpin, false);
   }
 
   // Bewilder Beast — top-right, icon only, always visible.
-  addIconButton(width - 76, 84, 64, 'ui/bewilder_beast.png', () => {
+  addIconButton(width - 140, 84, 128, 'ui/bewilder_beast.png', () => {
     openModal({ kind: 'beast-intro' });
   }, false);
 
@@ -517,16 +517,21 @@ function renderDragon(width, view) {
   } else {
     addBadgeText(0, 8, width, 30, breed.name, 24, 0xffffff);
     addBadgeText(0, 42, width, 26, 'Lv ' + view.level + '  ·  Age ' + view.ageDays + 'd', 18, 0xffeeaa);
-    // Energy row: large icon + bar, horizontally centered as one group.
-    const eIconS = 52;
-    const eGap = 8;
-    const eBarW = 200;
-    const eTotalW = eIconS + eGap + eBarW;
-    const eX = Math.floor((width - eTotalW) / 2);
-    const eY = 66;
-    addImg(eX, eY, eIconS, eIconS, 'ui/energy.png');
-    addBar(eX + eIconS + eGap, eY + Math.floor((eIconS - 20) / 2), eBarW, view.energy, CONFIG.energy.max);
-    addBadgeText(0, 122, width, 26, 'Strength ' + view.strength, 20, 0xffffff);
+    // Energy + strength row: both icons same size, aligned horizontally
+    // as one centered group. No dark pill behind the strength icon.
+    const statIconS = 78;
+    const statGap = 8;
+    const eBarW = 120;
+    const strTextW = 60;
+    const strGap = 6;
+    const statTotalW = statIconS + statGap + eBarW + statGap + statIconS + strGap + strTextW;
+    const statX = Math.floor((width - statTotalW) / 2);
+    const statY = 60;
+    addImg(statX, statY, statIconS, statIconS, 'ui/energy.png');
+    addBar(statX + statIconS + statGap, statY + Math.floor((statIconS - 20) / 2), eBarW, view.energy, CONFIG.energy.max);
+    const strIconX = statX + statIconS + statGap + eBarW + statGap;
+    addImg(strIconX, statY, statIconS, statIconS, 'ui/strength.png');
+    addText(strIconX + statIconS + strGap, statY, strTextW, statIconS, String(view.strength), 22, 0xffffff, hmUI.align.LEFT);
   }
 
   const imgSize = 240;
@@ -538,29 +543,31 @@ function renderDragon(width, view) {
     addImg(imgX, imgY, imgSize, imgSize, 'dragons/' + breed.assetKey + '.png');
   }
 
-  // Bottom row — icon-only buttons equally spaced.
-  // Eggs show just Home (so the player can get back); hatched dragons show
-  // Train / Sell / Danger / Home, with Danger hidden when no monsters wait.
+  // Bottom row — Home is pinned bottom-right so it never moves, even when
+  // other icons are hidden. Eggs show just Home; hatched dragons show
+  // Train / Sell / (Danger) on the left, with Danger hidden when no monsters wait.
   const rowY = DEVICE_HEIGHT - 96;
   const iconS = 84;
+  const homeX = width - iconS - 12;
+  const homeY = rowY - 24;
   if (egg) {
-    addIconButton(Math.floor((width - iconS) / 2), rowY - 24, iconS, 'ui/home.png', () => goTo(0), false);
+    addIconButton(homeX, homeY, iconS, 'ui/home.png', () => goTo(0), false);
   } else {
     const hasMonsters = engine.getSpawnedMonsters().length > 0;
-    const cells = [
+    const others = [
       { src: 'ui/training.png', dimmed: view.energy <= 0, tap: () => openModal({ kind: 'train', dragonId: view.dragon.id }) },
       { src: 'ui/sell.png', dimmed: false, tap: () => openModal({ kind: 'sell', dragonId: view.dragon.id }) },
     ];
     if (hasMonsters) {
-      cells.push({ src: 'ui/danger.png', dimmed: view.energy <= 0, tap: () => openMonsterSelect(view.dragon.id) });
+      others.push({ src: 'ui/danger.png', dimmed: view.energy <= 0, tap: () => openMonsterSelect(view.dragon.id) });
     }
-    cells.push({ src: 'ui/home.png', dimmed: false, tap: () => goTo(0) });
-    const cellW = Math.floor(width / cells.length);
-    cells.forEach((cell, i) => {
-      const cx = i * cellW;
-      const ix = cx + Math.floor((cellW - iconS) / 2);
-      addIconButton(ix, rowY - 24, iconS, cell.src, cell.tap, cell.dimmed);
+    const availW = width - iconS - 24;
+    const cellW = Math.floor(availW / others.length);
+    others.forEach((cell, i) => {
+      const ix = 12 + i * cellW + Math.floor((cellW - iconS) / 2);
+      addIconButton(ix, homeY, iconS, cell.src, cell.tap, cell.dimmed);
     });
+    addIconButton(homeX, homeY, iconS, 'ui/home.png', () => goTo(0), false);
   }
 
   renderNav(width);
@@ -661,9 +668,9 @@ function renderSell() {
     return;
   }
   renderModalShell('Sell ' + view.breed.name, false);
-  addImg(PANEL_X + 130, PANEL_Y + 60, 80, 80, 'dragons/' + view.breed.assetKey + '.png');
-  addText(PANEL_X + 20, PANEL_Y + 148, PANEL_W - 40, 28, 'Will receive:', 20, 0xffffff);
-  addCoinRow(DEVICE_WIDTH, PANEL_Y + 182, price, 22);
+  addImg(PANEL_X + Math.floor((PANEL_W - 160) / 2), PANEL_Y + 50, 160, 160, 'dragons/' + view.breed.assetKey + '.png');
+  addText(PANEL_X + 20, PANEL_Y + 216, PANEL_W - 40, 28, 'Will receive:', 20, 0xffffff);
+  addCoinRow(DEVICE_WIDTH, PANEL_Y + 248, price, 22);
   addButton(PANEL_X + 40, PANEL_Y + PANEL_H - 70, 120, 48, 'Sell', () => confirmSell(view.dragon.id), { normal: 0xb71c1c });
   addButton(PANEL_X + 180, PANEL_Y + PANEL_H - 70, 120, 48, 'Keep', closeModal);
 }
