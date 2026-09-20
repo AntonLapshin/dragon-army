@@ -512,74 +512,77 @@ function renderDragon(width, view) {
   // Swipe layer first so it never covers tappable icons.
   addSwipeNav(width);
 
-  if (egg) {
-    // Still hatching: hide the breed so the dragon stays a surprise.
-    addBadgeText(0, 8, width, 30, 'Egg', 24, 0xffffff);
-  } else {
-    addBadgeText(0, 8, width, 30, breed.name, 24, 0xffffff);
-    addBadgeText(0, 42, width, 26, 'Lv ' + view.level + '  ·  Age ' + view.ageDays + 'd', 18, 0xffeeaa);
-    // Energy and Strength are left-aligned.
-    const barH = 30;
-    const eIconS = 56;
-    const eGap = 8;
-    const eBarW = 120;
-    const eX = 12;
-    const eY = 70;
-    addImg(eX, eY, eIconS, eIconS, 'ui/energy.png');
-    addBar(eX + eIconS + eGap, eY + Math.floor((eIconS - barH) / 2), eBarW, view.energy, CONFIG.energy.max);
-    const sIconS = 56;
-    const sGap = 6;
-    const sPillW = 84;
-    const sPillH = 30;
-    const sX = 12;
-    const sY = 132;
-    addImg(sX, sY, sIconS, sIconS, 'ui/strength.png');
-    addBadgeText(sX + sIconS + sGap, sY + Math.floor((sIconS - sPillH) / 2), sPillW, sPillH, String(view.strength), 22, 0xffffff, hmUI.align.LEFT);
-  }
+if (egg) {
+     // Still hatching: hide the breed so the dragon stays a surprise.
+     addBadgeText(0, 8, width, 30, 'Egg', 24, 0xffffff);
+   } else {
+     addBadgeText(0, 8, width, 30, breed.name, 24, 0xffffff);
+     addBadgeText(0, 42, width, 26, 'Lv ' + view.level + '  ·  Age ' + view.ageDays + 'd', 18, 0xffeeaa);
+   }
 
-  const imgSize = 240;
-  const imgX = Math.floor((width - imgSize) / 2);
-  const imgY = 134;
-  // Ground shadow under the egg / dragon (drawn first so it stays behind).
-  const shW = 114;
-  const shH = 28;
-  addImg(Math.floor((width - shW) / 2), imgY + imgSize - 14, shW, shH, 'misc/shadow.png');
-  if (egg) {
-    addImg(imgX, imgY, imgSize, imgSize, 'eggs/' + breed.assetKey + '.png');
-  } else {
-    addImg(imgX, imgY, imgSize, imgSize, 'dragons/' + breed.assetKey + '.png');
-  }
+   const imgSize = 240;
+   const imgX = Math.floor((width - imgSize) / 2);
+   const imgY = 134;
+   // Ground shadow under the egg / dragon (drawn first so it stays behind).
+   const shW = 114;
+   const shH = 28;
+   addImg(Math.floor((width - shW) / 2), imgY + imgSize - 14, shW, shH, 'misc/shadow.png');
+   if (egg) {
+     addImg(imgX, imgY, imgSize, imgSize, 'eggs/' + breed.assetKey + '.png');
+   } else {
+     addImg(imgX, imgY, imgSize, imgSize, 'dragons/' + breed.assetKey + '.png');
+   }
 
-  // Bottom action row — pinned to the very bottom (no roster strip on this
-  // page). Eggs show just Home at bottom-right; hatched dragons show
-  // Train / Sell / (Danger) + Home evenly spread with 30px side paddings.
-  // Danger is hidden when no monsters wait.
-  const sidePad = 30;
-  if (egg) {
-    const eggIconS = 84;
-    const eggY = DEVICE_HEIGHT - eggIconS - 12;
-    addIconButton(width - sidePad - eggIconS, eggY, eggIconS, 'ui/home.png', () => goTo(0), false);
-  } else {
-    const hasMonsters = engine.getSpawnedMonsters().length > 0;
-    const others = [
-      { src: 'ui/training.png', dimmed: view.energy <= 0, tap: () => openModal({ kind: 'train', dragonId: view.dragon.id }) },
-      { src: 'ui/sell.png', dimmed: false, tap: () => openModal({ kind: 'sell', dragonId: view.dragon.id }) },
-    ];
-    if (hasMonsters) {
-      others.push({ src: 'ui/danger.png', dimmed: view.energy <= 0, tap: () => openMonsterSelect(view.dragon.id) });
-    }
-    // 4 icons of 84px would overlap in 330px, so shrink when Danger is shown.
-    const iconS = others.length >= 3 ? 72 : 84;
-    const rowY = DEVICE_HEIGHT - iconS - 12;
-    const cells = others.concat([
-      { src: 'ui/home.png', dimmed: false, tap: () => goTo(0) },
-    ]);
-    const step = (width - sidePad * 2 - iconS) / (cells.length - 1);
-    cells.forEach((cell, i) => {
-      const ix = Math.round(sidePad + i * step);
-      addIconButton(ix, rowY, iconS, cell.src, cell.tap, cell.dimmed);
-    });
-  }
+   // Energy and Strength on top of the dragon (drawn after so they sit above).
+   if (!egg) {
+     const barH = 30;
+     const eIconS = 56;
+     const eGap = 8;
+     const eBarW = 120;
+     const eX = 12;
+     const eY = 70;
+     addImg(eX, eY, eIconS, eIconS, 'ui/energy.png');
+     addBar(eX + eIconS + eGap, eY + Math.floor((eIconS - barH) / 2), eBarW, view.energy, CONFIG.energy.max);
+     const sIconS = 56;
+     const sGap = 6;
+     const sPillW = 84;
+     const sPillH = 30;
+     const sX = 12;
+     const sY = 132;
+     addImg(sX, sY, sIconS, sIconS, 'ui/strength.png');
+     addBadgeText(sX + sIconS + sGap, sY + Math.floor((sIconS - sPillH) / 2), sPillW, sPillH, String(view.strength), 22, 0xffffff, hmUI.align.LEFT);
+   }
+
+// Bottom action row — pinned to the very bottom (no roster strip on this
+   // page). Eggs show just Home at bottom-right; hatched dragons show
+   // Home / Train / Sell / (Danger) evenly spread with 30px side paddings.
+   // Danger is hidden when no monsters wait.
+   const sidePad = 30;
+   if (egg) {
+     const eggIconS = 84;
+     const eggY = DEVICE_HEIGHT - eggIconS - 12;
+     addIconButton(width - sidePad - eggIconS, eggY, eggIconS, 'ui/home.png', () => goTo(0), false);
+   } else {
+     const hasMonsters = engine.getSpawnedMonsters().length > 0;
+     const others = [
+       { src: 'ui/sell.png', dimmed: false, tap: () => openModal({ kind: 'sell', dragonId: view.dragon.id }) },
+     ];
+     if (hasMonsters) {
+       others.push({ src: 'ui/danger.png', dimmed: view.energy <= 0, tap: () => openMonsterSelect(view.dragon.id) });
+     }
+     others.push({ src: 'ui/training.png', dimmed: view.energy <= 0, tap: () => openModal({ kind: 'train', dragonId: view.dragon.id }) });
+     // 4 icons of 84px would overlap in 330px, so shrink when Danger is shown.
+     const iconS = others.length >= 3 ? 72 : 84;
+     const rowY = DEVICE_HEIGHT - iconS - 12;
+     const cells = [
+       { src: 'ui/home.png', dimmed: false, tap: () => goTo(0) },
+     ].concat(others);
+     const step = (width - sidePad * 2 - iconS) / (cells.length - 1);
+     cells.forEach((cell, i) => {
+       const ix = Math.round(sidePad + i * step);
+       addIconButton(ix, rowY, iconS, cell.src, cell.tap, cell.dimmed);
+     });
+   }
 }
 
 function renderRosterStrip(width) {
@@ -731,14 +734,16 @@ function renderMonsterSelect() {
     addText(PANEL_X + 20, PANEL_Y + 120, PANEL_W - 40, 40, CONFIG.monsterSpawn.emptyStateText, 20, 0xdddddd);
     return;
   }
-  list.forEach((m, i) => {
-    const rowY = PANEL_Y + 64 + i * 92;
-    if (rowY + 84 > PANEL_Y + PANEL_H - 10) return;
-    addImg(PANEL_X + 24, rowY, 60, 60, m.image);
-    addText(PANEL_X + 92, rowY, 120, 30, m.difficulty, 19, 0xffffff, hmUI.align.LEFT);
-    addText(PANEL_X + 92, rowY + 32, 120, 26, 'STR ' + m.strength, 17, 0xdddddd, hmUI.align.LEFT);
-    addButton(PANEL_X + 210, rowY + 12, 100, 44, 'Fight', () => startMonsterFight(view.dragon.id, m.id), { size: 19 });
-  });
+list.forEach((m, i) => {
+     const rowY = PANEL_Y + 64 + i * 92;
+     if (rowY + 84 > PANEL_Y + PANEL_H - 10) return;
+     addImg(PANEL_X + 24, rowY, 60, 60, m.image);
+     addText(PANEL_X + 92, rowY, 120, 30, m.difficulty, 19, 0xffffff, hmUI.align.LEFT);
+     const strIconS = 22;
+     addImg(PANEL_X + 92, rowY + 34, strIconS, strIconS, 'ui/strength.png');
+     addText(PANEL_X + 92 + strIconS + 4, rowY + 32, 120, 26, String(m.strength), 17, 0xdddddd, hmUI.align.LEFT);
+     addButton(PANEL_X + 210, rowY + 12, 100, 44, 'Fight', () => startMonsterFight(view.dragon.id, m.id), { size: 19 });
+   });
 }
 
 function renderFightLines() {
