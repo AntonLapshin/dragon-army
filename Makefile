@@ -17,10 +17,9 @@ bg:
 	cp raw/bg-dragon.png assets/bg/bg-dragon.png
 	cp raw/bg-home.png assets/bg/bg-home.png
 
-# 2) Overlay + shadow: raw/ -> assets/misc/
+# 2) Shadow: raw/ -> assets/misc/
 misc:
 	mkdir -p assets/misc
-	cp raw/overlay.png assets/misc/overlay.png
 	cp raw/shadow.png assets/misc/shadow.png
 
 # 3) Sprite sheets -> individual PNGs (must run from sprites/ dir),
@@ -38,7 +37,6 @@ sprites:
 # the final exact-size images (Zepp OS draws IMG 1:1, no runtime scaling).
 scale:
 	node optimize/resize.mjs assets assets.json
-	node optimize/round-overlay.mjs assets assets.json
 
 # 5) Optimize all PNGs in place (sharp-based, see optimize/README.md).
 optimize:
@@ -64,7 +62,7 @@ help:
 	@echo "  make icon      - copy icon raw/ -> assets/"
 	@echo "  make icon      - copy icon raw/ -> assets/"
 	@echo "  make bg        - copy backgrounds raw/ -> assets/bg/"
-	@echo "  make misc      - copy overlay/shadow raw/ -> assets/misc/"
+	@echo "  make misc      - copy shadow raw/ -> assets/misc/"
 	@echo "  make sprites   - cut sprite sheets raw/ -> assets/{ui,eggs,dragons,monsters}/"
 	@echo "  make scale     - scale PNGs to exact widget sizes per assets.json (deletes originals)"
 	@echo "  make optimize  - optimize PNGs in assets/ in place"

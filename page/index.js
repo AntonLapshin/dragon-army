@@ -4,6 +4,10 @@ import { storageAdapter } from '../utils/storageAdapter.js';
 import { timeAdapter } from '../utils/timeAdapter.js';
 import {
   PANEL_COLOR,
+  PANEL_ALPHA,
+  SHADE_COLOR,
+  SHADE_ALPHA,
+  TEXT_PILL_RADIUS,
   BTN_GREEN,
   BTN_GREEN_PRESS,
   PANEL_W,
@@ -189,41 +193,29 @@ function addText(x, y, w, h, text, size, color, alignH) {
   );
 }
 
-// Zepp OS ignores FILL_RECT alpha, so every translucent surface (text
-// pills, modal dim, bg dimming) uses a pre-baked translucent PNG from
-// assets/misc/ (see assets.json) instead of a semi-transparent color.
-// Zepp OS draws IMG 1:1 (no runtime scaling), so widgets must reference
-// pre-scaled files at exact w/h. Overlay is a flat shade, so a larger
-// source cropped to a smaller box looks identical — overlaySrc() picks the
-// smallest available size that covers the requested box.
-const OVERLAY_SIZES = [
-  '30x30', '43x30', '56x30', '72x72', '84x32', '92x32', '103x30', '103x32',
-  '106x32', '108x24', '117x30', '120x32', '132x30', '134x32', '146x30',
-  '148x32', '148x35', '160x30', '175x30', '178x26', '189x26', '204x30', '276x30',
-  '290x30', '390x450',
-];
+// Translucent surfaces (text pills, modal dim, bg dimming) use FILL_RECT
+// with a separate alpha prop (API 3.0+: 0-255, 255 opaque, 0 transparent).
+// Color stays 24-bit RGB — never pack alpha into color as 8-digit ARGB.
+// Common alphas: 255 = 100%, 192 = 75%, 128 = 50%, 64 = 25%, 0 = 0%.
 
-function overlaySrc(w, h) {
-  let best = null;
-  let bestArea = Infinity;
-  for (const dim of OVERLAY_SIZES) {
-    const parts = dim.split('x');
-    const bw = Number(parts[0]);
-    const bh = Number(parts[1]);
-    if (bw >= w && bh >= h) {
-      const area = bw * bh;
-      if (area < bestArea) {
-        bestArea = area;
-        best = dim;
-      }
-    }
+// Generic translucent rect with rounded corners. Radius defaults to 0
+// (sharp corners for full-screen dims); pass a radius for pills/panels.
+function addShade(x, y, w, h, onTap, opts) {
+  const o = opts || {};
+  // Allow addShade(x, y, w, h, { alpha, radius, color }) too.
+  if (onTap && typeof onTap === 'object' && !opts) {
+    return addShade(x, y, w, h, null, onTap);
   }
-  if (!best) best = '390x450';
-  return 'misc/overlay_' + best + '.png';
-}
-
-function addShade(x, y, w, h, onTap) {
-  return addImg(x, y, w, h, overlaySrc(w, h), onTap);
+  const rect = push(
+    hmUI.createWidget(hmUI.widget.FILL_RECT, {
+      x, y, w, h,
+      color: o.color === undefined ? SHADE_COLOR : o.color,
+      alpha: o.alpha === undefined ? SHADE_ALPHA : o.alpha,
+      radius: o.radius === undefined ? 0 : o.radius,
+    }),
+  );
+  if (onTap) rect.addEventListener(hmUI.event.CLICK_DOWN, onTap);
+  return rect;
 }
 
 // Dark pill behind a text line so it stays readable over bright backgrounds.
@@ -246,14 +238,14 @@ function addBadgeText(x, y, w, h, text, size, color, alignH) {
     pillX = Math.round(x + (w - pillW) / 2);
     textX = pillX + pad;
   }
-  push(hmUI.createWidget(hmUI.widget.IMG, {
-    x: Math.max(0, pillX), y, w: pillW, h, src: overlaySrc(pillW, h),
-  }));
+  addShade(Math.max(0, pillX), y, pillW, h, null, {
+    radius: Math.min(Math.floor(Math.min(pillW, h) / 2), TEXT_PILL_RADIUS),
+  });
   return addText(textX, y, textW, h, str, fs, color, alignH);
 }
 
 // Large centered coin (64x64) with the amount rendered right below it.
-// No dark pill/overlay — the caller picks the text color for the surface
+// No dark pill/shade — the caller picks the text color for the surface
 // (black on the bright home bg, white inside dark modals).
 function addCoinBig(cx, iconY, coins, textY, textH, fontSize, color) {
   const s = 64;
@@ -262,7 +254,7 @@ function addCoinBig(cx, iconY, coins, textY, textH, fontSize, color) {
 }
 
 // Full-screen swipe navigation. Must be created FIRST (bottom z-layer) so the
-// overlay never sits on top of icons/buttons and blocks their clicks.
+// dim shade never sits on top of icons/buttons and blocks their clicks.
 // (In zepp-web-runner the GESTURE div renders last-on-top when created last,
 // which swallowed every click in desktop testing.)
 function addSwipeNav(width) {
@@ -279,10 +271,11 @@ function addImg(x, y, w, h, src, onTap) {
   return img;
 }
 
-function addRect(x, y, w, h, color, radius, onTap) {
+function addRect(x, y, w, h, color, radius, onTap, alpha) {
   const rect = push(
     hmUI.createWidget(hmUI.widget.FILL_RECT, {
       x, y, w, h, color, radius: radius || 0,
+      alpha: alpha === undefined ? 255 : alpha,
     }),
   );
   if (onTap) rect.addEventListener(hmUI.event.CLICK_DOWN, onTap);
@@ -326,7 +319,7 @@ function addIconButton(x, y, size, src, onTap, dimmed) {
   addImg(x, y, size, size, src, dimmed ? null : onTap);
   if (dimmed) {
     push(hmUI.createWidget(hmUI.widget.FILL_RECT, {
-      x, y, w: size, h: size, color: 0x88000000, radius: 12,
+      x, y, w: size, h: size, color: 0x000000, alpha: 136, radius: 12,
     }));
   }
 }
@@ -662,15 +655,12 @@ function renderNav(width) {
 
 function renderModalShell(title, locked) {
   const width = DEVICE_WIDTH;
-  // Dim overlay with a no-op tap so it also swallows clicks in the web
+  // Dim shade with a no-op tap so it also swallows clicks in the web
   // runner (where a non-clickable layer has pointer-events:none and
   // would let clicks fall through to icons behind the modal).
-  // Uses a pre-scaled misc/overlay_WxH.png via addShade: Zepp OS ignores
-  // FILL_RECT alpha, so a pre-baked translucent image does the dimming
-  // instead. Zepp OS draws IMG 1:1, so the source must cover the box
-  // (overlay is flat, so cropping a larger source is exact).
+  // FILL_RECT with separate alpha (API 3.0+) does the dimming.
   addShade(0, 0, width, DEVICE_HEIGHT, () => {});
-  addRect(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, PANEL_COLOR, 20);
+  addRect(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, PANEL_COLOR, 20, null, PANEL_ALPHA);
   addText(PANEL_X, PANEL_Y + 12, PANEL_W, 34, title, 22, 0xffffff);
   if (!locked) {
     addImg(PANEL_X + PANEL_W - 46, PANEL_Y + 8, 36, 36, 'ui/close_36x36.png', closeModal);

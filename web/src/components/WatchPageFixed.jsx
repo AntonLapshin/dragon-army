@@ -13,11 +13,22 @@ import { DEVICE_WIDTH, DEVICE_HEIGHT } from "zepp-web-runner/constants";
 //     is forbidden — it hid asset/widget size mismatches.
 // ---------------------------------------------------------------------------
 
-function toCssColor(c) {
+function toCssColor(c, alphaProp) {
   const a = (c >>> 24) & 0xff;
   const r = (c >>> 16) & 0xff;
   const g = (c >>> 8) & 0xff;
   const b = c & 0xff;
+  // FILL_RECT opacity comes from the separate `alpha` prop (API 3.0+,
+  // 0-255) with color as 24-bit RGB. When present it wins; otherwise fall
+  // back to packed 8-digit ARGB for compatibility.
+  if (alphaProp !== undefined && alphaProp !== null) {
+    const alpha = Math.max(0, Math.min(255, alphaProp)) / 255;
+    if (alpha === 0) return "rgba(0,0,0,0)";
+    if (alpha === 1) {
+      return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+    }
+    return `rgba(${r},${g},${b},${alpha.toFixed(2)})`;
+  }
   // 24-bit RGB literals (e.g. 0xffffff) carry no alpha byte (a === 0) and
   // must render opaque; only an explicit 0x00000000 is transparent.
   if (c === 0) return "rgba(0,0,0,0)";
@@ -64,8 +75,7 @@ function renderIMG(widget) {
   // here — that hid size mismatches in desktop testing. This renderer keeps
   // the <img> at its natural size inside an overflow:hidden box so the web
   // preview shows exactly what the watch shows (top-left anchored, clipped).
-  // NOTE: misc/overlay.png is a flat shade, so cropping it to a smaller pill
-  // still looks the same; every other asset must match w/h exactly.
+  // Translucent surfaces use FILL_RECT color + alpha, not IMG assets.
   const clickable = Boolean(widget._events.click);
   return (
     <div
@@ -136,7 +146,7 @@ function renderFILL_RECT(widget) {
       key={widget._id}
       style={{
         ...baseStyle(p),
-        backgroundColor: toCssColor(p.color),
+        backgroundColor: toCssColor(p.color, p.alpha),
         borderRadius: (p.radius || 0) + "px",
         pointerEvents: hasClick ? "auto" : "none",
         cursor: hasClick ? "pointer" : "default",
