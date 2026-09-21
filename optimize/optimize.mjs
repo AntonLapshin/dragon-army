@@ -18,9 +18,9 @@ import { pathToFileURL } from 'node:url';
 const DEFAULTS = {
   outDir: null, // null = overwrite input files in place
   recursive: true,
-  quality: 80, // 0-100, applies when palette:true
+  quality: 70, // 0-100, applies when palette:true
   palette: true, // quantize to palette (much smaller for sprites/icons)
-  colours: 256, // 2-256, applies when palette:true
+  colours: 128, // 2-256, applies when palette:true
   effort: 10, // 1-10, higher = smaller + slower
   compressionLevel: 9, // 0-9, zlib level for libpng
   strip: true, // strip metadata (sharp strips by default; --no-strip keeps it)
