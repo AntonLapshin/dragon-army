@@ -86,15 +86,23 @@ export const BADGE_WIDTH_FACTOR = 0.6; // estTextW = len * size * factor
 export const ICON_SIZE = 64;
 export const COIN_BIG_TEXT_W = 300;
 
-// addBar(): white track with a threshold-colored fill.
+// Segment color thresholds (shared with the old continuous bar).
+export const BAR_HIGH_AT = 0.7;
+export const BAR_MID_AT = 0.4;
+// Legacy continuous-bar geometry (addBar removed in favor of the segmented
+// gold bar; kept for reference).
 export const BAR_H = 30; // 1.5x the old 20px bar
 export const BAR_RADIUS = 4;
 export const BAR_FILL_RADIUS = 3;
 export const BAR_INSET = 3;
-export const BAR_HIGH_AT = 0.7;
-export const BAR_MID_AT = 0.4;
 
-// addIconButton(): dimmed (tapped-out) overlay.
+// addIconButton(): dimmed (unavailable) state via IMG alpha.
+// Zepp OS IMG supports `alpha` (API 3.0+: 0-255, 255 opaque).
+// 128 = ~50% opacity for disabled icons (egg/danger/training).
+export const IMG_DISABLED_ALPHA = 128;
+
+// Legacy dim overlay (FILL_RECT black pill over a tapped-out icon).
+// Kept for compatibility; prefer IMG_DISABLED_ALPHA for icons.
 export const DIM_ALPHA = 136;
 export const DIM_RADIUS = 12;
 
@@ -163,11 +171,28 @@ export const DRAGON_SUB_Y = 42;
 export const DRAGON_SUB_H = 26;
 export const DRAGON_SUB_FONT = FONT_18;
 
-export const ENERGY_ICON_S = 56;
-export const ENERGY_GAP = 8;
-export const ENERGY_BAR_W = 120;
-export const ENERGY_X = 12;
-export const ENERGY_Y = 70;
+// Segmented gold energy bar (raw/energy_bar.png 467x78, 8 slots).
+// Rendered 300x50 (aspect 6.0 vs native 5.99, negligible stretch via
+// fill resize), centered below the Lv/Age line: SUB ends at 68,
+// dragon IMG starts at 134.
+export const ENERGY_BAR_W = 300;
+export const ENERGY_BAR_H = 50;
+export const ENERGY_BAR_X = 45; // (390 - 300) / 2 centered
+export const ENERGY_BAR_Y = 76;
+export const ENERGY_SEG_COUNT = 8;
+// Native slot geometry (middle-row scan of the 467x78 source):
+// interiors are 39px wide on a 52px pitch starting at x=31;
+// vertical interior is y 18..60 inclusive.
+export const ENERGY_BAR_NATIVE_W = 467;
+export const ENERGY_BAR_NATIVE_H = 78;
+export const ENERGY_SEG_X0 = [31, 83, 135, 188, 240, 293, 345, 398];
+export const ENERGY_SEG_X1 = [69, 121, 173, 226, 278, 331, 384, 436];
+export const ENERGY_SEG_Y0 = 18;
+export const ENERGY_SEG_Y1 = 60;
+export const ENERGY_SEG_INSET = 1;
+export const ENERGY_SEG_COLOR_LOW = 0xff0000;
+export const ENERGY_SEG_COLOR_MID = 0xffcc00;
+export const ENERGY_SEG_COLOR_HIGH = 0x00cc00;
 
 export const STR_ICON_S = 56;
 export const STR_GAP = 6;
@@ -333,12 +358,10 @@ export const BEAST_IMG_S = 72;
 export const BEAST_VANISHED_Y = 160;
 export const BEAST_VANISHED_H = 30;
 export const BEAST_VANISHED_FONT = FONT_19;
-export const BEAST_BAR_Y = 156;
-export const BEAST_ICON_S = 56;
-export const BEAST_GAP = 8;
-export const BEAST_BAR_X = 20; // + icon + gap (see BEAST_BAR_W)
-export const BEAST_BAR_Y_OFFSET = -13; // icon y relative to the bar
-export const BEAST_BAR_W = 260; // total row width incl. icon + gap
+export const BEAST_BAR_X = 20; // (340 - 300) / 2 centered inside the panel
+export const BEAST_BAR_Y = 150;
+export const BEAST_BAR_W = 300; // same segmented bar as the dragon page
+export const BEAST_BAR_H = 50;
 export const BEAST_TEAM_Y = 206;
 export const BEAST_TEAM_H = 30;
 export const BEAST_TEAM_FONT = FONT_18;
@@ -346,10 +369,12 @@ export const BEAST_WARN_Y = 238;
 export const BEAST_WARN_H = 44;
 export const BEAST_WARN_FONT = FONT_16;
 
-// Beast-fight modal HP bar.
+// Beast-fight modal HP bar: same segmented asset beside the beast image
+// (190x32 keeps the old row geometry: img ends at offset 102, bar at 116).
 export const BEAST_FIGHT_BAR_X = 116; // x offset inside the panel
 export const BEAST_FIGHT_BAR_Y = 76; // y offset inside the panel
 export const BEAST_FIGHT_BAR_W = 190;
+export const BEAST_FIGHT_BAR_H = 32;
 
 // ---------------------------------------------------------------------------
 // Coin-summary modal
@@ -372,7 +397,8 @@ export const ASSET_BEAST_128 = 'ui/bewilder_beast_128x128.png';
 export const ASSET_BEAST_72 = 'ui/bewilder_beast_72x72.png';
 export const ASSET_SHADOW = 'misc/shadow_114x28.png';
 export const ASSET_FRAME_72 = 'misc/frame_72x72.png';
-export const ASSET_ENERGY_56 = 'ui/energy_56x56.png';
+export const ASSET_ENERGY_BAR_300 = 'ui/energy_bar_300x50.png';
+export const ASSET_ENERGY_BAR_190 = 'ui/energy_bar_190x32.png';
 export const ASSET_STRENGTH_56 = 'ui/strength_56x56.png';
 export const ASSET_HOME_84 = 'ui/home_84x84.png';
 export const ASSET_SELL_84 = 'ui/sell_84x84.png';

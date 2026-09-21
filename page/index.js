@@ -15,7 +15,8 @@ import {
   ASSET_DANGER_84,
   ASSET_DICE_80,
   ASSET_EGG_128,
-  ASSET_ENERGY_56,
+  ASSET_ENERGY_BAR_300,
+  ASSET_ENERGY_BAR_190,
   ASSET_FRAME_72,
   ASSET_HOME_84,
   ASSET_LOSS_60,
@@ -33,21 +34,16 @@ import {
   BALANCE_ICON_Y,
   BALANCE_TEXT_H,
   BALANCE_TEXT_Y,
-  BAR_FILL_RADIUS,
-  BAR_H,
   BAR_HIGH_AT,
-  BAR_INSET,
   BAR_MID_AT,
-  BAR_RADIUS,
   BEAST_BAR_W,
   BEAST_BAR_X,
   BEAST_BAR_Y,
-  BEAST_BAR_Y_OFFSET,
+  BEAST_BAR_H,
   BEAST_FIGHT_BAR_W,
   BEAST_FIGHT_BAR_X,
   BEAST_FIGHT_BAR_Y,
-  BEAST_GAP,
-  BEAST_ICON_S,
+  BEAST_FIGHT_BAR_H,
   BEAST_IMG_S,
   BEAST_IMG_X,
   BEAST_IMG_Y,
@@ -75,11 +71,6 @@ import {
   COINS_ICON_Y,
   COINS_TEXT_H,
   COINS_TEXT_Y,
-  COLOR_BAR_HIGH,
-  COLOR_BAR_LOW,
-  COLOR_BAR_MID,
-  COLOR_BAR_TRACK,
-  COLOR_BLACK,
   COLOR_BTN_DISABLED,
   COLOR_BTN_SELL,
   COLOR_BTN_TEXT,
@@ -89,8 +80,6 @@ import {
   COLOR_SUBTITLE,
   COLOR_SUCCESS,
   COLOR_WHITE,
-  DIM_ALPHA,
-  DIM_RADIUS,
   DRAGON_IMG_HATCHED_OFFSET,
   DRAGON_IMG_S,
   DRAGON_IMG_Y,
@@ -127,10 +116,20 @@ import {
   EGG_SPIN_HINT_H,
   EGG_SPIN_HINT_Y,
   ENERGY_BAR_W,
-  ENERGY_GAP,
-  ENERGY_ICON_S,
-  ENERGY_X,
-  ENERGY_Y,
+  ENERGY_BAR_H,
+  ENERGY_BAR_X,
+  ENERGY_BAR_Y,
+  ENERGY_SEG_COUNT,
+  ENERGY_BAR_NATIVE_W,
+  ENERGY_BAR_NATIVE_H,
+  ENERGY_SEG_X0,
+  ENERGY_SEG_X1,
+  ENERGY_SEG_Y0,
+  ENERGY_SEG_Y1,
+  ENERGY_SEG_INSET,
+  ENERGY_SEG_COLOR_LOW,
+  ENERGY_SEG_COLOR_MID,
+  ENERGY_SEG_COLOR_HIGH,
   FALLBACK_ROSTER_ICON,
   FIGHT_BEAST_MAX_LINES,
   FIGHT_BEAST_OUTCOME_FONT,
@@ -165,6 +164,7 @@ import {
   FIGHT_VS_X,
   FIGHT_VS_Y,
   ICON_SIZE,
+  IMG_DISABLED_ALPHA,
   KEEP_BTN_X,
   MODAL_CLOSE_OFFSET,
   MODAL_CLOSE_S,
@@ -472,9 +472,19 @@ function addCoinBig(cx, iconY, coins, textY, textH, fontSize, color) {
   addText(Math.round(cx - COIN_BIG_TEXT_W / 2), textY, COIN_BIG_TEXT_W, textH, String(coins), fontSize, color);
 }
 
-function addImg(x, y, w, h, src, onTap) {
-  const img = push(hmUI.createWidget(hmUI.widget.IMG, { x, y, w, h, src }));
-  if (onTap) img.addEventListener(hmUI.event.CLICK_DOWN, onTap);
+function addImg(x, y, w, h, src, onTap, alpha) {
+  // Allow addImg(x, y, w, h, src, { alpha, onTap }) too.
+  let tap = onTap;
+  let a = alpha;
+  if (tap && typeof tap === 'object') {
+    a = tap.alpha !== undefined ? tap.alpha : a;
+    tap = tap.onTap || tap.tap || null;
+  }
+  // IMG supports `alpha` (API 3.0+: 0-255, 255 opaque, 128 ~= 50%).
+  const props = { x, y, w, h, src };
+  if (a !== undefined && a !== null) props.alpha = a;
+  const img = push(hmUI.createWidget(hmUI.widget.IMG, props));
+  if (tap) img.addEventListener(hmUI.event.CLICK_DOWN, tap);
   return img;
 }
 
@@ -507,28 +517,49 @@ function addButton(x, y, w, h, text, onTap, opts) {
   );
 }
 
-function addBar(x, y, w, value, max) {
+// Segmented gold energy bar: ornate frame IMG with colored squares drawn
+// inside its 8 slots. Fill count rounds UP so any remaining energy shows
+// at least one segment (1% -> 1 red bar, 99% -> all 8 green bars).
+// Color reflects the overall pct (same 0.7/0.4 thresholds as the old bar):
+// few -> red, mid -> yellow, high -> green.
+function energySegmentsFilled(value, max) {
   const pct = clamp(value / max, 0, 1);
-  const fillW = Math.round(pct * (w - BAR_INSET * 2));
-  const barH = BAR_H;
-  let color = COLOR_BAR_LOW;
-  if (pct > BAR_HIGH_AT) color = COLOR_BAR_HIGH;
-  else if (pct > BAR_MID_AT) color = COLOR_BAR_MID;
-  push(hmUI.createWidget(hmUI.widget.FILL_RECT, { x, y, w, h: barH, color: COLOR_BAR_TRACK, radius: BAR_RADIUS }));
-  if (fillW > 0) {
+  if (pct <= 0) return 0;
+  return Math.min(ENERGY_SEG_COUNT, Math.ceil(pct * ENERGY_SEG_COUNT));
+}
+
+function energySegmentColor(value, max) {
+  const pct = clamp(value / max, 0, 1);
+  if (pct > BAR_HIGH_AT) return ENERGY_SEG_COLOR_HIGH;
+  if (pct > BAR_MID_AT) return ENERGY_SEG_COLOR_MID;
+  return ENERGY_SEG_COLOR_LOW;
+}
+
+function addEnergyBar(x, y, w, h, src, value, max) {
+  addImg(x, y, w, h, src);
+  const filled = energySegmentsFilled(value, max);
+  if (filled <= 0) return;
+  const color = energySegmentColor(value, max);
+  const sx = w / ENERGY_BAR_NATIVE_W;
+  const sy = h / ENERGY_BAR_NATIVE_H;
+  const ry0 = Math.round(ENERGY_SEG_Y0 * sy) + ENERGY_SEG_INSET;
+  const ry1 = Math.round((ENERGY_SEG_Y1 + 1) * sy) - ENERGY_SEG_INSET;
+  const segH = Math.max(1, ry1 - ry0);
+  for (let i = 0; i < filled; i += 1) {
+    const rx0 = Math.round(ENERGY_SEG_X0[i] * sx) + ENERGY_SEG_INSET;
+    const rx1 = Math.round((ENERGY_SEG_X1[i] + 1) * sx) - ENERGY_SEG_INSET;
     push(hmUI.createWidget(hmUI.widget.FILL_RECT, {
-      x: x + BAR_INSET, y: y + BAR_INSET, w: fillW, h: barH - BAR_INSET * 2, color, radius: BAR_FILL_RADIUS,
+      x: x + rx0, y: y + ry0, w: Math.max(1, rx1 - rx0), h: segH, color, radius: 2,
     }));
   }
 }
 
 function addIconButton(x, y, size, src, onTap, dimmed) {
-  addImg(x, y, size, size, src, dimmed ? null : onTap);
-  if (dimmed) {
-    push(hmUI.createWidget(hmUI.widget.FILL_RECT, {
-      x, y, w: size, h: size, color: COLOR_BLACK, alpha: DIM_ALPHA, radius: DIM_RADIUS,
-    }));
-  }
+  // Disabled state = 50% opacity via IMG alpha (IMG supports `alpha`).
+  // The tap handler stays attached so a dimmed icon still explains why
+  // (egg blocked modal, train warning, monster empty state) instead of
+  // going dead.
+  return addImg(x, y, size, size, src, onTap, dimmed ? IMG_DISABLED_ALPHA : undefined);
 }
 
 // ---------------------------------------------------------------------------
@@ -706,11 +737,10 @@ function renderMain(width) {
   addImg(Math.round(balanceCx - BALANCE_ICON_S / 2), BALANCE_ICON_Y, BALANCE_ICON_S, BALANCE_ICON_S, ASSET_COIN_64);
   addBadgeText(0, BALANCE_TEXT_Y, width, BALANCE_TEXT_H, String(economy.coins), BALANCE_FONT, COLOR_WHITE);
 
-  // Buy Egg — top-left, icon only (no label). Hidden when a purchase
-  // isn't available (broke or roster full).
-  if (engine.canBuyEgg()) {
-    addIconButton(EGG_BTN_X, EGG_BTN_Y, EGG_BTN_S, ASSET_EGG_128, startEggSpin, false);
-  }
+  // Buy Egg — top-left, icon only (no label). 50% opacity via IMG alpha
+  // when a purchase isn't available (broke or roster full); tap still
+  // opens the blocked modal explaining why (startEggSpin gates first).
+  addIconButton(EGG_BTN_X, EGG_BTN_Y, EGG_BTN_S, ASSET_EGG_128, startEggSpin, !engine.canBuyEgg());
 
   // Bewilder Beast — top-right, icon only, always visible.
   addIconButton(width - BEAST_BTN_OFFSET_X, BEAST_BTN_Y, BEAST_BTN_S, ASSET_BEAST_128, () => {
@@ -758,16 +788,10 @@ function renderDragon(width, view) {
       addImg(imgX, imgY + DRAGON_IMG_HATCHED_OFFSET, imgSize, imgSize, dragonAsset240(breed.assetKey));
     }
 
-   // Energy and Strength on top of the dragon (drawn after so they sit above).
+   // Energy (segmented gold bar, centered below Lv/Age) and Strength
+   // on top of the dragon (drawn after so they sit above).
    if (!egg) {
-     const barH = BAR_H;
-     const eIconS = ENERGY_ICON_S;
-     const eGap = ENERGY_GAP;
-     const eBarW = ENERGY_BAR_W;
-     const eX = ENERGY_X;
-     const eY = ENERGY_Y;
-      addImg(eX, eY, eIconS, eIconS, ASSET_ENERGY_56);
-     addBar(eX + eIconS + eGap, eY + Math.floor((eIconS - barH) / 2), eBarW, view.energy, CONFIG.energy.max);
+     addEnergyBar(ENERGY_BAR_X, ENERGY_BAR_Y, ENERGY_BAR_W, ENERGY_BAR_H, ASSET_ENERGY_BAR_300, view.energy, CONFIG.energy.max);
      const sIconS = STR_ICON_S;
      const sGap = STR_GAP;
      const sPillW = STR_PILL_W;
@@ -779,10 +803,15 @@ function renderDragon(width, view) {
    }
 
 // Bottom action row — pinned to the very bottom (no roster strip on this
-   // page). Eggs show just Home at bottom-right; hatched dragons show
-   // Home / Sell / (Danger) / Training evenly spread with 20px side paddings.
-   // Danger is hidden when no monsters wait. Each icon uses its exact
-   // pre-scaled size (home/sell/training 84x84, danger 72x72), bottom-aligned.
+   // page). Eggs show just Home at bottom-right; hatched dragons always show
+   // 4 fixed slots: Home / Sell / Danger / Training, evenly spread with 20px
+   // side paddings. Fixed slots keep Training pinned right when Danger is
+   // unavailable. Danger is 50% opacity when no monsters wait or the dragon
+   // is tired (no energy); Training is 50% when view.canTrain is false
+   // (no energy or not enough coins). Dimmed taps still open their modals
+   // (train warning / monster empty state) instead of going dead.
+   // Each icon uses its exact pre-scaled size (home/sell/training 84x84,
+   // danger 72x72 -> rendered at ACTION_ICON_S), bottom-aligned.
    const sidePad = ACTION_SIDE_PAD;
    const bottom = DEVICE_HEIGHT - ACTION_BOTTOM_PAD;
    if (egg) {
@@ -791,16 +820,12 @@ function renderDragon(width, view) {
      addIconButton(width - sidePad - eggIconS, eggY, eggIconS, ASSET_HOME_84, () => goTo(0), false);
    } else {
      const hasMonsters = engine.getSpawnedMonsters().length > 0;
-     const others = [
-       { src: ASSET_SELL_84, size: ACTION_ICON_S, dimmed: false, tap: () => openModal({ kind: 'sell', dragonId: view.dragon.id }) },
-     ];
-     if (hasMonsters) {
-       others.push({ src: ASSET_DANGER_84, size: ACTION_ICON_S, dimmed: view.energy <= 0, tap: () => openMonsterSelect(view.dragon.id) });
-     }
-     others.push({ src: ASSET_TRAINING_84, size: ACTION_ICON_S, dimmed: view.energy <= 0, tap: () => openModal({ kind: 'train', dragonId: view.dragon.id }) });
      const cells = [
        { src: ASSET_HOME_84, size: ACTION_ICON_S, dimmed: false, tap: () => goTo(0) },
-     ].concat(others);
+       { src: ASSET_SELL_84, size: ACTION_ICON_S, dimmed: false, tap: () => openModal({ kind: 'sell', dragonId: view.dragon.id }) },
+       { src: ASSET_DANGER_84, size: ACTION_ICON_S, dimmed: !hasMonsters || !view.canFight, tap: () => openMonsterSelect(view.dragon.id) },
+       { src: ASSET_TRAINING_84, size: ACTION_ICON_S, dimmed: !view.canTrain, tap: () => openModal({ kind: 'train', dragonId: view.dragon.id }) },
+     ];
      const maxS = ACTION_ICON_S;
      const step = (width - sidePad * 2 - maxS) / (cells.length - 1);
      cells.forEach((cell, i) => {
@@ -1029,13 +1054,7 @@ function renderBeastIntro() {
     addText(PANEL_X + MODAL_PAD, PANEL_Y + BEAST_VANISHED_Y, PANEL_W - MODAL_PAD * 2, BEAST_VANISHED_H, 'Vanished - back in ~' + hrs + 'h', BEAST_VANISHED_FONT, COLOR_MUTED);
     return;
   }
-  const beastBarY = PANEL_Y + BEAST_BAR_Y;
-  const beastIconS = BEAST_ICON_S;
-  const beastGap = BEAST_GAP;
-  const beastBarX = PANEL_X + BEAST_BAR_X + beastIconS + beastGap;
-  const beastBarW = BEAST_BAR_W - beastIconS - beastGap;
-  addImg(PANEL_X + BEAST_BAR_X, beastBarY + BEAST_BAR_Y_OFFSET, beastIconS, beastIconS, ASSET_ENERGY_56);
-  addBar(beastBarX, beastBarY, beastBarW, beast.currentHp, beast.maxHp);
+  addEnergyBar(PANEL_X + BEAST_BAR_X, PANEL_Y + BEAST_BAR_Y, BEAST_BAR_W, BEAST_BAR_H, ASSET_ENERGY_BAR_300, beast.currentHp, beast.maxHp);
   const team = engine.getBeastParticipants();
   addText(
     PANEL_X + MODAL_PAD, PANEL_Y + BEAST_TEAM_Y, PANEL_W - MODAL_PAD * 2, BEAST_TEAM_H,
@@ -1062,7 +1081,7 @@ function renderBeastFight() {
   const hp = modal.outcome && modal.revealed >= modal.lines.length
     ? modal.outcome.hpAfter
     : beast.currentHp;
-  addBar(PANEL_X + BEAST_FIGHT_BAR_X, PANEL_Y + BEAST_FIGHT_BAR_Y, BEAST_FIGHT_BAR_W, hp, beast.maxHp);
+  addEnergyBar(PANEL_X + BEAST_FIGHT_BAR_X, PANEL_Y + BEAST_FIGHT_BAR_Y, BEAST_FIGHT_BAR_W, BEAST_FIGHT_BAR_H, ASSET_ENERGY_BAR_190, hp, beast.maxHp);
   renderFightLines(FIGHT_BEAST_MAX_LINES);
   if (!modal.locked && modal.outcome) {
     addImg(PANEL_X + FIGHT_OUTCOME_ICON_X, PANEL_Y + PANEL_H - FIGHT_OUTCOME_ICON_Y, FIGHT_OUTCOME_ICON_S, FIGHT_OUTCOME_ICON_S, modal.outcome.won ? ASSET_VICTORY_60 : ASSET_LOSS_60);

@@ -76,8 +76,12 @@ function renderIMG(widget) {
   // here — that hid size mismatches in desktop testing. This renderer keeps
   // the <img> at its natural size inside an overflow:hidden box so the web
   // preview shows exactly what the watch shows (top-left anchored, clipped).
-  // Translucent surfaces use FILL_RECT color + alpha, not IMG assets.
+  // IMG supports `alpha` (API 3.0+, 0-255): 128 ~= 50% disabled opacity.
   const clickable = Boolean(widget._events.click);
+  const alpha =
+    p.alpha === undefined || p.alpha === null
+      ? 1
+      : Math.max(0, Math.min(255, p.alpha)) / 255;
   return (
     <div
       key={widget._id}
@@ -108,6 +112,7 @@ function renderIMG(widget) {
           pointerEvents: "none",
           userSelect: "none",
           flexShrink: 0,
+          opacity: alpha,
         }}
         draggable={false}
       />

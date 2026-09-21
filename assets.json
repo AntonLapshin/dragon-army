@@ -168,8 +168,9 @@
   "ui/egg.png": [
     "128x128"
   ],
-  "ui/energy.png": [
-    "56x56"
+  "ui/energy_bar.png": [
+    "300x50",
+    "190x32"
   ],
   "ui/home.png": [
     "84x84"

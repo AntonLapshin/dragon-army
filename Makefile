@@ -1,7 +1,7 @@
 .PHONY: data bg misc sprites scale optimize zepp clean help
 
 # Full data pipeline: raw/ -> assets/ -> assets/default.{b,r,s}
-data: frame icon bg misc sprites scale optimize zepp
+data: frame icon bg misc sprites coin energy_bar scale optimize zepp
 
 # frame
 frame:
@@ -25,11 +25,17 @@ misc:
 # 3) Sprite sheets -> individual PNGs (must run from sprites/ dir),
 # then drop unused "_" placeholders.
 sprites:
-	cd sprites && venv/bin/python -m spritecut.cli ../raw/ui-icons.png -s 96x96 -n "egg _coin energy sell victory loss danger training strength dice home coin _shop _monster bewilder_beast close" -o ../assets/ui -g 4x4 --margin 0
+	cd sprites && venv/bin/python -m spritecut.cli ../raw/ui-icons.png -s 96x96 -n "egg _coin _energy sell victory loss danger training strength dice home coin _shop _monster bewilder_beast close" -o ../assets/ui -g 4x4 --margin 0
 	cd sprites && venv/bin/python -m spritecut.cli ../raw/eggs.png -s 300x300 -n "night_fury light_fury light_night night_light wooly_howl deadly_nadder razorwhip triple_stryke stormcutter songwing monstrous_nightmare skrill gronkle hideous_zippleback windwalker snowtail" -o ../assets/eggs -g 4x4 --margin 0
 	cd sprites && venv/bin/python -m spritecut.cli ../raw/dragons.png -s 300x300 -n "night_fury light_fury light_night night_light wooly_howl deadly_nadder razorwhip triple_stryke stormcutter songwing monstrous_nightmare skrill gronkle hideous_zippleback windwalker snowtail" -o ../assets/dragons -g 4x4 --margin 0
 	cd sprites && venv/bin/python -m spritecut.cli ../raw/monsters.png -s 128x128 -n "bewilder_beast gronkle deadly_nadder monstrous_nightmare" -o ../assets/monsters -g 2x2 --margin 0
 	rm -f assets/ui/_*.png assets/eggs/_*.png assets/dragons/_*.png assets/monsters/_*.png
+
+coin:
+	cp raw/coin.png assets/ui/coin.png
+
+energy_bar:
+	cp raw/energy_bar.png assets/ui/energy_bar.png
 
 # 4) Scale all PNGs to their exact widget sizes per assets.json
 # (e.g. dragons/songwing.png -> songwing_60x60.png + songwing_240x240.png),
