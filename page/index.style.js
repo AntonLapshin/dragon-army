@@ -188,8 +188,8 @@ export const ACTION_ICON_S = 84;
 export const ROSTER_SLOTS = 5;
 export const ROSTER_THUMB = 60;
 export const ROSTER_FRAME = 72;
-export const ROSTER_LEFT = 30;
-export const ROSTER_BOTTOM_PAD = 12;
+export const ROSTER_LEFT = 20;
+export const ROSTER_BOTTOM_PAD = 40;
 
 // ---------------------------------------------------------------------------
 // Egg-spin modal
@@ -273,7 +273,7 @@ export const MONSTER_GAIN_Y = 28;
 export const MONSTER_GAIN_W = 110;
 export const MONSTER_GAIN_H = 20;
 export const MONSTER_GAIN_FONT = FONT_14;
-export const MONSTER_STR_ICON_S = 32;
+export const MONSTER_STR_ICON_S = 56;
 export const MONSTER_STR_Y = 50;
 export const MONSTER_STR_VAL_GAP = 4;
 export const MONSTER_STR_VAL_Y = 52;

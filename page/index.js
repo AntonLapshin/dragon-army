@@ -813,7 +813,8 @@ function renderDragon(width, view) {
 
 function renderRosterStrip(width) {
   // Bottom thumbnail navigation: tap a thumbnail to jump to that dragon/egg
-  // page. 30px left/right paddings; always 5 slots fill the row exactly.
+  // page. 14px frame-edge (20px thumb-inset) left/right paddings; always
+  // 5 slots fill the row exactly.
   // Each slot uses the ornate misc/frame_72x72.png as its pill, with the
   // 60x60 dragon/egg icon centered inside (6px pad). Empty slots render
   // the frame alone so the row is stable even with no dragons/eggs.
