@@ -130,7 +130,16 @@ export const CONFIG = {
   beast: {
     name: "Bewilder Beast",
     hp: 260,
-    strengthConstant: 20,
+    // Display strength: feeds starsForStrength() for the boss icon /
+    // intro / fight header (75 = exactly 3 gold stars). This is the
+    // "final boss looks mighty" number shown to the player.
+    strengthConstant: 75,
+    // Combat defense: effective subtraction in resolveBeastTurn().
+    // Decoupled from the display value so the boss can LOOK like 3 gold
+    // stars while still hitting like ~20 (roster of 3-5 x 40-60 wins).
+    // Without this split, a display 75 would deal 0 damage per turn to
+    // mid-game rosters (40 + 10 - 75 < 0) and the beast would be unbeatable.
+    combatDefense: 20,
     counterDamageMin: 18,
     counterDamageMax: 28,
     counterTarget: "energy" as const,
@@ -608,6 +617,16 @@ export function rollSpawnedMonsters(rand01: Random01): MonsterDef[] {
 
 // ---------- Bewilder Beast (pure) ----------
 
+/**
+ * Effective beast defense used in damage math.
+ * Decoupled from the display `strengthConstant` (75 = 3 gold stars) so the
+ * boss looks like an end-game threat while staying beatable by the
+ * documented roster (3-5 dragons at 40-60). Pure.
+ */
+export function beastCombatDefense(): number {
+  return CONFIG.beast.combatDefense;
+}
+
 export function rollBeastCounterDamage(rand01: number): number {
   return rollIntInclusive(
     CONFIG.beast.counterDamageMin,
@@ -630,6 +649,10 @@ export function rollBeastReward(rand01: number): number {
  * while mid-fight exhaustion only shortens how many turns they last),
  * beast retaliates on Energy. Pure.
  *
+ * Damage subtracts `beastCombatDefense()` (20), NOT the display
+ * `strengthConstant` (75 = 3 gold stars) — the display value would
+ * otherwise zero out every mid-game hit (40 + 10 - 75 < 0).
+ *
  * `fightStartEnergy` is the dragon's energy at fight entry (the engine
  * snapshots it per participant); it defaults to `dragonEnergy` for
  * single-turn callers.
@@ -644,7 +667,7 @@ export function resolveBeastTurn(
 ): BeastTurnResult {
   const rawDamage = battleDamage(
     effectiveStrength(dragonStrength, fightStartEnergy),
-    CONFIG.beast.strengthConstant,
+    beastCombatDefense(),
     rollDamageBonus(bonusRand01),
   );
   const beastHpAfter = Math.max(0, beastHp - Math.max(0, rawDamage));

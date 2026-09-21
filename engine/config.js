@@ -93,7 +93,16 @@ const CONFIG = {
   beast: {
     name: "Bewilder Beast",
     hp: 260,
-    strengthConstant: 20,
+    // Display strength: feeds starsForStrength() for the boss icon /
+    // intro / fight header (75 = exactly 3 gold stars). This is the
+    // "final boss looks mighty" number shown to the player.
+    strengthConstant: 75,
+    // Combat defense: effective subtraction in resolveBeastTurn().
+    // Decoupled from the display value so the boss can LOOK like 3 gold
+    // stars while still hitting like ~20 (roster of 3-5 x 40-60 wins).
+    // Without this split, a display 75 would deal 0 damage per turn to
+    // mid-game rosters (40 + 10 - 75 < 0) and the beast would be unbeatable.
+    combatDefense: 20,
     counterDamageMin: 18,
     counterDamageMax: 28,
     counterTarget: "energy",
@@ -386,6 +395,9 @@ function rollSpawnedMonsters(rand01) {
     CONFIG.monsterSpawn.maxShown
   );
 }
+function beastCombatDefense() {
+  return CONFIG.beast.combatDefense;
+}
 function rollBeastCounterDamage(rand01) {
   return rollIntInclusive(
     CONFIG.beast.counterDamageMin,
@@ -403,7 +415,7 @@ function rollBeastReward(rand01) {
 function resolveBeastTurn(dragonStrength, dragonEnergy, beastHp, bonusRand01, counterRand01, fightStartEnergy = dragonEnergy) {
   const rawDamage = battleDamage(
     effectiveStrength(dragonStrength, fightStartEnergy),
-    CONFIG.beast.strengthConstant,
+    beastCombatDefense(),
     rollDamageBonus(bonusRand01)
   );
   const beastHpAfter = Math.max(0, beastHp - Math.max(0, rawDamage));
@@ -479,6 +491,7 @@ export {
   applyEnergyDrain,
   applyStrengthGain,
   battleDamage,
+  beastCombatDefense,
   breedForDragon,
   breedForIndex,
   canAffordEgg,

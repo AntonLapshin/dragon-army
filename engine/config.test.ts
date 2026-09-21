@@ -16,6 +16,7 @@ import {
   applyEnergyDrain,
   applyStrengthGain,
   battleDamage,
+  beastCombatDefense,
   breedForDragon,
   breedForIndex,
   canAffordEgg,
@@ -719,11 +720,23 @@ describe("bewilder beast", () => {
     });
   });
 
+  describe("bewilder beast display vs combat (3 gold stars, reasonable defense)", () => {
+    it("shows 3 gold stars while combat defense stays reasonable", () => {
+      expect(CONFIG.beast.strengthConstant).toBe(75);
+      expect(starsForStrength(CONFIG.beast.strengthConstant)).toEqual({
+        gold: 3,
+        silver: 0,
+      });
+      expect(beastCombatDefense()).toBe(CONFIG.beast.combatDefense);
+      expect(beastCombatDefense()).toBe(20);
+    });
+  });
+
   describe("resolveBeastTurn", () => {
     it("damages the beast and drains dragon energy on a normal turn", () => {
       const res = resolveBeastTurn(50, 100, 260, 0.5, 0.5);
       expect(res.rawDamage).toBe(
-        50 + rollDamageBonus(0.5) - CONFIG.beast.strengthConstant,
+        50 + rollDamageBonus(0.5) - beastCombatDefense(),
       );
       expect(res.beastHpAfter).toBe(260 - Math.max(0, res.rawDamage));
       expect(res.beastDefeated).toBe(false);
@@ -762,9 +775,10 @@ describe("bewilder beast", () => {
       const full = resolveBeastTurn(50, 100, 260, 0.5, 0.5);
       const tired = resolveBeastTurn(50, 10, 260, 0.5, 0.5);
       expect(tired.rawDamage).toBeLessThan(full.rawDamage);
-      // full-energy math is unchanged: strength + bonus - beast constant
+      // full-energy math is unchanged: strength + bonus - combat defense
+      // (NOT the 75 display value — that would zero out every mid-game hit)
       expect(full.rawDamage).toBe(
-        50 + rollDamageBonus(0.5) - CONFIG.beast.strengthConstant,
+        50 + rollDamageBonus(0.5) - beastCombatDefense(),
       );
     });
 

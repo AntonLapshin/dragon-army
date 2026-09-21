@@ -678,6 +678,11 @@ function startMonsterFight(dragonId, monsterId) {
 
 function startBeastFight() {
   if (!engine.canFightBeast().ok) return;
+  // Snapshot HP BEFORE resolving: engine.fightBeast() decides the outcome
+  // instantly and persists it (anti-cheat — closing mid-fight keeps the
+  // result), so the UI must replay the bar from this snapshot turn by turn.
+  const hpBefore = engine.getState().beast.currentHp;
+  const maxHp = engine.getState().beast.maxHp;
   const res = engine.fightBeast();
   if (!res.ok) return;
   const lines = res.turns.map((t) => t.text);
@@ -693,7 +698,17 @@ function startBeastFight() {
   openLockedFight(
     { kind: 'beast-fight' },
     lines,
-    { won: res.won, reward: res.reward, hpAfter: res.beastHpAfter, strengthGains: res.strengthGains || {} },
+    {
+      won: res.won,
+      reward: res.reward,
+      hpBefore,
+      hpAfter: res.beastHpAfter,
+      // Per-turn HP trail for the realtime bar replay (last entry is the
+      // final summary line, which holds the outcome — no HP step of its own).
+      hpSteps: res.turns.map((t) => t.beastHpAfter),
+      maxHp,
+      strengthGains: res.strengthGains || {},
+    },
     5000,
   );
 }
@@ -1080,10 +1095,26 @@ function renderBeastFight() {
   renderModalShell('Beast Battle', modal.locked);
   addImg(PANEL_X + FIGHT_MONSTER_IMG_X, PANEL_Y + FIGHT_MONSTER_IMG_Y, FIGHT_MONSTER_IMG_S, FIGHT_MONSTER_IMG_S, ASSET_BEAST_72);
   addStrengthStars(PANEL_X + FIGHT_MONSTER_IMG_X + Math.floor(FIGHT_MONSTER_IMG_S / 2), PANEL_Y + FIGHT_STARS_Y, CONFIG.beast.strengthConstant);
-  const hp = modal.outcome && modal.revealed >= modal.lines.length
-    ? modal.outcome.hpAfter
-    : beast.currentHp;
-  addEnergyBar(PANEL_X + BEAST_FIGHT_BAR_X, PANEL_Y + BEAST_FIGHT_BAR_Y, BEAST_FIGHT_BAR_W, BEAST_FIGHT_BAR_H, ASSET_ENERGY_BAR_190, hp, beast.maxHp);
+  // Realtime HP replay: the engine already persisted the final outcome
+  // (anti-cheat), but the bar must drain turn-by-turn as lines reveal.
+  // revealed counts text lines (turns + 1 final summary); each revealed turn
+  // line steps the bar to that turn's beastHpAfter.
+  let hp = beast.currentHp;
+  let maxHp = beast.maxHp;
+  if (modal.outcome && Array.isArray(modal.outcome.hpSteps)) {
+    const steps = modal.outcome.hpSteps;
+    maxHp = modal.outcome.maxHp || maxHp;
+    if (modal.revealed <= 0) {
+      hp = modal.outcome.hpBefore;
+    } else if (modal.revealed <= steps.length) {
+      hp = steps[modal.revealed - 1];
+    } else {
+      hp = modal.outcome.hpAfter;
+    }
+  } else if (modal.outcome && modal.revealed >= modal.lines.length) {
+    hp = modal.outcome.hpAfter;
+  }
+  addEnergyBar(PANEL_X + BEAST_FIGHT_BAR_X, PANEL_Y + BEAST_FIGHT_BAR_Y, BEAST_FIGHT_BAR_W, BEAST_FIGHT_BAR_H, ASSET_ENERGY_BAR_190, hp, maxHp);
   renderFightLines(FIGHT_BEAST_MAX_LINES);
   if (!modal.locked && modal.outcome) {
     addImg(PANEL_X + FIGHT_OUTCOME_ICON_X, PANEL_Y + PANEL_H - FIGHT_OUTCOME_ICON_Y, FIGHT_OUTCOME_ICON_S, FIGHT_OUTCOME_ICON_S, modal.outcome.won ? ASSET_VICTORY_60 : ASSET_LOSS_60);

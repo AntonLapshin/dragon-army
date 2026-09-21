@@ -21,6 +21,7 @@ import {
   DRAGONS,
   MONSTERS,
   ageDaysFromMs,
+  beastCombatDefense,
   collectibleCoins,
   energyAt,
   maxUncollectedCoins,
@@ -30,6 +31,7 @@ import {
   rollBeastCounterDamage,
   rollDamageBonus,
   rollTrainingGain,
+  starsForStrength,
   trainingCost,
 } from "./config";
 
@@ -299,6 +301,17 @@ describe("orientir: training progression -> Easy / Medium / Hard", () => {
 });
 
 describe("orientir: Bewilder Beast (boss)", () => {
+  it("displays 3 gold stars while combat defense stays at ~20 (reasonable)", () => {
+    // Display value feeds the star UI: 75 = exactly 3 gold stars.
+    expect(CONFIG.beast.strengthConstant).toBe(75);
+    expect(starsForStrength(CONFIG.beast.strengthConstant)).toEqual({
+      gold: 3,
+      silver: 0,
+    });
+    // Combat math uses the decoupled defense so mid-game rosters still chip it.
+    expect(beastCombatDefense()).toBe(20);
+  });
+
   it("documents per-turn math: avg bonus 5, avg counter 23", () => {
     expect(AVG_BONUS).toBe(5);
     expect(AVG_BEAST_COUNTER).toBe(23);
@@ -309,8 +322,9 @@ describe("orientir: Bewilder Beast (boss)", () => {
   });
 
   it("a strength-40 dragon deals ~25/turn and lasts ~5 turns (~125 lifetime damage)", () => {
-    // expected damage = 40 + 5 - 20 (beast constant) = 25
-    const expectedPerTurn = 40 + AVG_BONUS - CONFIG.beast.strengthConstant;
+    // expected damage = 40 + 5 - 20 (combat defense) = 25
+    // (display 75 is stars-only; using it here would zero out every hit)
+    const expectedPerTurn = 40 + AVG_BONUS - beastCombatDefense();
     expect(expectedPerTurn).toBe(25);
     // lifetime turns = ceil(100 / 23) = 5
     const expectedTurns = Math.ceil(100 / AVG_BEAST_COUNTER);
@@ -320,7 +334,7 @@ describe("orientir: Bewilder Beast (boss)", () => {
 
   it("ONE dragon can NEVER kill the 260-HP beast at strength 40, even with max rolls", () => {
     // best case: bonus 10 every turn (30 dmg), counter 18 (6 turns) -> 180 < 260
-    const maxDmgPerTurn = 40 + 10 - CONFIG.beast.strengthConstant;
+    const maxDmgPerTurn = 40 + 10 - beastCombatDefense();
     const maxTurns = Math.ceil(100 / CONFIG.beast.counterDamageMin);
     expect(maxDmgPerTurn * maxTurns).toBeLessThan(CONFIG.beast.hp);
     expect(beastWinRate([40], 300, 11)).toBe(0);
@@ -328,7 +342,7 @@ describe("orientir: Bewilder Beast (boss)", () => {
 
   it("THREE dragons at 40 ALWAYS kill the beast, even with worst rolls (design target: 3-5 x 40-60)", () => {
     // worst case: bonus 0 every turn (20 dmg), counter 18 (6 turns) -> 120 each -> 360 > 260
-    const minDmgPerTurn = 40 + 0 - CONFIG.beast.strengthConstant;
+    const minDmgPerTurn = 40 + 0 - beastCombatDefense();
     const minTurnsEach = Math.ceil(100 / CONFIG.beast.counterDamageMin);
     expect(minDmgPerTurn * minTurnsEach * 3).toBeGreaterThan(CONFIG.beast.hp);
     expect(beastWinRate([40, 40, 40], 300, 12)).toBe(1);

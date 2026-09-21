@@ -77,7 +77,7 @@
 
 #### 3.6 Bewilder Beast Modal (from Main Control)
 - **Intro** – illustration of the Bewilder Beast + **Fight** button. Uses the full roster except 0-energy dragons (excluded) and eggs (never participate).
-- **Turn log** – each dragon attacks in roster order; modal logs "Dragon [name] deals X damage to Bewilder Beast" and retaliation; beast HP bar shrinks; dragon Energy bars shrink.
+- **Turn log** – each dragon attacks in roster order; modal logs "Dragon [name] deals X damage to Bewilder Beast" and retaliation; beast HP bar drains turn-by-turn as lines reveal (realtime replay — the engine resolves + persists the outcome instantly so closing mid-fight cannot reroll, but the bar only shows each turn's HP once its line appears).
 - **Dragon out** – a dragon reduced to 0 energy mid-battle is **removed from the roster**; the next dragon enters.
 - **End conditions:**
   - **Beast defeated** – "Bewilder Beast vanishes for a day. Continue adventure." Survivors keep remaining energy and each gains permanent +3–5 strength; removed dragons stay removed. Beast respawns after a day.
