@@ -80,8 +80,11 @@ function simulateBeastRoster(
   let hp = CONFIG.beast.hp;
   for (const strength of strengths) {
     let energy = startEnergy;
+    // Mirror the engine loop: blows scale with entry energy, the counter
+    // drains live energy turn by turn.
+    const fightStartEnergy = startEnergy;
     while (energy > 0 && hp > 0) {
-      const turn = resolveBeastTurn(strength, energy, hp, rng(), rng());
+      const turn = resolveBeastTurn(strength, energy, hp, rng(), rng(), fightStartEnergy);
       hp = turn.beastHpAfter;
       energy = turn.dragonEnergyAfter;
       if (turn.beastDefeated) return true;

@@ -479,6 +479,23 @@ export function battleDamage(
   return dragonStrength + bonus - opponentStrength;
 }
 
+/**
+ * Energy-scaled combat strength: a tired dragon hits weaker.
+ * Linear in live energy — full bar hits at full strength, an emptied
+ * dragon hits at 0. Floored so damage math stays integral; at full
+ * energy this is exactly `dragonStrength` (all full-energy balance
+ * orientirs are unaffected). Pure.
+ */
+export function effectiveStrength(
+  dragonStrength: number,
+  dragonEnergy: number,
+): number {
+  const factor =
+    clamp(dragonEnergy, CONFIG.energy.min, CONFIG.energy.max) /
+    CONFIG.energy.max;
+  return Math.floor(dragonStrength * factor);
+}
+
 export function isBattleWin(rawDamage: number): boolean {
   return rawDamage >= 0;
 }
@@ -493,8 +510,10 @@ export function resolveMonsterFight(
   energyRand01: number,
   strengthRand01: number = 0.5,
 ): MonsterFightResult {
+  // Damage scales with live energy: an exhausted dragon barely scratches
+  // the monster, so winning on a sliver of energy is (almost) impossible.
   const rawDamage = battleDamage(
-    dragonStrength,
+    effectiveStrength(dragonStrength, dragonEnergy),
     monster.strength,
     rollDamageBonus(bonusRand01),
   );
@@ -502,11 +521,22 @@ export function resolveMonsterFight(
   const coinReward = won
     ? rollIntInclusive(monster.rewardMin, monster.rewardMax, rewardRand01)
     : 0;
-  const energyLoss = rollIntInclusive(
-    won ? monster.energyLossWinMin : monster.energyLossLoseMin,
-    won ? monster.energyLossWinMax : monster.energyLossLoseMax,
-    energyRand01,
-  );
+  // A loss knocks the dragon out cold: energy drops to 0 and the dragon
+  // must recover before it can fight again (no sliver left to chain a
+  // second fight with). A win drains the rolled effort cost instead,
+  // usually leaving the dragon tired but standing (0-30 left on Easy).
+  // `energyLoss` reports the ACTUAL drained amount in both cases.
+  const energyAfter = won
+    ? applyEnergyDrain(
+        dragonEnergy,
+        rollIntInclusive(
+          monster.energyLossWinMin,
+          monster.energyLossWinMax,
+          energyRand01,
+        ),
+      )
+    : CONFIG.energy.min;
+  const energyLoss = dragonEnergy - energyAfter;
   const strengthGain = won
     ? rollMonsterWinStrengthGain(monster, strengthRand01)
     : 0;
@@ -515,7 +545,7 @@ export function resolveMonsterFight(
     won,
     coinReward,
     energyLoss,
-    energyAfter: applyEnergyDrain(dragonEnergy, energyLoss),
+    energyAfter,
     strengthGain,
   };
 }
@@ -550,16 +580,26 @@ export function rollBeastReward(rand01: number): number {
   );
 }
 
-/** One Beast turn: dragon hits, beast retaliates on Energy. Pure. */
+/**
+ * One Beast turn: dragon hits (strength scaled by its live energy when it
+ * stepped into the fight — tired dragons chip weakly all the way through,
+ * while mid-fight exhaustion only shortens how many turns they last),
+ * beast retaliates on Energy. Pure.
+ *
+ * `fightStartEnergy` is the dragon's energy at fight entry (the engine
+ * snapshots it per participant); it defaults to `dragonEnergy` for
+ * single-turn callers.
+ */
 export function resolveBeastTurn(
   dragonStrength: number,
   dragonEnergy: number,
   beastHp: number,
   bonusRand01: number,
   counterRand01: number,
+  fightStartEnergy: number = dragonEnergy,
 ): BeastTurnResult {
   const rawDamage = battleDamage(
-    dragonStrength,
+    effectiveStrength(dragonStrength, fightStartEnergy),
     CONFIG.beast.strengthConstant,
     rollDamageBonus(bonusRand01),
   );

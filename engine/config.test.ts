@@ -26,6 +26,7 @@ import {
   collectibleCoins,
   drawBreedIndex,
   dragonStage,
+  effectiveStrength,
   energyAt,
   findBreed,
   hasCollectibleCoins,
@@ -559,6 +560,29 @@ describe("battle", () => {
     });
   });
 
+  describe("effectiveStrength (energy-scaled damage)", () => {
+    it("is full strength at full energy (identity)", () => {
+      expect(effectiveStrength(24, 100)).toBe(24);
+      expect(effectiveStrength(1, 100)).toBe(1);
+    });
+    it("scales linearly and floors (half bar = half strength)", () => {
+      expect(effectiveStrength(24, 50)).toBe(12);
+      expect(effectiveStrength(25, 50)).toBe(12); // floor(12.5)
+    });
+    it("is 0 at 0 energy (exhausted dragons cannot hurt anything)", () => {
+      expect(effectiveStrength(100, 0)).toBe(0);
+      expect(effectiveStrength(28, 0)).toBe(0);
+    });
+    it("a sliver of energy means a sliver of strength", () => {
+      // Night Fury 24 at 5 energy -> floor(1.2) = 1
+      expect(effectiveStrength(24, 5)).toBe(1);
+    });
+    it("clamps out-of-range energy", () => {
+      expect(effectiveStrength(24, 1000)).toBe(24);
+      expect(effectiveStrength(24, -10)).toBe(0);
+    });
+  });
+
   describe("resolveMonsterFight", () => {
     const easy = MONSTERS[0];
 
@@ -600,6 +624,34 @@ describe("battle", () => {
       expect(res.energyAfter).toBe(
         Math.max(0, 5 - res.energyLoss),
       );
+    });
+
+    it("respects energy in damage: same rolls hit weaker on low energy", () => {
+      const full = resolveMonsterFight(24, 100, easy, 0.5, 0.5, 0.5);
+      const low = resolveMonsterFight(24, 5, easy, 0.5, 0.5, 0.5);
+      expect(low.rawDamage).toBeLessThan(full.rawDamage);
+    });
+
+    it("a strong dragon on a sliver of energy LOSES to Easy (no cheap chain-wins)", () => {
+      // Night Fury 24 at 5 energy -> effective 1; even max bonus 10
+      // cannot beat Easy 19: 1 + 10 - 19 < 0.
+      const res = resolveMonsterFight(24, 5, easy, 0.999, 0.5, 0.5);
+      expect(res.won).toBe(false);
+      expect(res.rawDamage).toBeLessThan(0);
+      // ...while the same dragon at full energy wins with those rolls.
+      expect(resolveMonsterFight(24, 100, easy, 0.999, 0.5, 0.5).won).toBe(true);
+    });
+
+    it("a loss knocks the dragon out cold: energyAfter is 0, never a sliver", () => {
+      const res = resolveMonsterFight(11, 100, easy, 0, 0.5, 0);
+      expect(res.won).toBe(false);
+      expect(res.energyAfter).toBe(0);
+      expect(res.energyLoss).toBe(100); // everything actually drained
+      // also at partial energy: loss still empties the bar completely
+      const partial = resolveMonsterFight(11, 40, easy, 0, 0.5, 0.5);
+      expect(partial.won).toBe(false);
+      expect(partial.energyAfter).toBe(0);
+      expect(partial.energyLoss).toBe(40);
     });
   });
 
@@ -701,6 +753,25 @@ describe("bewilder beast", () => {
       expect(res.beastDefeated).toBe(false);
       expect(res.dragonEnergyAfter).toBe(0);
       expect(res.dragonRemoved).toBe(true);
+    });
+
+    it("scales damage with live energy: tired dragons chip weakly", () => {
+      const full = resolveBeastTurn(50, 100, 260, 0.5, 0.5);
+      const tired = resolveBeastTurn(50, 10, 260, 0.5, 0.5);
+      expect(tired.rawDamage).toBeLessThan(full.rawDamage);
+      // full-energy math is unchanged: strength + bonus - beast constant
+      expect(full.rawDamage).toBe(
+        50 + rollDamageBonus(0.5) - CONFIG.beast.strengthConstant,
+      );
+    });
+
+    it("mid-fight exhaustion does not weaken blows: damage keys off entry energy", () => {
+      const fresh = resolveBeastTurn(50, 100, 260, 0.5, 0.5, 100);
+      const winded = resolveBeastTurn(50, 12, 260, 0.5, 0.5, 100);
+      expect(winded.rawDamage).toBe(fresh.rawDamage);
+      // ...but a dragon that steps in tired hits weakly from the first turn
+      const steppedInTired = resolveBeastTurn(50, 12, 260, 0.5, 0.5, 12);
+      expect(steppedInTired.rawDamage).toBeLessThan(fresh.rawDamage);
     });
 
     it("clamps beast HP at 0 on overkill", () => {

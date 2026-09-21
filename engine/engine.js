@@ -591,6 +591,7 @@ function createGameEngine(deps) {
       s.ui.fightLog = [];
       for (const participant of lineup) {
         let energy = liveEnergyForDragon(participant, atMs);
+        const fightStartEnergy = energy;
         finalEnergies.set(participant.id, energy);
         while (energy > 0 && !defeated) {
           const turn = resolveBeastTurn(
@@ -598,7 +599,8 @@ function createGameEngine(deps) {
             energy,
             hp,
             rand(),
-            rand()
+            rand(),
+            fightStartEnergy
           );
           hp = turn.beastHpAfter;
           energy = turn.dragonEnergyAfter;

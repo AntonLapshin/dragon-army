@@ -321,29 +321,37 @@ function rollDamageBonus(rand01) {
 function battleDamage(dragonStrength, opponentStrength, bonus) {
   return dragonStrength + bonus - opponentStrength;
 }
+function effectiveStrength(dragonStrength, dragonEnergy) {
+  const factor = clamp(dragonEnergy, CONFIG.energy.min, CONFIG.energy.max) / CONFIG.energy.max;
+  return Math.floor(dragonStrength * factor);
+}
 function isBattleWin(rawDamage) {
   return rawDamage >= 0;
 }
 function resolveMonsterFight(dragonStrength, dragonEnergy, monster, bonusRand01, rewardRand01, energyRand01, strengthRand01 = 0.5) {
   const rawDamage = battleDamage(
-    dragonStrength,
+    effectiveStrength(dragonStrength, dragonEnergy),
     monster.strength,
     rollDamageBonus(bonusRand01)
   );
   const won = isBattleWin(rawDamage);
   const coinReward = won ? rollIntInclusive(monster.rewardMin, monster.rewardMax, rewardRand01) : 0;
-  const energyLoss = rollIntInclusive(
-    won ? monster.energyLossWinMin : monster.energyLossLoseMin,
-    won ? monster.energyLossWinMax : monster.energyLossLoseMax,
-    energyRand01
-  );
+  const energyAfter = won ? applyEnergyDrain(
+    dragonEnergy,
+    rollIntInclusive(
+      monster.energyLossWinMin,
+      monster.energyLossWinMax,
+      energyRand01
+    )
+  ) : CONFIG.energy.min;
+  const energyLoss = dragonEnergy - energyAfter;
   const strengthGain = won ? rollMonsterWinStrengthGain(monster, strengthRand01) : 0;
   return {
     rawDamage,
     won,
     coinReward,
     energyLoss,
-    energyAfter: applyEnergyDrain(dragonEnergy, energyLoss),
+    energyAfter,
     strengthGain
   };
 }
@@ -370,9 +378,9 @@ function rollBeastReward(rand01) {
     rand01
   );
 }
-function resolveBeastTurn(dragonStrength, dragonEnergy, beastHp, bonusRand01, counterRand01) {
+function resolveBeastTurn(dragonStrength, dragonEnergy, beastHp, bonusRand01, counterRand01, fightStartEnergy = dragonEnergy) {
   const rawDamage = battleDamage(
-    dragonStrength,
+    effectiveStrength(dragonStrength, fightStartEnergy),
     CONFIG.beast.strengthConstant,
     rollDamageBonus(bonusRand01)
   );
@@ -459,6 +467,7 @@ export {
   collectibleCoins,
   dragonStage,
   drawBreedIndex,
+  effectiveStrength,
   energyAt,
   findBreed,
   hasCollectibleCoins,

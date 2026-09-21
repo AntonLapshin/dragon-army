@@ -651,9 +651,12 @@ export function createGameEngine(deps: CreateEngineDeps) {
   }
 
   /**
-   * Single monster fight: `damage = (strength + bonus) - monsterStrength`.
-   * Win = coins only; lose = strength unchanged. Both drain energy by the
-   * difficulty-based loss (never a full restore).
+   * Single monster fight: `damage = (effectiveStrength + bonus) - monsterStrength`
+   * where effectiveStrength scales with live energy (tired dragons hit
+   * weaker). Win = coins + permanent strength, energy drained by effort;
+   * lose = knocked out to 0 energy, strength unchanged. Both outcomes
+   * persist the drained anchor; 0 energy blocks the next fight until
+   * recovery.
    */
   function fightMonster(
     dragonId: string,
@@ -794,6 +797,10 @@ export function createGameEngine(deps: CreateEngineDeps) {
 
       for (const participant of lineup) {
         let energy = liveEnergyForDragon(participant, atMs);
+        // Snapshot entry energy: the dragon's blows scale with how rested
+        // it was when it stepped in; the beast's counter then grinds its
+        // live energy down until it drops (or the beast falls).
+        const fightStartEnergy = energy;
         finalEnergies.set(participant.id, energy);
         while (energy > 0 && !defeated) {
           const turn = resolveBeastTurn(
@@ -802,6 +809,7 @@ export function createGameEngine(deps: CreateEngineDeps) {
             hp,
             rand(),
             rand(),
+            fightStartEnergy,
           );
           hp = turn.beastHpAfter;
           energy = turn.dragonEnergyAfter;

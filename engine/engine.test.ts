@@ -552,6 +552,47 @@ describe("monsters", () => {
     expect(s.player.coins).toBe(before);
     expect(s.player.totalMonsterLosses).toBe(1);
   });
+  it("a loss knocks the dragon out: energy 0 blocks an immediate refight", () => {
+    const saved = stateWith([hatchedDragon({ id: "d", strength: 11 })]);
+    saved.monsterSpawn = { spawned: [{ ...MONSTERS[0] }], lastRefreshMs: T0 };
+    const t = setup(saved);
+    t.engine.init();
+    const res = t.engine.fightMonster("d", MONSTERS[0].id, {
+      bonusRand01: 0, // 11 + 0 - 19 < 0 -> loss
+      rewardRand01: 0.5,
+      energyRand01: 0,
+      strengthRand01: 0.5,
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.won).toBe(false);
+    expect(res.energyAfter).toBe(0); // knocked out, no sliver left
+    expect(t.engine.getState().player.dragons[0].energy).toBe(0);
+    // an immediate second fight is rejected until recovery
+    expect(t.engine.fightMonster("d", MONSTERS[0].id)).toMatchObject({
+      ok: false,
+      reason: "no-energy",
+    });
+    expect(t.engine.openMonsterSelect("d")).toEqual({ ok: false, reason: "no-energy" });
+  });
+  it("near-zero energy cannot chain a win: strong dragon on a sliver loses", () => {
+    const saved = stateWith([
+      hatchedDragon({ id: "d", strength: 24, energy: 5, lastEnergyUpdateMs: T0 }),
+    ]);
+    saved.monsterSpawn = { spawned: [{ ...MONSTERS[0] }], lastRefreshMs: T0 };
+    const t = setup(saved);
+    t.engine.init();
+    const res = t.engine.fightMonster("d", MONSTERS[0].id, {
+      bonusRand01: 0.999, // max bonus still not enough: 1 + 10 - 19 < 0
+      rewardRand01: 0.5,
+      energyRand01: 0.5,
+      strengthRand01: 0.5,
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.won).toBe(false);
+    expect(res.energyAfter).toBe(0);
+  });
   it("rejects unknown dragons / eggs / tired dragons / unspawned targets", () => {
     const t = spawnedSetup();
     t.engine.init();
