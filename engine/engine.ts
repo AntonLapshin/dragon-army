@@ -12,13 +12,15 @@
  * - idempotent wall-clock tick: hatching, lifespan expiry, beast respawn,
  *   monster-spawn refresh (recovery/coins/age are derived, never tick-written)
  * - tap-to-collect hourly coins (nothing credited without tapping)
- * - Train (coin cost scales with strength, random gain, blocked at 0 energy)
+ * - Train (coin cost scales with strength, random gain, drains flat energy,
+ *   blocked at 0 energy)
  * - Sell (price from age/strength/energy/breed)
- * - Monster fights (spawned-only selection, win = coins only, both outcomes
- *   drain energy; strength unchanged)
+ * - Monster fights (spawned-only selection, win = coins + permanent strength
+ *   gain, both outcomes drain energy; strength unchanged on loss)
  * - Bewilder Beast turn-based roster-order battle with Energy retaliation;
  *   0-energy dragons are removed, survivors keep drained energy, win =
- *   vanish-for-a-day + coin reward, loss with empty roster = buy a new egg
+ *   vanish-for-a-day + coin reward + permanent strength gain per survivor,
+ *   loss with empty roster = buy a new egg
  * - transient UI slice (screens / modals / selection / fight log)
  *
  * RULE: all balance math goes through the pure functions in `config.ts`
@@ -30,6 +32,7 @@
 import {
   CONFIG,
   ageDaysForDragonInstance,
+  applyEnergyDrain,
   breedForDragon,
   breedForIndex,
   canAffordEgg,
@@ -48,11 +51,13 @@ import {
   resolveMonsterFight,
   rollBaseStrength,
   rollBeastReward,
+  rollBeastWinStrengthGain,
   rollHatchMs,
   rollSpawnedMonsters,
   rollTrainingGain,
   sellPriceForDragon,
   trainingCostForDragon,
+  trainingEnergyCost,
 } from "./config";
 import type {
   BeastState,
@@ -76,7 +81,6 @@ import {
   monsterFightLogText,
   screensForRoster,
   withEnergyAnchor,
-  withTrainingGain,
 } from "./utils";
 
 // ---------------------------------------------------------------------------
@@ -122,6 +126,8 @@ export type TrainResult =
       strengthAfter: number;
       levelBefore: number;
       levelAfter: number;
+      energyCost: number;
+      energyAfter: number;
     }
   | { ok: false; reason: TrainPreview["reason"] };
 
@@ -137,6 +143,8 @@ export type MonsterFightOutcome =
       coinReward: number;
       energyLoss: number;
       energyAfter: number;
+      strengthGain: number;
+      strengthAfter: number;
       logText: string;
     }
   | {
@@ -159,6 +167,8 @@ export type BeastBattleOutcome =
       beastHpAfter: number;
       reward: number;
       removedDragonIds: string[];
+      /** Permanent strength gained per surviving dragon id (only on win). */
+      strengthGains: Record<string, number>;
     }
   | { ok: false; reason: "beast-vanished" | "no-participants" };
 
@@ -577,14 +587,23 @@ export function createGameEngine(deps: CreateEngineDeps) {
 
   function trainDragon(dragonId: string, gainRand01?: number): TrainResult {
     const s = requireState();
+    const atMs = now();
     const preview = trainPreview(dragonId);
     if (!preview.canTrain) return { ok: false, reason: preview.reason };
     const dragon = findDragon(dragonId);
     if (!dragon) return { ok: false, reason: "unknown-dragon" };
     const levelBefore = levelForDragon(dragon);
     const gain = rollTrainingGain(gainRand01 ?? rand());
+    const energyCost = trainingEnergyCost();
+    const liveEnergy = liveEnergyForDragon(dragon, atMs);
+    const energyAfter = applyEnergyDrain(liveEnergy, energyCost);
     s.player.coins -= preview.cost;
-    replaceDragon(withTrainingGain(dragon, gain));
+    replaceDragon({
+      ...dragon,
+      strength: dragon.strength + gain,
+      energy: energyAfter,
+      lastEnergyUpdateMs: atMs,
+    });
     s.player.totalTrainings += 1;
     const after = findDragon(dragonId);
     const strengthAfter = after?.strength ?? dragon.strength + gain;
@@ -596,6 +615,8 @@ export function createGameEngine(deps: CreateEngineDeps) {
       strengthAfter,
       levelBefore,
       levelAfter: levelForDragon({ ...dragon, strength: strengthAfter }),
+      energyCost,
+      energyAfter,
     };
   }
 
@@ -675,7 +696,7 @@ export function createGameEngine(deps: CreateEngineDeps) {
   function fightMonster(
     dragonId: string,
     monsterId: string,
-    rolls?: { bonusRand01?: number; rewardRand01?: number; energyRand01?: number },
+    rolls?: { bonusRand01?: number; rewardRand01?: number; energyRand01?: number; strengthRand01?: number },
   ): MonsterFightOutcome {
     const s = requireState();
     const atMs = now();
@@ -701,8 +722,15 @@ export function createGameEngine(deps: CreateEngineDeps) {
         rolls?.bonusRand01 ?? rand(),
         rolls?.rewardRand01 ?? rand(),
         rolls?.energyRand01 ?? rand(),
+        rolls?.strengthRand01 ?? rand(),
       );
-      replaceDragon(withEnergyAnchor(dragon, result.energyAfter, atMs));
+      const strengthAfter = dragon.strength + result.strengthGain;
+      replaceDragon({
+        ...dragon,
+        strength: strengthAfter,
+        energy: result.energyAfter,
+        lastEnergyUpdateMs: atMs,
+      });
       if (result.won) {
         s.player.coins += result.coinReward;
         s.player.totalCoinsEarned += result.coinReward;
@@ -737,6 +765,8 @@ export function createGameEngine(deps: CreateEngineDeps) {
         coinReward: result.coinReward,
         energyLoss: result.energyLoss,
         energyAfter: result.energyAfter,
+        strengthGain: result.strengthGain,
+        strengthAfter,
         logText,
       };
     } finally {
@@ -773,8 +803,9 @@ export function createGameEngine(deps: CreateEngineDeps) {
   /**
    * Full Beast battle: each dragon attacks in roster order until removed,
    * the next steps in. Retaliation hits Energy; 0-energy dragons are
-   * REMOVED. Win = vanish-for-a-day + coin reward; survivors keep drained
-   * energy. Loss persists the beast's remaining HP.
+   * REMOVED. Win = vanish-for-a-day + coin reward + permanent strength gain
+   * for every surviving participant; survivors keep drained energy.
+   * Loss persists the beast's remaining HP (no strength gain).
    */
   function fightBeast(): BeastBattleOutcome {
     tick(now());
@@ -839,6 +870,7 @@ export function createGameEngine(deps: CreateEngineDeps) {
       }
 
       let reward = 0;
+      const strengthGains: Record<string, number> = {};
       if (defeated) {
         reward = rollBeastReward(rand());
         s.player.coins += reward;
@@ -852,11 +884,24 @@ export function createGameEngine(deps: CreateEngineDeps) {
         s.beast.currentHp = hp;
       }
 
-      // Persist energy: removed dragons go, surviving fighters keep drains.
+      // Persist energy (+ strength on win): removed dragons go, surviving
+      // fighters keep drains; winners grow stronger.
       for (const [id, energy] of finalEnergies) {
         if (removedIds.has(id)) continue;
         const current = s.player.dragons.find((d) => d.id === id);
-        if (current) replaceDragon(withEnergyAnchor(current, energy, atMs));
+        if (!current) continue;
+        if (defeated) {
+          const gain = rollBeastWinStrengthGain(rand());
+          strengthGains[id] = gain;
+          replaceDragon({
+            ...current,
+            strength: current.strength + gain,
+            energy,
+            lastEnergyUpdateMs: atMs,
+          });
+        } else {
+          replaceDragon(withEnergyAnchor(current, energy, atMs));
+        }
       }
       removeDragons(removedIds);
       s.ui.fightLog = turns;
@@ -868,6 +913,7 @@ export function createGameEngine(deps: CreateEngineDeps) {
         beastHpAfter: defeated ? 0 : hp,
         reward,
         removedDragonIds: [...removedIds],
+        strengthGains,
       };
     } finally {
       fightLocked = false;

@@ -1,16 +1,17 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { _reset, _collect } from "zepp-web-runner/shims/hmUI";
 import { DEVICE_WIDTH, DEVICE_HEIGHT } from "zepp-web-runner/constants";
 
 // ---------------------------------------------------------------------------
 // Local copy of zepp-web-runner WidgetRenderer with dev-only fixes:
-//  1. GESTURE supports mouse drag (pointer events), not just touch, so swipe
-//     navigation can be tested with `npm run dev` on a desktop browser.
-//  2. Fully transparent colors (alpha 0x00, e.g. 0x00000000) render as
+//  1. Fully transparent colors (alpha 0x00, e.g. 0x00000000) render as
 //     transparent instead of opaque black.
-//  3. IMG never scales (real Zepp OS device behavior): source PNG is drawn
+//  2. IMG never scales (real Zepp OS device behavior): source PNG is drawn
 //     1:1 at (x, y) inside an overflow:hidden w/h box. objectFit contain/fill
 //     is forbidden — it hid asset/widget size mismatches.
+// NOTE: no GESTURE/swipe support on purpose — the game uses tap-only
+// navigation (roster strip + Home) because swipe does not
+// work reliably on the real device.
 // ---------------------------------------------------------------------------
 
 function toCssColor(c, alphaProp) {
@@ -196,92 +197,11 @@ function renderBUTTON(widget) {
   );
 }
 
-function fireSwipe(widget, deltaX, deltaY, deltaTime) {
-  if (deltaTime > 600) return;
-  const absDx = Math.abs(deltaX);
-  const absDy = Math.abs(deltaY);
-  if (absDx < 40 || absDx < absDy) return;
-  if (deltaX < 0 && widget._events.swipeLeft) {
-    widget._events.swipeLeft.forEach((fn) => fn());
-  } else if (deltaX > 0 && widget._events.swipeRight) {
-    widget._events.swipeRight.forEach((fn) => fn());
-  }
-}
-
-function GestureWidget({ widget }) {
-  const touchRef = useRef({ startX: 0, startY: 0, startTime: 0 });
-  const ptrRef = useRef(null);
-  const p = widget._props;
-
-  const handleTouchStart = useCallback((e) => {
-    const t = e.touches[0];
-    touchRef.current = {
-      startX: t.clientX,
-      startY: t.clientY,
-      startTime: Date.now(),
-    };
-  }, []);
-
-  const handleTouchEnd = useCallback(
-    (e) => {
-      const t = e.changedTouches[0];
-      const { startX, startY, startTime } = touchRef.current;
-      fireSwipe(
-        widget,
-        t.clientX - startX,
-        t.clientY - startY,
-        Date.now() - startTime,
-      );
-    },
-    [widget],
-  );
-
-  const handlePointerDown = useCallback((e) => {
-    ptrRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      startTime: Date.now(),
-    };
-  }, []);
-
-  const handlePointerUp = useCallback(
-    (e) => {
-      if (!ptrRef.current) return;
-      const { startX, startY, startTime } = ptrRef.current;
-      ptrRef.current = null;
-      fireSwipe(
-        widget,
-        e.clientX - startX,
-        e.clientY - startY,
-        Date.now() - startTime,
-      );
-    },
-    [widget],
-  );
-
-  return (
-    <div
-      key={widget._id}
-      style={{
-        ...baseStyle(p),
-        touchAction: "pan-y",
-        pointerEvents: "auto",
-        cursor: "grab",
-      }}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-    />
-  );
-}
-
 const renderers = {
   IMG: renderIMG,
   TEXT: renderTEXT,
   FILL_RECT: renderFILL_RECT,
   BUTTON: renderBUTTON,
-  GESTURE: (w) => <GestureWidget key={w._id} widget={w} />,
 };
 
 function renderWidget(w) {

@@ -1,7 +1,8 @@
 # Interface.md
 
 ## Screen Layout Overview
-- The game is composed of **swipe-able screens** (left/right): the Main Control Screen plus one Dragon Detail Screen per owned dragon or unhatched egg.
+- The game is composed of **tap-navigated screens**: the Main Control Screen plus one Dragon Detail Screen per owned dragon or unhatched egg. There is **no swipe/GESTURE navigation** (unreliable on the real device).
+- Main hub navigation uses the bottom roster-strip thumbnails; detail screens return via **Home**.
 - Each screen may contain **icons** that open **modals** (panels over a semi-transparent dark overlay).
 - All modals appear on top of the current screen with **no animation** and contain a **close (X)** button (top-right) to dismiss them, **except Fight modals while turns are auto-resolving, which are locked until the outcome is shown**.
 
@@ -13,7 +14,7 @@
   - **Bewilder Beast** – top-right corner. Always visible; tapping opens the boss intro modal.
   - **Earn Coins** – bottom-left. Tap-to-collect hourly generation; **shown only when collectible coins are available**. Tapping opens the Coin-Earning Summary Modal and credits the coins.
 - **Background** – static scene image and text: "Dragons: N" (how many hatched dragons the user has; eggs may be counted separately or excluded per config — default: dragons only).
-- **Behavior** – Swiping left/right moves to Dragon Detail screens (one per dragon/egg).
+- **Behavior** – tapping a roster-strip thumbnail jumps to that Dragon Detail screen; Buy Egg / Beast icons open their modals.
 
 ---
 
@@ -29,7 +30,7 @@
   - **Train** (left) – opens Train modal. Disabled at 0 energy.
   - **Sell** (center) – opens Sell modal.
   - **Monster** (right) – opens Monster Selection modal. Disabled at 0 energy (dragon must recover first).
-- **Swipe left** returns toward the Main Control Screen; **swipe right** goes to the next owned dragon/egg (if any).
+- **Home** icon (bottom row) returns to the Main Control Screen.
 
 ---
 
@@ -47,9 +48,9 @@
 
 #### 3.2 Train Modal
 - **Title** – "Train [Dragon Name]".
-- **Cost display** – "Cost: X coins" (scales with dragon's current strength, per config).
-- **Start button** – "Start". Requires energy > 0 and sufficient coins. Tapping deducts the coins and increases the dragon's strength by a random value within the configured range.
-- **Result modal** – "Strength +Y (new total)". Level display updates if a threshold is crossed.
+- **Cost display** – "Cost: X coins" (scales with dragon's current strength, per config) plus "-15 energy per session".
+- **Start button** – "Start". Requires energy > 0 and sufficient coins. Tapping deducts the coins, drains 15 energy, and increases the dragon's strength by a random value within the configured range.
+- **Result modal** – "Strength +Y (new total)" plus "-15 energy". Level display updates if a threshold is crossed.
 
 #### 3.3 Sell Modal
 - **Title** – "Sell [Dragon Name]".
@@ -72,7 +73,7 @@
 - **Formula:**
   - `damage = (dragonStrength + random(0–10)) – monsterConstantStrength` (constants per opponent, config-defined; beast counter-damage on Energy likewise config-defined).
 - **Outcome (monster fight):**
-  - **Win** – coins reward only (random, based on difficulty). Dragon energy reduced by damage taken (no full restore).
+  - **Win** – coins reward (random, based on difficulty) **plus permanent strength gain** (Easy +1–2, Medium +2–3, Hard +3–5). Dragon energy reduced by damage taken (no full restore).
   - **Lose** – strength unchanged; dragon's energy reduced by damage taken (0 only if depleted); modal note "Dragon is tired, will recover automatically". Train/Monster/Beast blocked until energy recovers.
 
 #### 3.6 Bewilder Beast Modal (from Main Control)
@@ -80,7 +81,7 @@
 - **Turn log** – each dragon attacks in roster order; modal logs "Dragon [name] deals X damage to Bewilder Beast" and retaliation; beast HP bar shrinks; dragon Energy bars shrink.
 - **Dragon out** – a dragon reduced to 0 energy mid-battle is **removed from the roster**; the next dragon enters.
 - **End conditions:**
-  - **Beast defeated** – "Bewilder Beast vanishes for a day. Continue adventure." Survivors keep remaining energy; removed dragons stay removed. Beast respawns after a day.
+  - **Beast defeated** – "Bewilder Beast vanishes for a day. Continue adventure." Survivors keep remaining energy and each gains permanent +3–5 strength; removed dragons stay removed. Beast respawns after a day.
   - **All dragons removed** – "Defeat — roster empty. Buy a new egg. Return to Main Screen." Player buys a new egg, waiting/collecting hourly coins if broke (no game-over).
 
 #### 3.7 Coin-Earning Summary Modal (hourly, tap-to-collect)
@@ -96,14 +97,14 @@
 2. Taps **Buy Egg** (top-left). **Egg-Spin Purchase Modal** appears (or "Not enough coins" if broke).
 3. Symbol wheel spins; player taps to stop and reveal the breed.
 4. Player taps **"Yo hoo"** → coins deducted, egg added with hidden 1–2 day hatch timer.
-5. Egg occupies its own swipeable detail screen (egg image + "Hatching...", no actions). Once hatched, the dragon appears with Train/Sell/Monster actions.
+5. Egg gets its own detail screen (egg image + "Hatching...", no actions). Once hatched, the dragon appears with Train/Sell/Monster actions.
 
 #### B. Fighting a Monster
 1. Player selects a hatched dragon (energy > 0) on the **Dragon Detail Screen** and taps **Monster** (bottom-right).
 2. **Monster Selection Modal** shows only currently spawned monsters (0–3 rows) each with a Fight button, or the empty state.
 3. Player taps a Fight button; **Fight Modal** opens (locked) with dragon and monster images/HP.
 4. Turns resolve automatically using the damage formula; energy drains by damage taken; outcome is displayed.
-5. **Win** → coins added only, energy reduced by damage taken (no auto-restore).
+5. **Win** → coins plus strength gain (Easy +1–2, Medium +2–3, Hard +3–5), energy reduced by damage taken (no auto-restore).
    **Lose** → strength unchanged, energy reduced by damage taken. Player waits for passive recovery (Train/Monster/Beast blocked at 0).
 
 #### C. Bewilder Beast Battle
@@ -111,7 +112,7 @@
 2. Taps **Fight** – turn-based sequence starts with all energy-positive dragons in roster order (locked modal).
 3. Each dragon deals damage; beast retaliates on Energy; modal logs damage and both HP/Energy bars.
 4. Dragons at 0 are removed; next enters.
-5. If the beast's HP reaches 0 → "Bewilder Beast vanishes for a day. Continue." (respawns after a day).
+5. If the beast's HP reaches 0 → "Bewilder Beast vanishes for a day. Continue." Survivors gain +3–5 strength each (respawns after a day).
 6. If all dragons are removed → "Defeat — roster empty. Buy a new egg." Player returns to Main, collects hourly coins if needed, and buys a new egg.
 
 ---

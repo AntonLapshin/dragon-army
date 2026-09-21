@@ -66,6 +66,9 @@ export interface MonsterDef {
   energyLossWinMax: number;
   energyLossLoseMin: number;
   energyLossLoseMax: number;
+  /** Permanent strength gained on a win (rolled in [min, max]; 0 on loss). */
+  strengthGainWinMin: number;
+  strengthGainWinMax: number;
   /**
    * Image path relative to `assets/` (e.g. `monsters/gronkle.png`).
    * Presentation-only; never enters formulas.
@@ -80,6 +83,8 @@ export interface MonsterFightResult {
   coinReward: number;
   energyLoss: number;
   energyAfter: number;
+  /** Permanent strength gained (0 on loss). */
+  strengthGain: number;
 }
 
 /** Outcome of a single Bewilder Beast turn (`resolveBeastTurn`). */
@@ -240,7 +245,7 @@ export type ModalKind =
   | "coin-summary"
   | null;
 
-/** Swipeable screens: main hub + one detail screen per dragon/egg. */
+/** Screens: main hub + one detail screen per dragon/egg. */
 export type ScreenRef =
   | { kind: "main" }
   | { kind: "dragon"; dragonId: string };

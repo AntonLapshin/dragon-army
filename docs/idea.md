@@ -1,7 +1,7 @@
 # Dragon Army – Game Overview
 
 ## Core Concept
-A Zepp OS / Amazfit Bip 6 game inspired by *How to Train Your Dragon*. The player hatches, raises, and trains a collection of dragons, then uses the strongest members to battle monsters and ultimately the **Bewilder Beast** boss. Core resources are **energy** (recovers passively) and **coins** (tap-to-collect each hour). The UI is built of swipe-able screens, mimicking the Koala-game "egg-at-center" flow.
+A Zepp OS / Amazfit Bip 6 game inspired by *How to Train Your Dragon*. The player hatches, raises, and trains a collection of dragons, then uses the strongest members to battle monsters and ultimately the **Bewilder Beast** boss. Core resources are **energy** (recovers passively, drained by training and battles) and **coins** (tap-to-collect each hour). The UI is tap-navigated screens (roster strip + Home, no swipe), mimicking the Koala-game "egg-at-center" flow.
 
 ## Starting Resources
 - The player begins with a **fixed amount of coins** sufficient to purchase a single random egg.
@@ -15,7 +15,7 @@ A Zepp OS / Amazfit Bip 6 game inspired by *How to Train Your Dragon*. The playe
 - The egg's hatch time is **random between 1 and 2 days** (real-time), encoded at time of purchase. **No timer is shown.**
 
 ## Interface Layout
-- The game consists of multiple **screens** that the player switches by **swiping left or right**.
+- The game consists of multiple **screens** switched by **tap-only button navigation** (roster-strip thumbnails on the main hub, Home on detail screens; no swipe).
 - Screens: **Main Control Screen**, plus one **Dragon Detail Screen per owned dragon or unhatched egg**.
 - Modals (all share the common modal design below):
   1. **Egg-Spin Purchase modal** (= "Shop / egg store")
@@ -43,14 +43,14 @@ Appears per dragon (or per unhatched egg). Displays at the top the dragon's **Br
 - **Breed** is revealed at spin time and shown as the dragon's name/image on its detail screen.
 - **Level** does not drive formulas directly; it is a display tier computed from Strength (config thresholds).
 - Bottom row (hatched dragons only): three icons:
-  - **Train** icon – Opens a modal showing the **training price** and a **"Start"** button.
-    - Paying the price increases the dragon's **strength** by a random value within a range; the stronger the dragon, the higher the cost (reasonable progression, config-defined).
+  - **Train** icon – Opens a modal showing the **training price** (plus -15 energy) and a **"Start"** button.
+    - Paying the price increases the dragon's **strength** by a random value within a range and drains 15 energy; the stronger the dragon, the higher the cost (reasonable progression, config-defined).
     - Blocked when the dragon's energy is 0.
   - **Sell** icon – Opens a modal showing the **sale price**, which depends on the dragon's **age, strength, energy, and breed** (config). Selling can provide coins to buy multiple eggs.
   - **Monster** icon – Opens the Monster Selection Modal.
     - Spawn-based availability: **0–3 monsters** may be present. Easy spawns frequently, Medium rarely, Hard rarest. Missing difficulties are hidden; if nothing spawned the modal shows "No monsters right now".
     - Fighting follows the same strength-+-random vs. monster-strength formula.
-    - **Win → receives coins only** (amount random, based on monster difficulty). No free egg.
+    - **Win → receives coins** (amount random, based on monster difficulty) **plus permanent strength gain** (Easy +1–2, Medium +2–3, Hard +3–5). No free egg.
     - **Lose → strength unchanged**; energy drained by damage taken (see Energy & Recovery).
 - **Unhatched egg screens have no Train / Sell / Monster actions**; they only display the egg until it hatches into a dragon.
 
@@ -68,7 +68,7 @@ Appears per dragon (or per unhatched egg). Displays at the top the dragon's **Br
 
 ## Boss & Winning Condition
 - **Bewilder Beast** – The final boss. It has HP; dragons attack in roster order with beast retaliation on Energy as described above.
-- Defeating the beast: surviving dragons keep their remaining (drained) energy; dragons dropped to 0 during the run are removed. The beast **vanishes for a day, then respawns**. There is **no end-win state** — the loop continues with new eggs and dragons.
+- Defeating the beast: surviving dragons keep their remaining (drained) energy and each gains permanent +3–5 strength; dragons dropped to 0 during the run are removed. The beast **vanishes for a day, then respawns**. There is **no end-win state** — the loop continues with new eggs and dragons.
 - Losing to the beast: all participating dragons are removed; the player continues by buying a new egg (waiting for hourly coins if needed).
 
 ## Modal Design
@@ -79,12 +79,12 @@ Appears per dragon (or per unhatched egg). Displays at the top the dragon's **Br
 ## Rules Summary
 1. Start with fixed coins enough for one random egg; no auto-modal — player taps Buy Egg.
 2. Spin-then-pay in the egg modal (spin → tap to stop → Yo hoo to pay + add egg); insufficient coins = disabled / "Not enough coins", no spin.
-3. Egg hatches in 1–2 days (real-time), no timer shown; egg occupies its own swipeable detail screen with no actions until hatched.
-4. Swipe between Main screen and one detail screen per dragon/egg.
+3. Egg hatches in 1–2 days (real-time), no timer shown; egg gets its own detail screen with no actions until hatched.
+4. Tap-only navigation between Main screen and one detail screen per dragon/egg (roster strip + Home, no swipe).
 5. Dragon screen shows Breed / Level (from Strength) / Age / Energy / Strength; Train, Sell, Monster actions via modals (blocked at 0 energy; eggs have no actions).
-6. Training costs coins, raises strength randomly; cost scales with strength.
+6. Training costs coins plus 15 energy, raises strength randomly; cost scales with strength.
 7. Selling price depends on age, strength, energy, breed.
-8. Monsters spawn by rarity (Easy frequent / Medium rare / Hard rarest, 0–3 shown); win gives coins only, lose drains energy by damage with strength unchanged.
+8. Monsters spawn by rarity (Easy frequent / Medium rare / Hard rarest, 0–3 shown); win gives coins plus strength gain (+1–2 / +2–3 / +3–5), lose drains energy by damage with strength unchanged.
 9. Beast battle is turn-based with retaliation on Energy (Energy = Health); each dragon attacks in order, modal logs each turn; 0-energy dragons are removed; if all fall, player loses and must buy a new egg (wait for hourly coins if broke).
-10. Beast vanishes for a day after defeat, then respawns; no final win state — the loop continues.
+10. Beast vanishes for a day after defeat (survivors gain +3–5 strength each), then respawns; no final win state — the loop continues.
 11. Hourly coins are tap-to-collect via the Earn Coins icon (visible only when collectible), enabling first training after first hatch.

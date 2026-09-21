@@ -111,6 +111,10 @@ export const CONFIG = {
     costPerStrength: 0.8,
     strengthGainMin: 3,
     strengthGainMax: 7,
+    // Training is hard work: each session drains this much energy (flat,
+    // clamped at 0). Cheap next to a monster fight (70-100) but enough that
+    // ~6 back-to-back sessions empty a full bar; recovery is 10/hour.
+    energyCost: 15,
     cooldownMs: 0,
   },
   selling: {
@@ -142,6 +146,9 @@ export const CONFIG = {
     loseCondition: "all-dragons-removed-before-hp-0",
     winRewardMin: 300,
     winRewardMax: 300,
+    // Survivors of a victorious beast battle grow stronger (rolled per dragon).
+    winStrengthGainMin: 3,
+    winStrengthGainMax: 5,
     respawnAfterWinMs: 24 * 60 * 60 * 1000,
   },
   timers: {
@@ -207,6 +214,9 @@ export const MONSTERS: MonsterDef[] = [
     energyLossWinMax: 100,
     energyLossLoseMin: 85,
     energyLossLoseMax: 100,
+    // Winning a fight trains the dragon: small permanent strength gain.
+    strengthGainWinMin: 1,
+    strengthGainWinMax: 2,
     image: "monsters/gronkle.png",
   },
   {
@@ -221,6 +231,8 @@ export const MONSTERS: MonsterDef[] = [
     energyLossWinMax: 100,
     energyLossLoseMin: 90,
     energyLossLoseMax: 100,
+    strengthGainWinMin: 2,
+    strengthGainWinMax: 3,
     image: "monsters/deadly_nadder.png",
   },
   {
@@ -235,6 +247,8 @@ export const MONSTERS: MonsterDef[] = [
     energyLossWinMax: 100,
     energyLossLoseMin: 95,
     energyLossLoseMax: 100,
+    strengthGainWinMin: 3,
+    strengthGainWinMax: 5,
     image: "monsters/monstrous_nightmare.png",
   },
 ];
@@ -403,6 +417,32 @@ export function rollTrainingGain(rand01: number): number {
   );
 }
 
+/** Flat energy drained by one training session. Pure. */
+export function trainingEnergyCost(): number {
+  return CONFIG.training.energyCost;
+}
+
+/** Permanent strength gained for winning vs this monster (0 on loss). Pure. */
+export function rollMonsterWinStrengthGain(
+  monster: MonsterDef,
+  rand01: number,
+): number {
+  return rollIntInclusive(
+    monster.strengthGainWinMin,
+    monster.strengthGainWinMax,
+    rand01,
+  );
+}
+
+/** Permanent strength gained by each surviving beast-battle winner. Pure. */
+export function rollBeastWinStrengthGain(rand01: number): number {
+  return rollIntInclusive(
+    CONFIG.beast.winStrengthGainMin,
+    CONFIG.beast.winStrengthGainMax,
+    rand01,
+  );
+}
+
 export function canTrain(energy: number, coins: number, strength: number): boolean {
   return (
     energy > CONFIG.training.requiresEnergyAbove && coins >= trainingCost(strength)
@@ -466,6 +506,7 @@ export function resolveMonsterFight(
   bonusRand01: number,
   rewardRand01: number,
   energyRand01: number,
+  strengthRand01: number = 0.5,
 ): MonsterFightResult {
   const rawDamage = battleDamage(
     dragonStrength,
@@ -481,12 +522,16 @@ export function resolveMonsterFight(
     won ? monster.energyLossWinMax : monster.energyLossLoseMax,
     energyRand01,
   );
+  const strengthGain = won
+    ? rollMonsterWinStrengthGain(monster, strengthRand01)
+    : 0;
   return {
     rawDamage,
     won,
     coinReward,
     energyLoss,
     energyAfter: applyEnergyDrain(dragonEnergy, energyLoss),
+    strengthGain,
   };
 }
 

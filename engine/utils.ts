@@ -3,7 +3,7 @@
  *
  * Everything here is pure (no clock reads, no storage, no mutation):
  * roster-entry factories, immutable anchor updates, tap-to-collect anchor
- * math, swipe-screen list builders, and fight-log text formatters.
+ * math, screen list builders, and fight-log text formatters.
  * All balance numbers and formulas come from `config.ts` — this file only
  * orchestrates shapes defined in `types.ts`.
  */
@@ -117,7 +117,7 @@ export function advanceCollectAnchor(
 }
 
 // ---------------------------------------------------------------------------
-// Swipe screens (pure)
+// Screens (pure)
 // ---------------------------------------------------------------------------
 
 /** Main hub + one detail screen per roster entry, in roster order. Pure. */

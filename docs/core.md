@@ -2,26 +2,26 @@
 
 1. **Fixed start-up resources** – The player begins with a set amount of coins sufficient to purchase a single random egg. No modal auto-appears on launch; the player starts the flow manually via Buy Egg.
 2. **Random egg selection (spin-then-pay)** – Tapping Buy Egg opens a modal with a symbol-spinning animation; the player's tap freezes it and the resulting combination assigns the egg type (one of 15 possible dragons = 15 breeds). Tapping "Yo hoo" then deducts the egg price and adds the egg. Insufficient coins = Buy Egg disabled / "Not enough coins" state, no spin.
-3. **Hatch timer** – After purchase the egg hatches after 1–2 days of real time; the timer is not displayed but is encoded at purchase. The egg occupies its own swipeable detail screen (egg image + "Hatching...", no actions) until hatched.
-4. **Swipe navigation** – The UI consists of swipe-able screens (left/right): the main control screen plus one dragon detail screen per owned dragon or unhatched egg.
+3. **Hatch timer** – After purchase the egg hatches after 1–2 days of real time; the timer is not displayed but is encoded at purchase. The egg gets its own detail screen (egg image + "Hatching...", no actions) until hatched.
+4. **Button navigation (no swipe)** – The UI consists of the main control screen plus one dragon detail screen per owned dragon or unhatched egg. Navigation is tap-only: the main hub has a bottom roster-strip of thumbnails, detail screens return via Home. There is no swipe/GESTURE logic (unreliable on the real device).
 5. **Main control screen hub** – Central screen holding fixed icons that open modals:
    - **Buy Egg** (top-left) – purchases a new egg via spin-then-pay; disabled when coins are insufficient.
    - **Bewilder Beast** (top-right) – always visible; opens the boss intro modal with the boss image and a **Fight** button.
    - **Earn Coins** (bottom-left) – tap-to-collect hourly generation; the icon is shown **only when collectible coins are available** and opens the coin summary modal on tap. Nothing is credited without tapping.
 6. **Dragon detail screen** – Shows a dragon's **Breed (type name), Level (display-only tier derived from Strength via config), Age, Energy, and Strength** with a central image. Egg screens show the egg + "Hatching..." and no actions. Hatched-dragon actions via modals:
-   - **Train** – costs coins (scales with dragon strength) and raises strength by a random amount. Blocked at 0 energy.
+   - **Train** – costs coins (scales with dragon strength) and drains a flat 15 energy; raises strength by a random amount. Blocked at 0 energy.
    - **Sell** – returns coins based on the dragon's age, strength, energy, and breed.
    - **Monster** – opens the monster selection modal (0–3 spawned monsters).
 7. **Energy & recovery** – Energy **drains after every battle (win or lose), proportional to damage taken**. It recovers automatically over time; no manual action or food is required. A dragon with 0 energy cannot Train, fight monsters, or join Beast battles — except dragons dropped to 0 inside a Beast battle are **removed** instead of kept.
 8. **Monster battles** –
    - Spawn-based: Easy spawns frequently, Medium rarely, Hard rarest; the selection modal shows only spawned monsters (0–3 rows) or an empty state.
    - The selected dragon fights using: `damage = (dragonStrength + random(0–10)) – monsterConstantStrength`.
-   - **Win → receives coins only** (random, based on difficulty). No egg reward.
+   - **Win → receives coins (random, based on difficulty) plus a permanent strength gain** (Easy +1–2, Medium +2–3, Hard +3–5). No egg reward.
    - **Lose → energy drained by damage taken; strength unchanged.**
-9. **Training** – Paying the coin cost increases the dragon's strength by a random value within a range; cost scales with the dragon's current strength (config-defined). Requires energy > 0.
+9. **Training** – Paying the coin cost increases the dragon's strength by a random value within a range and drains a flat 15 energy; cost scales with the dragon's current strength (config-defined). Requires energy > 0.
 10. **Selling** – Provides coins whose amount depends on the dragon's age, strength, energy, and breed. Selling can supply coins for multiple egg purchases.
 11. **Dragon turns against Bewilder Beast** – Turn-based with retaliation: each dragon attacks in roster order using the damage formula against the beast's HP; the beast hits back on that dragon's Energy (config-defined counter-damage; Energy = Health here). A dragon at 0 energy is out and **removed**. The modal logs each turn and is locked (not closable) until the outcome. If all dragons are removed before the beast falls, the player loses with an empty roster and must buy a new egg (waiting for hourly coins if broke).
-12. **Bewilder Beast boss** – The final boss with an HP bar. Defeating it keeps survivors at their remaining (drained) energy and removes dragons dropped to 0; the beast vanishes for a day and then respawns.
+12. **Bewilder Beast boss** – The final boss with an HP bar. Defeating it keeps survivors at their remaining (drained) energy, grants each surviving dragon a permanent +3–5 strength gain, and removes dragons dropped to 0; the beast vanishes for a day and then respawns.
 13. **Win condition** – Progress is measured by defeating monsters and the Bewilder Beast; there is no separate "win-end" state, the loop continues with new eggs and dragons.
 14. **Modal design** – No animation; semi-transparent dark overlay. Every modal contains a close (X) button **except Fight modals while turns auto-resolve** (locked until outcome). Modals: egg-spin purchase outcome + "Not enough coins", training price/result, sell confirmation, monster selection & fight result, Bewilder Beast intro/fight, and coin-earning summary ("Yo hoo" to close/collect).
 15. **Hourly coin generation** – Coins accrue hourly but are credited **only by tapping the Earn Coins icon** (visible only when collectible), enabling the first training after the first egg hatches.

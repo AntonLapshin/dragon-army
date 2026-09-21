@@ -59,6 +59,10 @@ const CONFIG = {
     costPerStrength: 0.8,
     strengthGainMin: 3,
     strengthGainMax: 7,
+    // Training is hard work: each session drains this much energy (flat,
+    // clamped at 0). Cheap next to a monster fight (70-100) but enough that
+    // ~6 back-to-back sessions empty a full bar; recovery is 10/hour.
+    energyCost: 15,
     cooldownMs: 0
   },
   selling: {
@@ -90,6 +94,9 @@ const CONFIG = {
     loseCondition: "all-dragons-removed-before-hp-0",
     winRewardMin: 300,
     winRewardMax: 300,
+    // Survivors of a victorious beast battle grow stronger (rolled per dragon).
+    winStrengthGainMin: 3,
+    winStrengthGainMax: 5,
     respawnAfterWinMs: 24 * 60 * 60 * 1e3
   },
   timers: {
@@ -153,6 +160,9 @@ const MONSTERS = [
     energyLossWinMax: 100,
     energyLossLoseMin: 85,
     energyLossLoseMax: 100,
+    // Winning a fight trains the dragon: small permanent strength gain.
+    strengthGainWinMin: 1,
+    strengthGainWinMax: 2,
     image: "monsters/gronkle.png"
   },
   {
@@ -167,6 +177,8 @@ const MONSTERS = [
     energyLossWinMax: 100,
     energyLossLoseMin: 90,
     energyLossLoseMax: 100,
+    strengthGainWinMin: 2,
+    strengthGainWinMax: 3,
     image: "monsters/deadly_nadder.png"
   },
   {
@@ -181,6 +193,8 @@ const MONSTERS = [
     energyLossWinMax: 100,
     energyLossLoseMin: 95,
     energyLossLoseMax: 100,
+    strengthGainWinMin: 3,
+    strengthGainWinMax: 5,
     image: "monsters/monstrous_nightmare.png"
   }
 ];
@@ -269,6 +283,23 @@ function rollTrainingGain(rand01) {
     rand01
   );
 }
+function trainingEnergyCost() {
+  return CONFIG.training.energyCost;
+}
+function rollMonsterWinStrengthGain(monster, rand01) {
+  return rollIntInclusive(
+    monster.strengthGainWinMin,
+    monster.strengthGainWinMax,
+    rand01
+  );
+}
+function rollBeastWinStrengthGain(rand01) {
+  return rollIntInclusive(
+    CONFIG.beast.winStrengthGainMin,
+    CONFIG.beast.winStrengthGainMax,
+    rand01
+  );
+}
 function canTrain(energy, coins, strength) {
   return energy > CONFIG.training.requiresEnergyAbove && coins >= trainingCost(strength);
 }
@@ -293,7 +324,7 @@ function battleDamage(dragonStrength, opponentStrength, bonus) {
 function isBattleWin(rawDamage) {
   return rawDamage >= 0;
 }
-function resolveMonsterFight(dragonStrength, dragonEnergy, monster, bonusRand01, rewardRand01, energyRand01) {
+function resolveMonsterFight(dragonStrength, dragonEnergy, monster, bonusRand01, rewardRand01, energyRand01, strengthRand01 = 0.5) {
   const rawDamage = battleDamage(
     dragonStrength,
     monster.strength,
@@ -306,12 +337,14 @@ function resolveMonsterFight(dragonStrength, dragonEnergy, monster, bonusRand01,
     won ? monster.energyLossWinMax : monster.energyLossLoseMax,
     energyRand01
   );
+  const strengthGain = won ? rollMonsterWinStrengthGain(monster, strengthRand01) : 0;
   return {
     rawDamage,
     won,
     coinReward,
     energyLoss,
-    energyAfter: applyEnergyDrain(dragonEnergy, energyLoss)
+    energyAfter: applyEnergyDrain(dragonEnergy, energyLoss),
+    strengthGain
   };
 }
 function shouldSpawnMonster(spawnChance, rand01) {
@@ -447,9 +480,11 @@ export {
   rollBaseStrength,
   rollBeastCounterDamage,
   rollBeastReward,
+  rollBeastWinStrengthGain,
   rollDamageBonus,
   rollHatchMs,
   rollIntInclusive,
+  rollMonsterWinStrengthGain,
   rollSpawnedMonsters,
   rollTrainingGain,
   sellEnergyFactor,
@@ -457,5 +492,6 @@ export {
   sellPriceForDragon,
   shouldSpawnMonster,
   trainingCost,
-  trainingCostForDragon
+  trainingCostForDragon,
+  trainingEnergyCost
 };

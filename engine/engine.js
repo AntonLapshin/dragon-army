@@ -4,6 +4,7 @@
 import {
   CONFIG,
   ageDaysForDragonInstance,
+  applyEnergyDrain,
   breedForDragon,
   breedForIndex,
   canAffordEgg,
@@ -22,11 +23,13 @@ import {
   resolveMonsterFight,
   rollBaseStrength,
   rollBeastReward,
+  rollBeastWinStrengthGain,
   rollHatchMs,
   rollSpawnedMonsters,
   rollTrainingGain,
   sellPriceForDragon,
-  trainingCostForDragon
+  trainingCostForDragon,
+  trainingEnergyCost
 } from "./config.js";
 import {
   advanceCollectAnchor,
@@ -36,8 +39,7 @@ import {
   hatchDragonInstance,
   monsterFightLogText,
   screensForRoster,
-  withEnergyAnchor,
-  withTrainingGain
+  withEnergyAnchor
 } from "./utils.js";
 function createNewGameState(params) {
   const { playerId, nowMs, configVersion, beastMaxHp } = params;
@@ -347,14 +349,23 @@ function createGameEngine(deps) {
   }
   function trainDragon(dragonId, gainRand01) {
     const s = requireState();
+    const atMs = now();
     const preview = trainPreview(dragonId);
     if (!preview.canTrain) return { ok: false, reason: preview.reason };
     const dragon = findDragon(dragonId);
     if (!dragon) return { ok: false, reason: "unknown-dragon" };
     const levelBefore = levelForDragon(dragon);
     const gain = rollTrainingGain(gainRand01 ?? rand());
+    const energyCost = trainingEnergyCost();
+    const liveEnergy = liveEnergyForDragon(dragon, atMs);
+    const energyAfter = applyEnergyDrain(liveEnergy, energyCost);
     s.player.coins -= preview.cost;
-    replaceDragon(withTrainingGain(dragon, gain));
+    replaceDragon({
+      ...dragon,
+      strength: dragon.strength + gain,
+      energy: energyAfter,
+      lastEnergyUpdateMs: atMs
+    });
     s.player.totalTrainings += 1;
     const after = findDragon(dragonId);
     const strengthAfter = after?.strength ?? dragon.strength + gain;
@@ -365,7 +376,9 @@ function createGameEngine(deps) {
       gain,
       strengthAfter,
       levelBefore,
-      levelAfter: levelForDragon({ ...dragon, strength: strengthAfter })
+      levelAfter: levelForDragon({ ...dragon, strength: strengthAfter }),
+      energyCost,
+      energyAfter
     };
   }
   function sellPreview(dragonId, atMs = now()) {
@@ -439,9 +452,16 @@ function createGameEngine(deps) {
         target,
         rolls?.bonusRand01 ?? rand(),
         rolls?.rewardRand01 ?? rand(),
-        rolls?.energyRand01 ?? rand()
+        rolls?.energyRand01 ?? rand(),
+        rolls?.strengthRand01 ?? rand()
       );
-      replaceDragon(withEnergyAnchor(dragon, result.energyAfter, atMs));
+      const strengthAfter = dragon.strength + result.strengthGain;
+      replaceDragon({
+        ...dragon,
+        strength: strengthAfter,
+        energy: result.energyAfter,
+        lastEnergyUpdateMs: atMs
+      });
       if (result.won) {
         s.player.coins += result.coinReward;
         s.player.totalCoinsEarned += result.coinReward;
@@ -476,6 +496,8 @@ function createGameEngine(deps) {
         coinReward: result.coinReward,
         energyLoss: result.energyLoss,
         energyAfter: result.energyAfter,
+        strengthGain: result.strengthGain,
+        strengthAfter,
         logText
       };
     } finally {
@@ -558,6 +580,7 @@ function createGameEngine(deps) {
         if (defeated) break;
       }
       let reward = 0;
+      const strengthGains = {};
       if (defeated) {
         reward = rollBeastReward(rand());
         s.player.coins += reward;
@@ -573,7 +596,19 @@ function createGameEngine(deps) {
       for (const [id, energy] of finalEnergies) {
         if (removedIds.has(id)) continue;
         const current = s.player.dragons.find((d) => d.id === id);
-        if (current) replaceDragon(withEnergyAnchor(current, energy, atMs));
+        if (!current) continue;
+        if (defeated) {
+          const gain = rollBeastWinStrengthGain(rand());
+          strengthGains[id] = gain;
+          replaceDragon({
+            ...current,
+            strength: current.strength + gain,
+            energy,
+            lastEnergyUpdateMs: atMs
+          });
+        } else {
+          replaceDragon(withEnergyAnchor(current, energy, atMs));
+        }
       }
       removeDragons(removedIds);
       s.ui.fightLog = turns;
@@ -584,7 +619,8 @@ function createGameEngine(deps) {
         turns,
         beastHpAfter: defeated ? 0 : hp,
         reward,
-        removedDragonIds: [...removedIds]
+        removedDragonIds: [...removedIds],
+        strengthGains
       };
     } finally {
       fightLocked = false;

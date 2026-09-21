@@ -139,7 +139,9 @@ function currentView() {
 }
 
 // ---------------------------------------------------------------------------
-// Navigation
+// Navigation (tap-only; no swipe/GESTURE — unreliable on real device).
+// Main hub uses the bottom roster-strip thumbnails; detail screens return
+// via Home. goTo clamps into [0, roster.length].
 // ---------------------------------------------------------------------------
 
 function goTo(index) {
@@ -251,18 +253,6 @@ function addCoinBig(cx, iconY, coins, textY, textH, fontSize, color) {
   const s = 64;
   addImg(Math.round(cx - s / 2), iconY, s, s, 'ui/coin_64x64.png');
   addText(Math.round(cx - 150), textY, 300, textH, String(coins), fontSize, color);
-}
-
-// Full-screen swipe navigation. Must be created FIRST (bottom z-layer) so the
-// dim shade never sits on top of icons/buttons and blocks their clicks.
-// (In zepp-web-runner the GESTURE div renders last-on-top when created last,
-// which swallowed every click in desktop testing.)
-function addSwipeNav(width) {
-  try {
-    const g = push(hmUI.createWidget(hmUI.widget.GESTURE, { x: 0, y: 0, w: width, h: DEVICE_HEIGHT }));
-    g.addEventListener(hmUI.event.SWIPE_LEFT, () => goTo(_screenIndex + 1));
-    g.addEventListener(hmUI.event.SWIPE_RIGHT, () => goTo(_screenIndex - 1));
-  } catch (_) {}
 }
 
 function addImg(x, y, w, h, src, onTap) {
@@ -396,6 +386,8 @@ function startTrain(dragonId) {
     strengthAfter: res.strengthAfter,
     leveledUp: res.levelAfter > res.levelBefore,
     levelAfter: res.levelAfter,
+    energyCost: res.energyCost,
+    energyAfter: res.energyAfter,
   });
 }
 
@@ -423,10 +415,10 @@ function startMonsterFight(dragonId, monsterId) {
     [
       'Dragon ' + view.breed.name + ' attacks - damage ' + res.rawDamage,
       res.won
-        ? 'Victory! +' + res.coinReward + ' coins'
+        ? 'Victory! +' + res.coinReward + ' coins, +' + res.strengthGain + ' strength'
         : 'Dragon is tired, will recover automatically',
     ],
-    { won: res.won, reward: res.coinReward, energyAfter: res.energyAfter, rawDamage: res.rawDamage },
+    { won: res.won, reward: res.coinReward, energyAfter: res.energyAfter, rawDamage: res.rawDamage, strengthGain: res.strengthGain, strengthAfter: res.strengthAfter },
   );
 }
 
@@ -435,15 +427,19 @@ function startBeastFight() {
   const res = engine.fightBeast();
   if (!res.ok) return;
   const lines = res.turns.map((t) => t.text);
-  lines.push(
-    res.won
-      ? 'Bewilder Beast vanishes for a day. Continue adventure. +' + res.reward + ' coins'
-      : 'Defeat - roster empty. Buy a new egg.',
-  );
+  if (res.won) {
+    const gains = Object.values(res.strengthGains || {});
+    const avg = gains.length ? Math.round(gains.reduce((a, b) => a + b, 0) / gains.length) : 0;
+    lines.push(
+      'Bewilder Beast vanishes for a day. Continue adventure. +' + res.reward + ' coins, survivors +' + avg + ' strength',
+    );
+  } else {
+    lines.push('Defeat - roster empty. Buy a new egg.');
+  }
   openLockedFight(
     { kind: 'beast-fight' },
     lines,
-    { won: res.won, reward: res.reward, hpAfter: res.beastHpAfter },
+    { won: res.won, reward: res.reward, hpAfter: res.beastHpAfter, strengthGains: res.strengthGains || {} },
     5000,
   );
 }
@@ -487,8 +483,6 @@ function openLockedFight(base, lines, outcome, delayMs) {
 function renderMain(width) {
   const economy = engine.getEconomyView();
   addImg(0, 0, width, DEVICE_HEIGHT, 'bg/bg-home_390x450.png');
-  // Swipe layer first so it never covers tappable icons.
-  addSwipeNav(width);
 
   // Balance: large coin centered with the amount on a dark pill right below.
   const balanceCx = Math.floor(width / 2);
@@ -525,8 +519,6 @@ function renderDragon(width, view) {
   addImg(0, 0, width, DEVICE_HEIGHT, 'bg/bg-dragon_390x450.png');
   // Dim the bright bg artwork so the dragon and UI stay visible.
   addShade(0, 0, width, DEVICE_HEIGHT);
-  // Swipe layer first so it never covers tappable icons.
-  addSwipeNav(width);
 
   if (egg) {
      // Still hatching: hide the breed so the dragon stays a surprise.
@@ -705,13 +697,14 @@ function renderTrain() {
   const preview = engine.trainPreview(view.dragon.id);
   renderModalShell('Train ' + view.breed.name, false);
   addCoinBig(PANEL_X + PANEL_W / 2, PANEL_Y + 60, preview.cost, PANEL_Y + 128, 40, 44, 0xffffff);
+  addText(PANEL_X + 20, PANEL_Y + 168, PANEL_W - 40, 26, '-' + CONFIG.training.energyCost + ' energy per session', 16, 0xdddddd);
   if (!preview.canTrain) {
     const msg = preview.reason === 'no-energy'
       ? 'No energy - recover first'
       : preview.reason === 'not-enough-coins'
         ? 'Not enough coins'
         : 'Cannot train now';
-    addText(PANEL_X + 20, PANEL_Y + 180, PANEL_W - 40, 30, msg, 18, 0xff8888);
+    addText(PANEL_X + 20, PANEL_Y + 194, PANEL_W - 40, 30, msg, 18, 0xff8888);
     addButton(PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'Start', null, { normal: 0x555555 });
   } else {
     addButton(PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'Start', () => startTrain(view.dragon.id));
@@ -723,12 +716,15 @@ function renderTrainResult() {
   addImg(PANEL_X + 140, PANEL_Y + 70, 60, 60, 'ui/victory_60x60.png');
   const gainLine = _modal.text
     || ('Strength +' + _modal.gain + ' (' + _modal.strengthAfter + ')');
-  addText(PANEL_X + 20, PANEL_Y + 150, PANEL_W - 40, 30, gainLine, 20, 0xaaffaa);
+  addText(PANEL_X + 20, PANEL_Y + 140, PANEL_W - 40, 30, gainLine, 20, 0xaaffaa);
+  if (_modal.energyCost !== undefined) {
+    addText(PANEL_X + 20, PANEL_Y + 170, PANEL_W - 40, 26, '-' + _modal.energyCost + ' energy', 16, 0xdddddd);
+  }
   if (_modal.leveledUp || (typeof _modal.text === 'string' && _modal.text.indexOf('Level up') !== -1)) {
     const lv = _modal.levelAfter !== undefined
       ? _modal.levelAfter
       : _modal.text.replace(/^.*Lv\s*/, '');
-    addText(PANEL_X + 20, PANEL_Y + 182, PANEL_W - 40, 30, 'Level up! Lv ' + lv, 20, 0xffee88);
+    addText(PANEL_X + 20, PANEL_Y + 196, PANEL_W - 40, 30, 'Level up! Lv ' + lv, 20, 0xffee88);
   }
   addButton(PANEL_X + 90, PANEL_Y + PANEL_H - 70, 160, 48, 'OK', closeModal);
 }
@@ -764,10 +760,11 @@ list.forEach((m, i) => {
      const rowY = PANEL_Y + 64 + i * 92;
      if (rowY + 90 > PANEL_Y + PANEL_H - 10) return;
      addImg(PANEL_X + 24, rowY, 72, 72, m.image.replace('.png', '_72x72.png'));
-     addText(PANEL_X + 100, rowY, 100, 30, m.difficulty, 19, 0xffffff, hmUI.align.LEFT);
-     const strIconS = 56;
-     addImg(PANEL_X + 100, rowY + 34, strIconS, strIconS, 'ui/strength_56x56.png');
-     addText(PANEL_X + 100 + strIconS + 4, rowY + 49, 40, 26, String(m.strength), 17, 0xdddddd, hmUI.align.LEFT);
+     addText(PANEL_X + 100, rowY, 100, 28, m.difficulty, 19, 0xffffff, hmUI.align.LEFT);
+     addText(PANEL_X + 100, rowY + 28, 110, 20, 'win: +' + m.strengthGainWinMin + '-' + m.strengthGainWinMax + ' str', 14, 0xaaffaa, hmUI.align.LEFT);
+     const strIconS = 32;
+     addImg(PANEL_X + 100, rowY + 50, strIconS, strIconS, 'ui/strength_56x56.png');
+     addText(PANEL_X + 100 + strIconS + 4, rowY + 52, 40, 26, String(m.strength), 17, 0xdddddd, hmUI.align.LEFT);
      addButton(PANEL_X + 210, rowY + 12, 100, 44, 'Fight', () => startMonsterFight(view.dragon.id, m.id), { size: 19 });
    });
 }
@@ -798,7 +795,7 @@ function renderMonsterFight() {
     addImg(PANEL_X + 140, PANEL_Y + PANEL_H - 140, 60, 60, modal.outcome.won ? 'ui/victory_60x60.png' : 'ui/loss_60x60.png');
     addText(
       PANEL_X + 20, PANEL_Y + PANEL_H - 76, PANEL_W - 40, 28,
-      modal.outcome.won ? '+' + modal.outcome.reward + ' coins' : 'Rest to recover',
+      modal.outcome.won ? '+' + modal.outcome.reward + ' coins, +' + (modal.outcome.strengthGain || 0) + ' str' : 'Rest to recover',
       18, modal.outcome.won ? 0xaaffaa : 0xff8888,
     );
   }
@@ -829,7 +826,7 @@ function renderBeastIntro() {
   );
   addText(
     PANEL_X + 20, PANEL_Y + 238, PANEL_W - 40, 44,
-    'Warning: you can lose dragons if defeated!',
+    'Warning: you can lose dragons if defeated! Winners gain strength.',
     16, 0xff8888,
   );
   if (team.length > 0) {
@@ -854,7 +851,7 @@ function renderBeastFight() {
     if (modal.outcome.won) {
       addText(
         PANEL_X + 20, PANEL_Y + PANEL_H - 76, PANEL_W - 40, 28,
-        'Vanishes for a day! +' + modal.outcome.reward,
+        'Vanishes for a day! +' + modal.outcome.reward + ' coins, survivors +str',
         17, 0xaaffaa,
       );
     }
