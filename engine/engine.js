@@ -3,6 +3,7 @@
 // (zeus build only bundles .js; the .ts sources are for vitest.)
 import {
   CONFIG,
+  MONSTERS,
   ageDaysForDragonInstance,
   applyEnergyDrain,
   breedForDragon,
@@ -39,7 +40,8 @@ import {
   hatchDragonInstance,
   monsterFightLogText,
   screensForRoster,
-  withEnergyAnchor
+  withEnergyAnchor,
+  withTrainingGain
 } from "./utils.js";
 function createNewGameState(params) {
   const { playerId, nowMs, configVersion, beastMaxHp } = params;
@@ -80,6 +82,55 @@ function createNewGameState(params) {
     nowMs,
     lastTickMs: nowMs
   };
+}
+function asFiniteNumber(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+function migrateLegacySave(raw, nowMs) {
+  const state = createNewGameState({
+    playerId: "player-1",
+    nowMs,
+    configVersion: CONFIG.meta.configVersion,
+    beastMaxHp: CONFIG.beast.hp
+  });
+  const coins = asFiniteNumber(raw.coins);
+  if (coins !== null) state.player.coins = coins;
+  state.player.createdAtMs = asFiniteNumber(raw.createdAt) ?? nowMs;
+  state.player.lastSeenMs = nowMs;
+  state.player.lastCoinCollectMs = asFiniteNumber(raw.lastCoinCollectMs) ?? nowMs;
+  const entries = Array.isArray(raw.dragons) ? raw.dragons : [];
+  state.player.dragons = entries.filter(
+    (d) => typeof d === "object" && d !== null && typeof d.id === "string"
+  ).map((d) => ({
+    id: d.id,
+    breedId: breedForIndex(
+      typeof d.breedIdx === "number" ? d.breedIdx : 0
+    ).id,
+    strength: asFiniteNumber(d.strength) ?? 0,
+    energy: asFiniteNumber(d.energy) ?? CONFIG.energy.initial,
+    purchasedAtMs: asFiniteNumber(d.purchasedAt) ?? nowMs,
+    hatchAtMs: asFiniteNumber(d.hatchAt) ?? nowMs,
+    hatchedAtMs: asFiniteNumber(d.hatchedAt),
+    lastEnergyUpdateMs: asFiniteNumber(d.energyTs) ?? nowMs
+  }));
+  state.beast.currentHp = asFiniteNumber(raw.beastHp) ?? CONFIG.beast.hp;
+  state.beast.status = raw.beastStatus === "vanished" ? "vanished" : "alive";
+  state.beast.respawnAtMs = asFiniteNumber(raw.beastRespawnAt);
+  const spawnedIds = new Set(Array.isArray(raw.spawned) ? raw.spawned : []);
+  state.monsterSpawn.spawned = MONSTERS.filter((m) => spawnedIds.has(m.id));
+  state.monsterSpawn.lastRefreshMs = asFiniteNumber(raw.spawnTs) ?? 0;
+  return state;
+}
+function coerceLoadedSave(raw, nowMs) {
+  if (!raw || typeof raw !== "object") return null;
+  const candidate = raw;
+  if (candidate.player && Array.isArray(candidate.player.dragons)) {
+    return candidate;
+  }
+  if (typeof candidate.coins === "number" && Array.isArray(candidate.dragons)) {
+    return migrateLegacySave(candidate, nowMs);
+  }
+  return null;
 }
 function cloneState(state) {
   return JSON.parse(JSON.stringify(state));
@@ -360,12 +411,9 @@ function createGameEngine(deps) {
     const liveEnergy = liveEnergyForDragon(dragon, atMs);
     const energyAfter = applyEnergyDrain(liveEnergy, energyCost);
     s.player.coins -= preview.cost;
-    replaceDragon({
-      ...dragon,
-      strength: dragon.strength + gain,
-      energy: energyAfter,
-      lastEnergyUpdateMs: atMs
-    });
+    replaceDragon(
+      withEnergyAnchor(withTrainingGain(dragon, gain), energyAfter, atMs)
+    );
     s.player.totalTrainings += 1;
     const after = findDragon(dragonId);
     const strengthAfter = after?.strength ?? dragon.strength + gain;
@@ -700,6 +748,8 @@ function createGameEngine(deps) {
   };
 }
 export {
+  coerceLoadedSave,
   createGameEngine,
-  createNewGameState
+  createNewGameState,
+  migrateLegacySave
 };

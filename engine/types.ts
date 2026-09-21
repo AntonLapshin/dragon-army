@@ -302,3 +302,172 @@ export interface NewGameStateParams {
   configVersion: number;
   beastMaxHp: number;
 }
+
+// ---------------------------------------------------------------------------
+// Engine deps (injected platform boundaries — the engine never touches I/O)
+// ---------------------------------------------------------------------------
+
+export interface EngineStorage {
+  load(): GameState | null;
+  save(state: GameState): void;
+}
+
+export interface CreateEngineDeps {
+  storage: EngineStorage;
+  getTime: () => number;
+  /** Random source in [0,1). Defaults to Math.random. Injected in tests. */
+  rand01?: Random01;
+  /** Id factory (rand01, nowMs) => id. Defaults to `createDragonId`. */
+  generateId?: (rand01: number, nowMs: number) => string;
+  playerId?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Engine results (every state-mutating call returns one of these)
+// ---------------------------------------------------------------------------
+
+export type EggSpinPreview =
+  | { ok: true; breedIndex: number; breed: DragonBreed }
+  | { ok: false; reason: "not-enough-coins" | "roster-full" };
+
+export type ConfirmEggResult =
+  | { ok: true; dragon: Dragon }
+  | { ok: false; reason: "not-enough-coins" | "roster-full" };
+
+export type TrainPreview =
+  | { canTrain: true; cost: number; reason: null }
+  | {
+      canTrain: false;
+      cost: number;
+      reason: "unknown-dragon" | "egg" | "no-energy" | "not-enough-coins";
+    };
+
+export type TrainResult =
+  | {
+      ok: true;
+      cost: number;
+      gain: number;
+      strengthAfter: number;
+      levelBefore: number;
+      levelAfter: number;
+      energyCost: number;
+      energyAfter: number;
+    }
+  | { ok: false; reason: NonNullable<TrainPreview["reason"]> };
+
+export type SellResult =
+  | { ok: true; price: number }
+  | { ok: false; reason: "unknown-dragon" | "egg" };
+
+export type MonsterFightOutcome =
+  | {
+      ok: true;
+      won: boolean;
+      rawDamage: number;
+      coinReward: number;
+      energyLoss: number;
+      energyAfter: number;
+      strengthGain: number;
+      strengthAfter: number;
+      logText: string;
+    }
+  | {
+      ok: false;
+      reason:
+        | "unknown-dragon"
+        | "egg"
+        | "no-energy"
+        | "unknown-monster"
+        | "monster-not-spawned";
+    };
+
+export interface BeastBattleTurn extends FightLogEntry {}
+
+export type BeastBattleOutcome =
+  | {
+      ok: true;
+      won: boolean;
+      turns: BeastBattleTurn[];
+      beastHpAfter: number;
+      reward: number;
+      removedDragonIds: string[];
+      /** Permanent strength gained per surviving dragon id (only on win). */
+      strengthGains: Record<string, number>;
+    }
+  | { ok: false; reason: "beast-vanished" | "no-participants" };
+
+/** Derived per-dragon view model for the detail screen (§2). */
+export interface DragonView {
+  dragon: Dragon;
+  breed: DragonBreed;
+  stage: DragonStage;
+  level: number;
+  ageDays: number;
+  /** Live energy at view time (recovery derived, never stored). */
+  energy: number;
+  strength: number;
+  sellPrice: number;
+  remainingLifespanDays: number;
+  expired: boolean;
+  canTrain: boolean;
+  canFight: boolean;
+}
+
+/** Derived main-hub icon state (§1). */
+export interface EconomyView {
+  coins: number;
+  collectible: number;
+  /** Earn Coins icon visibility: shown only when collectible > 0. */
+  hasCollectible: boolean;
+  canAffordEgg: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Roster-entry factory params / collect-anchor math (see utils.ts)
+// ---------------------------------------------------------------------------
+
+export interface NewEggParams {
+  id: string;
+  breedId: string;
+  nowMs: number;
+  hatchDelayMs: number;
+}
+
+export interface CollectAdvance {
+  /** Coins earned for whole elapsed intervals (capped, 0 below 1 interval). */
+  collected: number;
+  /**
+   * Advanced anchor: whole consumed intervals move forward, the partial
+   * remainder stays so no progress is lost by tapping early.
+   */
+  newLastCollectMs: number;
+}
+
+// ---------------------------------------------------------------------------
+// Legacy save (page-owned shape from before the engine refactor)
+// ---------------------------------------------------------------------------
+
+/** One entry of the pre-engine `{ coins, dragons }` persisted shape. */
+export interface LegacyDragonEntry {
+  id?: unknown;
+  breedIdx?: unknown;
+  strength?: unknown;
+  energy?: unknown;
+  purchasedAt?: unknown;
+  hatchAt?: unknown;
+  hatchedAt?: unknown;
+  energyTs?: unknown;
+}
+
+/** Pre-engine persisted shape (migrated on load, never written). */
+export interface LegacySave {
+  coins?: unknown;
+  dragons?: unknown;
+  createdAt?: unknown;
+  lastCoinCollectMs?: unknown;
+  beastHp?: unknown;
+  beastStatus?: unknown;
+  beastRespawnAt?: unknown;
+  spawned?: unknown;
+  spawnTs?: unknown;
+}

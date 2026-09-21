@@ -28,7 +28,6 @@
 
 import type {
   BeastTurnResult,
-  Difficulty,
   Dragon,
   DragonBreed,
   DragonStage,
@@ -36,20 +35,6 @@ import type {
   MonsterDef,
   MonsterFightResult,
   Random01,
-  Rarity,
-} from "./types";
-
-export type {
-  BeastTurnResult,
-  Difficulty,
-  Dragon,
-  DragonBreed,
-  DragonStage,
-  LevelThreshold,
-  MonsterDef,
-  MonsterFightResult,
-  Random01,
-  Rarity,
 } from "./types";
 
 export const CONFIG = {

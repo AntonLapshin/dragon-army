@@ -31,6 +31,7 @@
 
 import {
   CONFIG,
+  MONSTERS,
   ageDaysForDragonInstance,
   applyEnergyDrain,
   breedForDragon,
@@ -60,17 +61,26 @@ import {
   trainingEnergyCost,
 } from "./config";
 import type {
+  BeastBattleTurn,
+  BeastBattleOutcome,
   BeastState,
+  ConfirmEggResult,
+  CreateEngineDeps,
   Dragon,
-  DragonBreed,
-  DragonStage,
-  FightLogEntry,
+  DragonView,
+  EconomyView,
+  EggSpinPreview,
   GameState,
+  LegacySave,
   ModalKind,
   MonsterDef,
+  MonsterFightOutcome,
   NewGameStateParams,
   Random01,
   ScreenRef,
+  SellResult,
+  TrainPreview,
+  TrainResult,
 } from "./types";
 import {
   advanceCollectAnchor,
@@ -81,122 +91,8 @@ import {
   monsterFightLogText,
   screensForRoster,
   withEnergyAnchor,
+  withTrainingGain,
 } from "./utils";
-
-// ---------------------------------------------------------------------------
-// Deps / results
-// ---------------------------------------------------------------------------
-
-export interface EngineStorage {
-  load(): GameState | null;
-  save(state: GameState): void;
-}
-
-export interface CreateEngineDeps {
-  storage: EngineStorage;
-  getTime: () => number;
-  /** Random source in [0,1). Defaults to Math.random. Injected in tests. */
-  rand01?: Random01;
-  /** Id factory (rand01, nowMs) => id. Defaults to `createDragonId`. */
-  generateId?: (rand01: number, nowMs: number) => string;
-  playerId?: string;
-}
-
-export type EggSpinPreview =
-  | { ok: true; breedIndex: number; breed: DragonBreed }
-  | { ok: false; reason: "not-enough-coins" | "roster-full" };
-
-export type ConfirmEggResult =
-  | { ok: true; dragon: Dragon }
-  | { ok: false; reason: "not-enough-coins" | "roster-full" };
-
-export type TrainPreview =
-  | { canTrain: true; cost: number; reason: null }
-  | {
-      canTrain: false;
-      cost: number;
-      reason: "unknown-dragon" | "egg" | "no-energy" | "not-enough-coins";
-    };
-
-export type TrainResult =
-  | {
-      ok: true;
-      cost: number;
-      gain: number;
-      strengthAfter: number;
-      levelBefore: number;
-      levelAfter: number;
-      energyCost: number;
-      energyAfter: number;
-    }
-  | { ok: false; reason: TrainPreview["reason"] };
-
-export type SellResult =
-  | { ok: true; price: number }
-  | { ok: false; reason: "unknown-dragon" | "egg" };
-
-export type MonsterFightOutcome =
-  | {
-      ok: true;
-      won: boolean;
-      rawDamage: number;
-      coinReward: number;
-      energyLoss: number;
-      energyAfter: number;
-      strengthGain: number;
-      strengthAfter: number;
-      logText: string;
-    }
-  | {
-      ok: false;
-      reason:
-        | "unknown-dragon"
-        | "egg"
-        | "no-energy"
-        | "unknown-monster"
-        | "monster-not-spawned";
-    };
-
-export interface BeastBattleTurn extends FightLogEntry {}
-
-export type BeastBattleOutcome =
-  | {
-      ok: true;
-      won: boolean;
-      turns: BeastBattleTurn[];
-      beastHpAfter: number;
-      reward: number;
-      removedDragonIds: string[];
-      /** Permanent strength gained per surviving dragon id (only on win). */
-      strengthGains: Record<string, number>;
-    }
-  | { ok: false; reason: "beast-vanished" | "no-participants" };
-
-/** Derived per-dragon view model for the detail screen (§2). */
-export interface DragonView {
-  dragon: Dragon;
-  breed: DragonBreed;
-  stage: DragonStage;
-  level: number;
-  ageDays: number;
-  /** Live energy at view time (recovery derived, never stored). */
-  energy: number;
-  strength: number;
-  sellPrice: number;
-  remainingLifespanDays: number;
-  expired: boolean;
-  canTrain: boolean;
-  canFight: boolean;
-}
-
-/** Derived main-hub icon state (§1). */
-export interface EconomyView {
-  coins: number;
-  collectible: number;
-  /** Earn Coins icon visibility: shown only when collectible > 0. */
-  hasCollectible: boolean;
-  canAffordEgg: boolean;
-}
 
 // ---------------------------------------------------------------------------
 // Pure factory (exported for tests / first boot)
@@ -241,6 +137,75 @@ export function createNewGameState(params: NewGameStateParams): GameState {
     nowMs,
     lastTickMs: nowMs,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Save migration (pure given nowMs — the page storage adapter calls
+// `coerceLoadedSave` on boot; the engine itself only sees GameState)
+// ---------------------------------------------------------------------------
+
+function asFiniteNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Upgrade the legacy page-owned save (`{ coins, dragons with breedIdx,
+ * beastHp, ... }`) from before the engine refactor so existing progress is
+ * kept. Pure given nowMs (no clock reads).
+ */
+export function migrateLegacySave(raw: LegacySave, nowMs: number): GameState {
+  const state = createNewGameState({
+    playerId: "player-1",
+    nowMs,
+    configVersion: CONFIG.meta.configVersion,
+    beastMaxHp: CONFIG.beast.hp,
+  });
+  const coins = asFiniteNumber(raw.coins);
+  if (coins !== null) state.player.coins = coins;
+  state.player.createdAtMs = asFiniteNumber(raw.createdAt) ?? nowMs;
+  state.player.lastSeenMs = nowMs;
+  state.player.lastCoinCollectMs = asFiniteNumber(raw.lastCoinCollectMs) ?? nowMs;
+  const entries = Array.isArray(raw.dragons) ? raw.dragons : [];
+  state.player.dragons = entries
+    .filter(
+      (d): d is Record<string, unknown> =>
+        typeof d === "object" && d !== null && typeof d.id === "string",
+    )
+    .map((d) => ({
+      id: d.id as string,
+      breedId: breedForIndex(
+        typeof d.breedIdx === "number" ? d.breedIdx : 0,
+      ).id,
+      strength: asFiniteNumber(d.strength) ?? 0,
+      energy: asFiniteNumber(d.energy) ?? CONFIG.energy.initial,
+      purchasedAtMs: asFiniteNumber(d.purchasedAt) ?? nowMs,
+      hatchAtMs: asFiniteNumber(d.hatchAt) ?? nowMs,
+      hatchedAtMs: asFiniteNumber(d.hatchedAt),
+      lastEnergyUpdateMs: asFiniteNumber(d.energyTs) ?? nowMs,
+    }));
+  state.beast.currentHp = asFiniteNumber(raw.beastHp) ?? CONFIG.beast.hp;
+  state.beast.status = raw.beastStatus === "vanished" ? "vanished" : "alive";
+  state.beast.respawnAtMs = asFiniteNumber(raw.beastRespawnAt);
+  const spawnedIds = new Set(Array.isArray(raw.spawned) ? raw.spawned : []);
+  state.monsterSpawn.spawned = MONSTERS.filter((m) => spawnedIds.has(m.id));
+  state.monsterSpawn.lastRefreshMs = asFiniteNumber(raw.spawnTs) ?? 0;
+  return state;
+}
+
+/**
+ * Accept an engine-shaped save as-is; upgrade the legacy page-owned shape;
+ * anything else → null (fresh game). Pure given nowMs.
+ */
+export function coerceLoadedSave(raw: unknown, nowMs: number): GameState | null {
+  if (!raw || typeof raw !== "object") return null;
+  const candidate = raw as Partial<GameState> & LegacySave;
+  if (candidate.player && Array.isArray(candidate.player.dragons)) {
+    return candidate as GameState;
+  }
+  if (typeof candidate.coins === "number" && Array.isArray(candidate.dragons)) {
+    return migrateLegacySave(candidate, nowMs);
+  }
+  return null;
 }
 
 function cloneState(state: GameState): GameState {
@@ -598,12 +563,9 @@ export function createGameEngine(deps: CreateEngineDeps) {
     const liveEnergy = liveEnergyForDragon(dragon, atMs);
     const energyAfter = applyEnergyDrain(liveEnergy, energyCost);
     s.player.coins -= preview.cost;
-    replaceDragon({
-      ...dragon,
-      strength: dragon.strength + gain,
-      energy: energyAfter,
-      lastEnergyUpdateMs: atMs,
-    });
+    replaceDragon(
+      withEnergyAnchor(withTrainingGain(dragon, gain), energyAfter, atMs),
+    );
     s.player.totalTrainings += 1;
     const after = findDragon(dragonId);
     const strengthAfter = after?.strength ?? dragon.strength + gain;

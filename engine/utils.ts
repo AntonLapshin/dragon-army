@@ -10,10 +10,14 @@
 
 import { CONFIG, collectibleCoins } from "./config";
 import type {
+  CollectAdvance,
   Dragon,
   FightLogEntry,
+  NewEggParams,
   ScreenRef,
 } from "./types";
+
+export type { CollectAdvance, NewEggParams } from "./types";
 
 // ---------------------------------------------------------------------------
 // Ids (deterministic given inputs — the engine injects rand/now)
@@ -28,13 +32,6 @@ export function createDragonId(rand01: number, nowMs: number): string {
 // ---------------------------------------------------------------------------
 // Roster-entry factories / immutable updates (pure)
 // ---------------------------------------------------------------------------
-
-export interface NewEggParams {
-  id: string;
-  breedId: string;
-  nowMs: number;
-  hatchDelayMs: number;
-}
 
 /**
  * Fresh unhatched egg: strength 0, full-energy anchor, hidden hatch timer.
@@ -82,16 +79,6 @@ export function withTrainingGain(dragon: Dragon, gain: number): Dragon {
 // ---------------------------------------------------------------------------
 // Tap-to-collect anchor math (pure)
 // ---------------------------------------------------------------------------
-
-export interface CollectAdvance {
-  /** Coins earned for whole elapsed intervals (capped, 0 below 1 interval). */
-  collected: number;
-  /**
-   * Advanced anchor: whole consumed intervals move forward, the partial
-   * remainder stays so no progress is lost by tapping early.
-   */
-  newLastCollectMs: number;
-}
 
 /**
  * Advance the Earn-Coins anchor to `nowMs`. Whole hourly intervals are

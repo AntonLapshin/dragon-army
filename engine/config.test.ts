@@ -11,42 +11,58 @@ import {
   DRAGONS,
   MONSTERS,
   ageDaysForDragon,
+  ageDaysForDragonInstance,
   ageDaysFromMs,
   applyEnergyDrain,
   battleDamage,
+  breedForDragon,
   breedForIndex,
   canAffordEgg,
   canDragonFight,
+  canFightDragon,
   canTrain,
+  canTrainDragon,
   clamp,
   collectibleCoins,
   drawBreedIndex,
   dragonStage,
   energyAt,
+  findBreed,
   hasCollectibleCoins,
   isBattleWin,
+  isBeastEligible,
   isDragonExpired,
+  isDragonHatched,
+  isDragonInstanceExpired,
   isHatchDue,
+  levelForDragon,
   levelForStrength,
+  liveEnergyForDragon,
   maxUncollectedCoins,
   recoverEnergy,
   remainingLifespanDays,
+  remainingLifespanForDragon,
   rollBaseStrength,
   rollBeastCounterDamage,
   rollBeastReward,
+  rollBeastWinStrengthGain,
   rollDamageBonus,
   rollHatchMs,
   rollIntInclusive,
+  rollMonsterWinStrengthGain,
   rollSpawnedMonsters,
   rollTrainingGain,
   resolveBeastTurn,
   resolveMonsterFight,
   sellEnergyFactor,
   sellPrice,
+  sellPriceForDragon,
   shouldSpawnMonster,
   trainingCost,
-  type DragonBreed,
+  trainingCostForDragon,
+  trainingEnergyCost,
 } from "./config";
+import type { Dragon, DragonBreed } from "./types";
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -60,6 +76,18 @@ const stubBreed = (over: Partial<DragonBreed> = {}): DragonBreed => ({
   sellMultiplier: 1.0,
   lifespanDays: 45,
   assetKey: "test_breed",
+  ...over,
+});
+
+const stubDragon = (over: Partial<Dragon> = {}): Dragon => ({
+  id: "dragon-test",
+  breedId: DRAGONS[0].id,
+  strength: 10,
+  energy: 100,
+  purchasedAtMs: 0,
+  hatchAtMs: 0,
+  hatchedAtMs: 0,
+  lastEnergyUpdateMs: 0,
   ...over,
 });
 
@@ -678,6 +706,156 @@ describe("bewilder beast", () => {
     it("clamps beast HP at 0 on overkill", () => {
       const res = resolveBeastTurn(200, 100, 10, 0.999, 0.5);
       expect(res.beastHpAfter).toBe(0);
+    });
+  });
+});
+
+describe("trainingEnergyCost / win strength gains", () => {
+  it("drains a flat 15 energy per training session", () => {
+    expect(trainingEnergyCost()).toBe(CONFIG.training.energyCost);
+    expect(trainingEnergyCost()).toBe(15);
+  });
+  it("rollMonsterWinStrengthGain stays in the monster's win range", () => {
+    for (const m of MONSTERS) {
+      expect(rollMonsterWinStrengthGain(m, 0)).toBe(m.strengthGainWinMin);
+      expect(rollMonsterWinStrengthGain(m, 0.999999)).toBe(m.strengthGainWinMax);
+    }
+  });
+  it("rollBeastWinStrengthGain stays in [3, 5]", () => {
+    expect(rollBeastWinStrengthGain(0)).toBe(CONFIG.beast.winStrengthGainMin);
+    expect(rollBeastWinStrengthGain(0.999999)).toBe(CONFIG.beast.winStrengthGainMax);
+    for (let i = 0; i < 10; i++) {
+      const v = rollBeastWinStrengthGain(i / 10);
+      expect(v).toBeGreaterThanOrEqual(3);
+      expect(v).toBeLessThanOrEqual(5);
+    }
+  });
+  it("resolveMonsterFight grants win-range strength on win, 0 on loss", () => {
+    const easy = MONSTERS[0];
+    const win = resolveMonsterFight(50, 100, easy, 0.999, 0.5, 0.5, 0);
+    expect(win.won).toBe(true);
+    expect(win.strengthGain).toBe(easy.strengthGainWinMin);
+    const winMax = resolveMonsterFight(50, 100, easy, 0.999, 0.5, 0.5, 0.999);
+    expect(winMax.strengthGain).toBe(easy.strengthGainWinMax);
+    const loss = resolveMonsterFight(1, 100, easy, 0, 0.5, 0.5, 0.999);
+    expect(loss.won).toBe(false);
+    expect(loss.strengthGain).toBe(0);
+  });
+});
+
+describe("dragon-instance helpers (computed-not-stored)", () => {
+  describe("findBreed / breedForDragon", () => {
+    it("finds a breed by id", () => {
+      expect(findBreed(DRAGONS[3].id)).toBe(DRAGONS[3]);
+    });
+    it("returns undefined for unknown ids", () => {
+      expect(findBreed("no-such-breed")).toBeUndefined();
+    });
+    it("resolves the breed for a roster entry", () => {
+      expect(breedForDragon(stubDragon({ breedId: DRAGONS[5].id }))).toBe(DRAGONS[5]);
+    });
+    it("falls back to the first breed for stale saves", () => {
+      expect(breedForDragon(stubDragon({ breedId: "stale-id" }))).toBe(DRAGONS[0]);
+    });
+  });
+
+  describe("isDragonHatched", () => {
+    it("is false while hatchedAtMs is null (egg)", () => {
+      expect(isDragonHatched(stubDragon({ hatchedAtMs: null }))).toBe(false);
+    });
+    it("is true once hatchedAtMs is set", () => {
+      expect(isDragonHatched(stubDragon({ hatchedAtMs: 123 }))).toBe(true);
+    });
+  });
+
+  describe("liveEnergyForDragon", () => {
+    it("derives live energy from the stored anchor", () => {
+      const d = stubDragon({ energy: 50, lastEnergyUpdateMs: 1_000_000 });
+      expect(liveEnergyForDragon(d, 1_000_000)).toBeCloseTo(50);
+      expect(liveEnergyForDragon(d, 1_000_000 + HOUR)).toBeCloseTo(60);
+    });
+    it("caps at max after long offline gaps", () => {
+      const d = stubDragon({ energy: 10, lastEnergyUpdateMs: 0 });
+      expect(liveEnergyForDragon(d, 100 * HOUR)).toBe(100);
+    });
+  });
+
+  describe("ageDaysForDragonInstance / remainingLifespanForDragon / isDragonInstanceExpired", () => {
+    it("is 0 age for eggs", () => {
+      expect(ageDaysForDragonInstance(stubDragon({ hatchedAtMs: null }), DAY * 100)).toBe(0);
+    });
+    it("counts days since hatch", () => {
+      expect(ageDaysForDragonInstance(stubDragon({ hatchedAtMs: 0 }), DAY * 5)).toBe(5);
+    });
+    it("counts the lifespan down from the breed value", () => {
+      const d = stubDragon({ breedId: DRAGONS[0].id, hatchedAtMs: 0 });
+      expect(remainingLifespanForDragon(d, DAY * 5)).toBe(DRAGONS[0].lifespanDays - 5);
+      expect(remainingLifespanForDragon(stubDragon({ hatchedAtMs: null }), 999)).toBe(
+        DRAGONS[0].lifespanDays,
+      );
+      expect(remainingLifespanForDragon(d, DAY * 1000)).toBe(0);
+    });
+    it("expires exactly at the breed lifespan, never as an egg", () => {
+      const lifespan = DRAGONS[0].lifespanDays;
+      const d = stubDragon({ breedId: DRAGONS[0].id, hatchedAtMs: 0 });
+      expect(isDragonInstanceExpired(d, DAY * (lifespan - 1))).toBe(false);
+      expect(isDragonInstanceExpired(d, DAY * lifespan)).toBe(true);
+      expect(isDragonInstanceExpired(stubDragon({ hatchedAtMs: null }), DAY * 1000)).toBe(false);
+    });
+  });
+
+  describe("levelForDragon / trainingCostForDragon", () => {
+    it("maps strength to the display level", () => {
+      expect(levelForDragon(stubDragon({ strength: 0 }))).toBe(1);
+      expect(levelForDragon(stubDragon({ strength: 60 }))).toBe(6);
+      expect(levelForDragon(stubDragon({ strength: 1000 }))).toBe(10);
+    });
+    it("charges the strength-scaled training cost", () => {
+      expect(trainingCostForDragon(stubDragon({ strength: 10 }))).toBe(trainingCost(10));
+      expect(trainingCostForDragon(stubDragon({ strength: 0 }))).toBe(CONFIG.training.costBase);
+    });
+  });
+
+  describe("sellPriceForDragon", () => {
+    it("derives age + live energy internally", () => {
+      const d = stubDragon({ strength: 10, energy: 100, hatchedAtMs: 0, lastEnergyUpdateMs: 0 });
+      const expected = sellPrice(
+        10,
+        ageDaysForDragon(0, DAY * 2),
+        energyAt(100, 0, DAY * 2),
+        DRAGONS[0].sellMultiplier,
+      );
+      expect(sellPriceForDragon(d, DAY * 2)).toBe(expected);
+    });
+    it("drops for drained dragons (energy factor)", () => {
+      const full = stubDragon({ strength: 20, energy: 100, hatchedAtMs: 0, lastEnergyUpdateMs: 0 });
+      const empty = stubDragon({ strength: 20, energy: 0, hatchedAtMs: 0, lastEnergyUpdateMs: DAY });
+      expect(sellPriceForDragon(empty, DAY)).toBeLessThan(sellPriceForDragon(full, DAY));
+    });
+  });
+
+  describe("canFightDragon / canTrainDragon / isBeastEligible", () => {
+    it("canFightDragon needs hatched + positive live energy", () => {
+      expect(canFightDragon(stubDragon({ hatchedAtMs: null }), 0)).toBe(false);
+      expect(canFightDragon(stubDragon({ energy: 0, lastEnergyUpdateMs: 0 }), 0)).toBe(false);
+      expect(canFightDragon(stubDragon({ energy: 1, lastEnergyUpdateMs: 0 }), 0)).toBe(true);
+    });
+    it("canFightDragon derives recovery (drained anchor + time = fightable)", () => {
+      const d = stubDragon({ energy: 0, lastEnergyUpdateMs: 0 });
+      expect(canFightDragon(d, 0)).toBe(false);
+      expect(canFightDragon(d, 2 * HOUR)).toBe(true);
+    });
+    it("canTrainDragon needs hatched + energy + coins", () => {
+      const cost = trainingCost(10);
+      expect(canTrainDragon(stubDragon({ hatchedAtMs: null }), 1000, 0)).toBe(false);
+      expect(canTrainDragon(stubDragon({ energy: 0, lastEnergyUpdateMs: 0 }), 1000, 0)).toBe(false);
+      expect(canTrainDragon(stubDragon({ energy: 100, lastEnergyUpdateMs: 0 }), cost - 1, 0)).toBe(false);
+      expect(canTrainDragon(stubDragon({ energy: 100, lastEnergyUpdateMs: 0 }), cost, 0)).toBe(true);
+    });
+    it("isBeastEligible mirrors canFightDragon (eggs never participate)", () => {
+      expect(isBeastEligible(stubDragon({ hatchedAtMs: null, energy: 100 }), 0)).toBe(false);
+      expect(isBeastEligible(stubDragon({ energy: 0, lastEnergyUpdateMs: 0 }), 0)).toBe(false);
+      expect(isBeastEligible(stubDragon({ energy: 50, lastEnergyUpdateMs: 0 }), 0)).toBe(true);
     });
   });
 });
