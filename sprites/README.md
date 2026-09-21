@@ -82,6 +82,7 @@ PYTHONPATH=/path/to/sprites python -m spritecut.cli [args...]
 | `--no-split-merged` | – | Do not split boxes that swallowed several icons back apart. | `--no-split-merged` |
 | `--margin` | – | Empty border around the art inside the canvas, fraction of output size (0‑0.45, default 0.05). | `--margin 0.1` |
 | `--fit` | – | How the art fits the output size: `contain` (keeps aspect ratio, default) or `stretch` (fills exactly). | `--fit stretch` |
+| `--valign` / `--vertical-align` | – | Vertical placement inside the canvas: `top` \| `center` (default) \| `bottom`. `bottom` pins the art to the bottom margin so legs stay at the same distance from the bottom. | `--valign bottom` |
 | `--resample` | – | Resampling filter when scaling: `nearest|box|bilinear|hamming|bicubic|lanczos` (default `lanczos`). | `--resample bilinear` |
 | `--out-bg` | – | Background of written files: `transparent` (default), `#RRGGBB` or `white`. | `--out-bg '#101014'` |
 | `--template` | – | File‑name pattern; `{name}` and `{index}` are substituted (default `{name}.png`). | `--template "{index}_{name}.png"` |

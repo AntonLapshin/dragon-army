@@ -152,11 +152,15 @@ def fit_center(
     margin: float = 0.0,
     resample: int = Image.LANCZOS,
     mode: str = "contain",
+    valign: str = "center",
 ) -> np.ndarray:
-    """Scale rgba into an out_width x out_height canvas and centre it.
+    """Scale rgba into an out_width x out_height canvas and place it.
 
     margin is the fraction (0 .. 0.45) of the canvas kept empty around the
-    artwork.  mode is contain (aspect preserved) or stretch.
+    artwork.  mode is contain (aspect preserved) or stretch.  valign controls
+    the vertical placement inside the canvas: top, center (default) or bottom.
+    Horizontal placement always stays centred. Top/bottom pin the art to the
+    margin edge so e.g. legs stay at a constant distance from the bottom.
     """
     srch, srcw = rgba.shape[:2]
     if srcw == 0 or srch == 0:
@@ -181,10 +185,20 @@ def fit_center(
     img = img.resize((new_w, new_h), resample)
     resized = np.asarray(img, dtype=np.uint8)
 
-    # Centre on canvas
+    # Centre horizontally, align vertically.
     canvas = np.zeros((out_height, out_width, 4), dtype=np.uint8)
-    y0 = (out_height - new_h) // 2
     x0 = (out_width - new_w) // 2
+    valign_key = str(valign).lower()
+    if valign_key not in ("top", "center", "bottom"):
+        raise ValueError(f"valign must be top, center or bottom, got {valign!r}")
+    if valign_key == "top":
+        y0 = int(round(out_height * margin))
+    elif valign_key == "bottom":
+        y0 = out_height - new_h - int(round(out_height * margin))
+    else:
+        y0 = (out_height - new_h) // 2
+    y0 = max(0, min(y0, out_height - new_h))
+    x0 = max(0, min(x0, out_width - new_w))
     canvas[y0:y0 + new_h, x0:x0 + new_w] = resized
     return canvas
 

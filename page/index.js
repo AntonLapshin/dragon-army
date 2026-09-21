@@ -15,7 +15,7 @@ import {
   ASSET_DANGER_84,
   ASSET_DICE_80,
   ASSET_EGG_128,
-  ASSET_ENERGY_BAR_300,
+  ASSET_ENERGY_BAR_250,
   ASSET_ENERGY_BAR_190,
   ASSET_FRAME_72,
   ASSET_HOME_84,
@@ -811,7 +811,7 @@ function renderDragon(width, view) {
    // Energy (segmented gold bar) with strength stars centered right below it
    // (drawn after the dragon so they sit above).
    if (!egg) {
-     addEnergyBar(ENERGY_BAR_X, ENERGY_BAR_Y, ENERGY_BAR_W, ENERGY_BAR_H, ASSET_ENERGY_BAR_300, view.energy, CONFIG.energy.max);
+      addEnergyBar(ENERGY_BAR_X, ENERGY_BAR_Y, ENERGY_BAR_W, ENERGY_BAR_H, ASSET_ENERGY_BAR_250, view.energy, CONFIG.energy.max);
      addStrengthStars(Math.floor(width / 2), DRAGON_STARS_Y, view.strength);
    }
 
@@ -1070,7 +1070,7 @@ function renderBeastIntro() {
     return;
   }
   addStrengthStars(PANEL_X + BEAST_IMG_X + Math.floor(BEAST_IMG_S / 2), PANEL_Y + BEAST_STARS_Y, CONFIG.beast.strengthConstant);
-  addEnergyBar(PANEL_X + BEAST_BAR_X, PANEL_Y + BEAST_BAR_Y, BEAST_BAR_W, BEAST_BAR_H, ASSET_ENERGY_BAR_300, beast.currentHp, beast.maxHp);
+  addEnergyBar(PANEL_X + BEAST_BAR_X, PANEL_Y + BEAST_BAR_Y, BEAST_BAR_W, BEAST_BAR_H, ASSET_ENERGY_BAR_250, beast.currentHp, beast.maxHp);
   const team = engine.getBeastParticipants();
   addText(
     PANEL_X + MODAL_PAD, PANEL_Y + BEAST_TEAM_Y, PANEL_W - MODAL_PAD * 2, BEAST_TEAM_H,

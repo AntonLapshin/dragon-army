@@ -159,7 +159,7 @@ export const EARN_ICON_Y = 264;
 export const CENTER_IMG = 240;
 export const DRAGON_IMG_S = CENTER_IMG;
 export const DRAGON_IMG_Y = 134;
-export const DRAGON_IMG_HATCHED_OFFSET = 28; // hatched art sits lower
+export const DRAGON_IMG_HATCHED_OFFSET = 6; // hatched art sits lower
 export const SHADOW_W = 114;
 export const SHADOW_H = 28;
 export const SHADOW_Y_OFFSET = -22; // relative to imgY + imgSize
@@ -172,24 +172,25 @@ export const DRAGON_SUB_H = 26;
 export const DRAGON_SUB_FONT = FONT_18;
 
 // Segmented gold energy bar (raw/energy_bar.png 467x78, 8 slots).
-// Rendered 300x50 (aspect 6.0 vs native 5.99, negligible stretch via
+// Rendered 250x42 (aspect 5.95 vs native 5.99, negligible stretch via
 // fill resize), centered below the Lv/Age line: SUB ends at 68,
 // dragon IMG starts at 134.
-export const ENERGY_BAR_W = 300;
-export const ENERGY_BAR_H = 50;
-export const ENERGY_BAR_X = 45; // (390 - 300) / 2 centered
+export const ENERGY_BAR_W = 250;
+export const ENERGY_BAR_H = 42;
+export const ENERGY_BAR_X = 70; // (390 - 250) / 2 centered
 export const ENERGY_BAR_Y = 76;
 export const ENERGY_SEG_COUNT = 8;
 // Native slot geometry (middle-row scan of the 467x78 source):
-// interiors are 39px wide on a 52px pitch starting at x=31;
-// vertical interior is y 18..60 inclusive.
+// fills span edge-to-edge up to the gold dividers/frame (no brown
+// padding): each slot covers [X0[i], X1[i]+1) x [Y0, Y1+1), leaving
+// only the ~6px gold divider cores visible between segments.
 export const ENERGY_BAR_NATIVE_W = 467;
 export const ENERGY_BAR_NATIVE_H = 78;
-export const ENERGY_SEG_X0 = [31, 83, 135, 188, 240, 293, 345, 398];
-export const ENERGY_SEG_X1 = [69, 121, 173, 226, 278, 331, 384, 436];
-export const ENERGY_SEG_Y0 = 18;
-export const ENERGY_SEG_Y1 = 60;
-export const ENERGY_SEG_INSET = 1;
+export const ENERGY_SEG_X0 = [26, 79, 131, 183, 236, 288, 340, 394];
+export const ENERGY_SEG_X1 = [72, 125, 178, 230, 282, 335, 388, 440];
+export const ENERGY_SEG_Y0 = 13;
+export const ENERGY_SEG_Y1 = 64;
+export const ENERGY_SEG_INSET = 2;
 export const ENERGY_SEG_COLOR_LOW = 0xff0000;
 export const ENERGY_SEG_COLOR_MID = 0xffcc00;
 export const ENERGY_SEG_COLOR_HIGH = 0x00cc00;
@@ -208,8 +209,8 @@ export const STAR_S = 16;
 export const STAR_GAP = 2;
 export const ASSET_SILVER_STAR_16 = 'ui/silver_star_16x16.png';
 export const ASSET_GOLD_STAR_16 = 'ui/gold_star_16x16.png';
-// Dragon page: centered right below the energy bar (bar ends at 126).
-export const DRAGON_STARS_Y = 132;
+// Dragon page: centered right below the energy bar (bar ends at 118).
+export const DRAGON_STARS_Y = 124;
 // Beast-intro modal: centered below the beast image (img 56..128, bar at 150).
 export const BEAST_STARS_Y = 130;
 // Monster-select rows: offset below the 72px monster image (rowY + 74).
@@ -373,14 +374,14 @@ export const BEAST_IMG_S = 72;
 export const BEAST_VANISHED_Y = 160;
 export const BEAST_VANISHED_H = 30;
 export const BEAST_VANISHED_FONT = FONT_19;
-export const BEAST_BAR_X = 20; // (340 - 300) / 2 centered inside the panel
+export const BEAST_BAR_X = 45; // (340 - 250) / 2 centered inside the panel
 export const BEAST_BAR_Y = 150;
-export const BEAST_BAR_W = 300; // same segmented bar as the dragon page
-export const BEAST_BAR_H = 50;
-export const BEAST_TEAM_Y = 206;
+export const BEAST_BAR_W = 250; // same segmented bar as the dragon page
+export const BEAST_BAR_H = 42;
+export const BEAST_TEAM_Y = 198;
 export const BEAST_TEAM_H = 30;
 export const BEAST_TEAM_FONT = FONT_18;
-export const BEAST_WARN_Y = 238;
+export const BEAST_WARN_Y = 230;
 export const BEAST_WARN_H = 44;
 export const BEAST_WARN_FONT = FONT_16;
 
@@ -412,7 +413,7 @@ export const ASSET_BEAST_128 = 'ui/bewilder_beast_128x128.png';
 export const ASSET_BEAST_72 = 'ui/bewilder_beast_72x72.png';
 export const ASSET_SHADOW = 'misc/shadow_114x28.png';
 export const ASSET_FRAME_72 = 'misc/frame_72x72.png';
-export const ASSET_ENERGY_BAR_300 = 'ui/energy_bar_300x50.png';
+export const ASSET_ENERGY_BAR_250 = 'ui/energy_bar_250x42.png';
 export const ASSET_ENERGY_BAR_190 = 'ui/energy_bar_190x32.png';
 export const ASSET_STRENGTH_56 = 'ui/strength_56x56.png';
 export const ASSET_HOME_84 = 'ui/home_84x84.png';

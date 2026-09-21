@@ -58,6 +58,7 @@ class CutOptions:
     padding: int = 4
     margin: float = 0.05
     fit: str = "contain"
+    valign: str = "center"
     resample: str = "lanczos"
     remove_bg: bool = False
     background: BackgroundSpec = field(default_factory=BackgroundSpec)
@@ -216,7 +217,7 @@ def cut_sprites(
     options: CutOptions,
     log: Callable[[str], None] = lambda _message: None,
 ) -> List[SpriteResult]:
-    """Detect, extract, clean, fit, centre and save every icon of sheet_path."""
+    """Detect, extract, clean, fit, place and save every icon of sheet_path."""
     rgba = load_rgba(sheet_path)
     height, width = rgba.shape[:2]
     log(f"sheet {sheet_path}: {width}x{height}px")
@@ -289,6 +290,9 @@ def cut_sprites(
 
     resample = RESAMPLERS.get(str(options.resample).lower(), Image.LANCZOS)
     out_w, out_h = options.size
+    valign = str(options.valign).lower()
+    if valign not in ("top", "center", "bottom"):
+        raise SystemExit(f"error: --valign must be top, center or bottom, got {options.valign!r}")
     solid_bg: Optional[Tuple[int, int, int]] = None
     if str(options.out_bg).lower() not in ("transparent", "alpha", "none"):
         solid_bg = (255, 255, 255) if str(options.out_bg).lower() == "white" else parse_color(options.out_bg)
@@ -308,7 +312,7 @@ def cut_sprites(
             cleaned = np.array(crop, dtype=np.uint8, copy=True)
         if solid_bg is not None:
             cleaned = flatten(cleaned, solid_bg)
-        fitted = fit_center(cleaned, out_w, out_h, options.margin, resample, options.fit)
+        fitted = fit_center(cleaned, out_w, out_h, options.margin, resample, options.fit, valign)
 
         src_h, src_w = crop.shape[:2]
         if options.fit == "stretch":
@@ -348,6 +352,7 @@ def write_manifest(results: Sequence[SpriteResult], path: str, sheet: str, optio
         "count": len(results),
         "size": {"w": options.size[0], "h": options.size[1]},
         "grid": list(options.grid) if options.grid else None,
+        "valign": options.valign,
         "sprites": [result.to_dict() for result in results],
     }
     folder = os.path.dirname(os.path.abspath(path))

@@ -5,6 +5,7 @@ data: frame icon bg misc sprites coin energy_bar stars scale optimize zepp
 
 # frame
 frame:
+	mkdir -p assets/misc
 	cp raw/frame.png assets/misc/frame.png
 
 # 0) Icon raw/ -> assets/
@@ -27,7 +28,7 @@ misc:
 sprites:
 	cd sprites && venv/bin/python -m spritecut.cli ../raw/ui-icons.png -s 96x96 -n "egg _coin _energy sell victory loss danger training strength dice home coin _shop _monster bewilder_beast close" -o ../assets/ui -g 4x4 --margin 0
 	cd sprites && venv/bin/python -m spritecut.cli ../raw/eggs.png -s 300x300 -n "night_fury light_fury light_night night_light wooly_howl deadly_nadder razorwhip triple_stryke stormcutter songwing monstrous_nightmare skrill gronkle hideous_zippleback windwalker snowtail" -o ../assets/eggs -g 4x4 --margin 0
-	cd sprites && venv/bin/python -m spritecut.cli ../raw/dragons.png -s 300x300 -n "night_fury light_fury light_night night_light wooly_howl deadly_nadder razorwhip triple_stryke stormcutter songwing monstrous_nightmare skrill gronkle hideous_zippleback windwalker snowtail" -o ../assets/dragons -g 4x4 --margin 0
+	cd sprites && venv/bin/python -m spritecut.cli ../raw/dragons.png -s 300x300 -n "night_fury light_fury light_night night_light wooly_howl deadly_nadder razorwhip triple_stryke stormcutter songwing monstrous_nightmare skrill gronkle hideous_zippleback windwalker snowtail" -o ../assets/dragons -g 4x4 --margin 0 --valign bottom
 	cd sprites && venv/bin/python -m spritecut.cli ../raw/monsters.png -s 128x128 -n "bewilder_beast gronkle deadly_nadder monstrous_nightmare" -o ../assets/monsters -g 2x2 --margin 0
 	rm -f assets/ui/_*.png assets/eggs/_*.png assets/dragons/_*.png assets/monsters/_*.png
 

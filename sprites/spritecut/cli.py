@@ -116,6 +116,10 @@ def build_parser() -> argparse.ArgumentParser:
                      help="empty border around the art inside the canvas, 0-0.45 (default: %(default)s)")
     out.add_argument("--fit", choices=("contain", "stretch"), default="contain",
                      help="contain keeps the aspect ratio (default), stretch fills WxH exactly")
+    out.add_argument("--valign", "--vertical-align", choices=("top", "center", "bottom"),
+                     default="center",
+                     help="vertical placement inside the canvas: top, center (default) or "
+                          "bottom - bottom pins legs to the same distance from the bottom")
     out.add_argument("--resample",
                      choices=("nearest", "box", "bilinear", "hamming", "bicubic", "lanczos"),
                      default="lanczos",
@@ -218,6 +222,7 @@ def make_options(args: argparse.Namespace) -> CutOptions:
         padding=max(0, args.padding),
         margin=args.margin,
         fit=args.fit,
+        valign=args.valign,
         resample=args.resample,
         remove_bg=remove_bg,
         background=background,
@@ -298,6 +303,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "input": os.path.abspath(args.input),
             "count": len(results),
             "size": {"w": options.size[0], "h": options.size[1]},
+            "valign": options.valign,
             "dry_run": options.dry_run,
             "sprites": [result.to_dict() for result in results],
         }
