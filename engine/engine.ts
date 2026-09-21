@@ -34,10 +34,12 @@ import {
   MONSTERS,
   ageDaysForDragonInstance,
   applyEnergyDrain,
+  applyStrengthGain,
   breedForDragon,
   breedForIndex,
   canAffordEgg,
   canTrainDragon,
+  clampStrength,
   collectibleCoins,
   drawBreedIndex,
   dragonStage,
@@ -176,7 +178,7 @@ export function migrateLegacySave(raw: LegacySave, nowMs: number): GameState {
       breedId: breedForIndex(
         typeof d.breedIdx === "number" ? d.breedIdx : 0,
       ).id,
-      strength: asFiniteNumber(d.strength) ?? 0,
+      strength: clampStrength(asFiniteNumber(d.strength) ?? 0),
       energy: asFiniteNumber(d.energy) ?? CONFIG.energy.initial,
       purchasedAtMs: asFiniteNumber(d.purchasedAt) ?? nowMs,
       hatchAtMs: asFiniteNumber(d.hatchAt) ?? nowMs,
@@ -200,7 +202,12 @@ export function coerceLoadedSave(raw: unknown, nowMs: number): GameState | null 
   if (!raw || typeof raw !== "object") return null;
   const candidate = raw as Partial<GameState> & LegacySave;
   if (candidate.player && Array.isArray(candidate.player.dragons)) {
-    return candidate as GameState;
+    const state = candidate as GameState;
+    // Clamp pre-cap saves (strength could exceed 125 before the cap).
+    for (const d of state.player.dragons) {
+      if (typeof d.strength === "number") d.strength = clampStrength(d.strength);
+    }
+    return state;
   }
   if (typeof candidate.coins === "number" && Array.isArray(candidate.dragons)) {
     return migrateLegacySave(candidate, nowMs);
@@ -568,7 +575,7 @@ export function createGameEngine(deps: CreateEngineDeps) {
     );
     s.player.totalTrainings += 1;
     const after = findDragon(dragonId);
-    const strengthAfter = after?.strength ?? dragon.strength + gain;
+    const strengthAfter = after?.strength ?? applyStrengthGain(dragon.strength, gain);
     save();
     return {
       ok: true,
@@ -689,7 +696,7 @@ export function createGameEngine(deps: CreateEngineDeps) {
         rolls?.energyRand01 ?? rand(),
         rolls?.strengthRand01 ?? rand(),
       );
-      const strengthAfter = dragon.strength + result.strengthGain;
+      const strengthAfter = applyStrengthGain(dragon.strength, result.strengthGain);
       replaceDragon({
         ...dragon,
         strength: strengthAfter,
@@ -865,7 +872,7 @@ export function createGameEngine(deps: CreateEngineDeps) {
           strengthGains[id] = gain;
           replaceDragon({
             ...current,
-            strength: current.strength + gain,
+            strength: applyStrengthGain(current.strength, gain),
             energy,
             lastEnergyUpdateMs: atMs,
           });

@@ -46,7 +46,7 @@ function mulberry32(seed: number): () => number {
 }
 
 const HOUR = 60 * 60 * 1000;
-const AVG_TRAINING_GAIN = (CONFIG.training.strengthGainMin + CONFIG.training.strengthGainMax) / 2; // 5
+const AVG_TRAINING_GAIN = (CONFIG.training.strengthGainMin + CONFIG.training.strengthGainMax) / 2; // 3.5
 const AVG_BONUS = (CONFIG.battle.randomBonusMin + CONFIG.battle.randomBonusMax) / 2; // 5
 const AVG_BEAST_COUNTER = (CONFIG.beast.counterDamageMin + CONFIG.beast.counterDamageMax) / 2; // 23
 
@@ -228,23 +228,23 @@ describe("orientir: monster spawn distribution", () => {
 });
 
 describe("orientir: training progression -> Easy / Medium / Hard", () => {
-  it("documents average training gain of 5 strength", () => {
-    expect(AVG_TRAINING_GAIN).toBe(5);
-    // sanity: every roll in [3,7] (rand01 contract is [0, 1))
+  it("documents average training gain of 3.5 strength", () => {
+    expect(AVG_TRAINING_GAIN).toBe(3.5);
+    // sanity: every roll in [2,5] (rand01 contract is [0, 1))
     for (let i = 0; i < 10; i++) {
-      expect(rollTrainingGain(i / 10)).toBeGreaterThanOrEqual(3);
-      expect(rollTrainingGain(i / 10)).toBeLessThanOrEqual(7);
+      expect(rollTrainingGain(i / 10)).toBeGreaterThanOrEqual(2);
+      expect(rollTrainingGain(i / 10)).toBeLessThanOrEqual(5);
     }
   });
 
-  it("fresh common hatch (~11) usually LOSES to Easy-19 (~25% win); reliable after 2-3 trainings", () => {
+  it("fresh common hatch (~11) usually LOSES to Easy-19 (~25% win); reliable after 3-4 trainings", () => {
     // Easy strength 19: strength 11 wins only with bonus>=8 (3/11 ≈ 27%)
     const freshRate = monsterWinRate(11, 0, 3000, 1);
     expect(freshRate).toBeGreaterThan(0.15);
     expect(freshRate).toBeLessThan(0.4);
     // weakest hatch (8) can never win (needs bonus>=11, max 10)
     expect(monsterWinRate(8, 0, 500, 9)).toBe(0);
-    // after ~2 avg trainings (11 -> 21) the dragon beats Easy reliably
+    // after ~3 avg trainings (11 -> 21) the dragon beats Easy reliably
     expect(monsterWinRate(21, 0, 500, 3)).toBeGreaterThan(0.9);
     // a win costs almost all energy (70-100 loss -> 0-30 left)
     const rng = mulberry32(21);
@@ -257,11 +257,11 @@ describe("orientir: training progression -> Easy / Medium / Hard", () => {
     }
   });
 
-  it("Medium (~32) becomes favored at strength ~30 after ~3-5 trainings", () => {
-    // 11 -> 30 needs +19 ≈ 4 avg trainings; win needs bonus>=2 (~82%)
+  it("Medium (~32) becomes favored at strength ~30 after ~4-7 trainings", () => {
+    // 11 -> 30 needs +19 ≈ 6 avg trainings; win needs bonus>=2 (~82%)
     const trainingsNeeded = Math.ceil((30 - 11) / AVG_TRAINING_GAIN);
-    expect(trainingsNeeded).toBeGreaterThanOrEqual(3);
-    expect(trainingsNeeded).toBeLessThanOrEqual(5);
+    expect(trainingsNeeded).toBeGreaterThanOrEqual(4);
+    expect(trainingsNeeded).toBeLessThanOrEqual(7);
     const rate = monsterWinRate(30, 1, 3000, 4);
     expect(rate).toBeGreaterThan(0.7);
     expect(rate).toBeLessThan(0.95);
@@ -269,12 +269,12 @@ describe("orientir: training progression -> Easy / Medium / Hard", () => {
     expect(monsterWinRate(15, 1, 2000, 5)).toBeLessThan(0.1);
   });
 
-  it("Hard (~55) needs ~7-12 trainings or an epic hatch", () => {
-    // common 11 -> 55 needs +44 ≈ 9 avg trainings
+  it("Hard (~55) needs ~9-15 trainings or an epic hatch", () => {
+    // common 11 -> 55 needs +44 ≈ 13 avg trainings
     const fromCommon = Math.ceil((55 - 11) / AVG_TRAINING_GAIN);
-    expect(fromCommon).toBeGreaterThanOrEqual(7);
-    expect(fromCommon).toBeLessThanOrEqual(12);
-    // epic hatch 18-25 shortens the grind to ~6-8 trainings
+    expect(fromCommon).toBeGreaterThanOrEqual(9);
+    expect(fromCommon).toBeLessThanOrEqual(15);
+    // epic hatch 18-25 shortens the grind
     const fromEpic = Math.ceil((55 - 22) / AVG_TRAINING_GAIN);
     expect(fromEpic).toBeLessThan(fromCommon);
     // at 55 every bonus wins; at 40 nothing wins (needs bonus>=15, max 10)
@@ -354,27 +354,32 @@ describe("orientir: Bewilder Beast (boss)", () => {
 });
 
 describe("orientir: ideal-playthrough cost model (egg -> beast-ready)", () => {
-  it("reaching Medium-ready (~30 str) costs < 150 coins (~4 trainings from hatch)", () => {
-    // 11->16 (16) + 16->21 (20) + 21->26 (24) + 26->31 (28) = 88
-    const costs = [11, 16, 21, 26].map(trainingCost);
-    const total = costs.reduce((a, b) => a + b, 0);
-    expect(total).toBeLessThan(150);
-    // at 2/h passive this is ~44h of idle income — active Easy wins (~20
-    // each, minus a ~10h recovery) are the intended accelerator
-    expect(total / CONFIG.economy.hourlyCoins).toBeLessThan(50);
-  });
-
-  it("reaching Hard-ready (~55 str) costs < 400 coins (~9 trainings)", () => {
+  it("reaching Medium-ready (~30 str) costs < 200 coins (~6 trainings from hatch)", () => {
+    // ~3.5 avg per training: 11 -> ~32 in 6 sessions
     let strength = 11;
     let total = 0;
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 6; i++) {
+      total += trainingCost(strength);
+      strength += AVG_TRAINING_GAIN;
+    }
+    expect(strength).toBeGreaterThanOrEqual(30);
+    expect(total).toBeLessThan(200);
+    // at 2/h passive this is ~70h of idle income — active Easy wins (~20
+    // each, minus a ~10h recovery) are the intended accelerator
+    expect(total / CONFIG.economy.hourlyCoins).toBeLessThan(100);
+  });
+
+  it("reaching Hard-ready (~55 str) costs < 550 coins (~13 trainings)", () => {
+    let strength = 11;
+    let total = 0;
+    for (let i = 0; i < 13; i++) {
       total += trainingCost(strength);
       strength += AVG_TRAINING_GAIN;
     }
     expect(strength).toBeGreaterThanOrEqual(55);
-    expect(total).toBeLessThan(400);
-    // ~2 Medium wins (≈90) + ~100h passive trickle (200) covers it
-    expect(total).toBeLessThan(2 * 55 + 100 * CONFIG.economy.hourlyCoins);
+    expect(total).toBeLessThan(550);
+    // ~4 Medium wins (≈180) + ~150h passive trickle (300) covers it
+    expect(total).toBeLessThan(4 * 55 + 150 * CONFIG.economy.hourlyCoins);
   });
 
   it("a 3-dragon beast roster fits comfortably inside the 30-45d lifespan", () => {

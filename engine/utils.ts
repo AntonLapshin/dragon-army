@@ -8,7 +8,7 @@
  * orchestrates shapes defined in `types.ts`.
  */
 
-import { CONFIG, collectibleCoins } from "./config";
+import { CONFIG, applyStrengthGain, clampStrength, collectibleCoins } from "./config";
 import type {
   CollectAdvance,
   Dragon,
@@ -56,7 +56,7 @@ export function hatchDragonInstance(
   nowMs: number,
   baseStrength: number,
 ): Dragon {
-  return { ...dragon, hatchedAtMs: nowMs, strength: baseStrength };
+  return { ...dragon, hatchedAtMs: nowMs, strength: clampStrength(baseStrength) };
 }
 
 /**
@@ -71,9 +71,9 @@ export function withEnergyAnchor(
   return { ...dragon, energy, lastEnergyUpdateMs: nowMs };
 }
 
-/** Add a training gain to strength. Pure. */
+/** Add a training gain to strength (clamped at CONFIG.strength.max). Pure. */
 export function withTrainingGain(dragon: Dragon, gain: number): Dragon {
-  return { ...dragon, strength: dragon.strength + gain };
+  return { ...dragon, strength: applyStrengthGain(dragon.strength, gain) };
 }
 
 // ---------------------------------------------------------------------------

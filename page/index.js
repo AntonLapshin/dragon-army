@@ -22,7 +22,8 @@ import {
   ASSET_LOSS_60,
   ASSET_SELL_84,
   ASSET_SHADOW,
-  ASSET_STRENGTH_56,
+  ASSET_GOLD_STAR_16,
+  ASSET_SILVER_STAR_16,
   ASSET_TRAINING_84,
   ASSET_VICTORY_60,
   BADGE_MIN_W,
@@ -77,7 +78,6 @@ import {
   COLOR_COIN,
   COLOR_ERROR,
   COLOR_MUTED,
-  COLOR_SUBTITLE,
   COLOR_SUCCESS,
   COLOR_WHITE,
   DRAGON_IMG_HATCHED_OFFSET,
@@ -86,9 +86,7 @@ import {
   DRAGON_NAME_FONT,
   DRAGON_NAME_H,
   DRAGON_NAME_Y,
-  DRAGON_SUB_FONT,
-  DRAGON_SUB_H,
-  DRAGON_SUB_Y,
+  DRAGON_STARS_Y,
   EARN_FONT,
   EARN_ICON_S,
   EARN_ICON_Y,
@@ -151,14 +149,7 @@ import {
   FIGHT_OUTCOME_ICON_Y,
   FIGHT_OUTCOME_TEXT_H,
   FIGHT_OUTCOME_TEXT_Y,
-  FIGHT_STR_ICON_S,
-  FIGHT_STR_ICON_X,
-  FIGHT_STR_ICON_Y,
-  FIGHT_STR_VAL_FONT,
-  FIGHT_STR_VAL_GAP,
-  FIGHT_STR_VAL_H,
-  FIGHT_STR_VAL_W,
-  FIGHT_STR_VAL_Y,
+  FIGHT_STARS_Y,
   FIGHT_VS_FONT,
   FIGHT_VS_H,
   FIGHT_VS_X,
@@ -193,13 +184,7 @@ import {
   MONSTER_ROW_H,
   MONSTER_ROW_MAX_H,
   MONSTER_ROW_Y,
-  MONSTER_STR_ICON_S,
-  MONSTER_STR_VAL_FONT,
-  MONSTER_STR_VAL_GAP,
-  MONSTER_STR_VAL_H,
-  MONSTER_STR_VAL_W,
-  MONSTER_STR_VAL_Y,
-  MONSTER_STR_Y,
+  MONSTER_STARS_Y_OFFSET,
   PANEL_ALPHA,
   PANEL_COLOR,
   PANEL_H,
@@ -227,16 +212,12 @@ import {
   SHADOW_H,
   SHADOW_W,
   SHADOW_Y_OFFSET,
+  BEAST_STARS_Y,
   SHADE_ALPHA,
   SHADE_COLOR,
   SHADE_DEFAULT_RADIUS,
-  STR_FONT,
-  STR_GAP,
-  STR_ICON_S,
-  STR_PILL_H,
-  STR_PILL_W,
-  STR_X,
-  STR_Y,
+  STAR_GAP,
+  STAR_S,
   TEXT_DEFAULT_SIZE,
   TEXT_PILL_RADIUS,
   TRAIN_COIN_FONT,
@@ -270,7 +251,7 @@ import {
   eggAsset60,
   monsterAsset72,
 } from './index.style.js';
-import { CONFIG, breedForIndex, clamp } from '../engine/config.js';
+import { CONFIG, breedForIndex, clamp, starsForStrength } from '../engine/config.js';
 import { createGameEngine, coerceLoadedSave } from '../engine/engine.js';
 
 /**
@@ -562,6 +543,31 @@ function addIconButton(x, y, size, src, onTap, dimmed) {
   return addImg(x, y, size, size, src, onTap, dimmed ? IMG_DISABLED_ALPHA : undefined);
 }
 
+// Dragon name with age: "Wooly Howl (2 days)" / "Wooly Howl (1 day)".
+function formatDragonName(breedName, ageDays) {
+  const age = Math.max(0, Math.floor(ageDays));
+  return breedName + ' (' + age + ' day' + (age === 1 ? '' : 's') + ')';
+}
+
+// Strength visual: 5 strength = 1 silver star, 5 silver = 1 gold star
+// (25 strength = 1 gold; 30 = 1 gold + 1 silver; max 125 = 5 gold).
+// 16px stars with a tiny 2px gap, centered on cx.
+function addStrengthStars(cx, y, strength) {
+  const stars = starsForStrength(strength);
+  const total = stars.gold + stars.silver;
+  if (total <= 0) return;
+  const width = total * STAR_S + (total - 1) * STAR_GAP;
+  let x = Math.round(cx - width / 2);
+  for (let i = 0; i < stars.gold; i += 1) {
+    addImg(x, y, STAR_S, STAR_S, ASSET_GOLD_STAR_16);
+    x += STAR_S + STAR_GAP;
+  }
+  for (let i = 0; i < stars.silver; i += 1) {
+    addImg(x, y, STAR_S, STAR_S, ASSET_SILVER_STAR_16);
+    x += STAR_S + STAR_GAP;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Actions (thin wrappers: engine does the work, page animates the result)
 // ---------------------------------------------------------------------------
@@ -771,8 +777,7 @@ function renderDragon(width, view) {
      // Still hatching: hide the breed so the dragon stays a surprise.
      // addBadgeText(0, 8, width, 30, 'Egg', 24, COLOR_WHITE);
    } else {
-     addBadgeText(0, DRAGON_NAME_Y, width, DRAGON_NAME_H, breed.name, DRAGON_NAME_FONT, COLOR_WHITE);
-     addBadgeText(0, DRAGON_SUB_Y, width, DRAGON_SUB_H, 'Lv ' + view.level + '  ·  Age ' + view.ageDays + 'd', DRAGON_SUB_FONT, COLOR_SUBTITLE);
+     addBadgeText(0, DRAGON_NAME_Y, width, DRAGON_NAME_H, formatDragonName(breed.name, view.ageDays), DRAGON_NAME_FONT, COLOR_WHITE);
    }
 
    const imgSize = DRAGON_IMG_S;
@@ -788,18 +793,11 @@ function renderDragon(width, view) {
       addImg(imgX, imgY + DRAGON_IMG_HATCHED_OFFSET, imgSize, imgSize, dragonAsset240(breed.assetKey));
     }
 
-   // Energy (segmented gold bar, centered below Lv/Age) and Strength
-   // on top of the dragon (drawn after so they sit above).
+   // Energy (segmented gold bar) with strength stars centered right below it
+   // (drawn after the dragon so they sit above).
    if (!egg) {
      addEnergyBar(ENERGY_BAR_X, ENERGY_BAR_Y, ENERGY_BAR_W, ENERGY_BAR_H, ASSET_ENERGY_BAR_300, view.energy, CONFIG.energy.max);
-     const sIconS = STR_ICON_S;
-     const sGap = STR_GAP;
-     const sPillW = STR_PILL_W;
-     const sPillH = STR_PILL_H;
-     const sX = STR_X;
-     const sY = STR_Y;
-      addImg(sX, sY, sIconS, sIconS, ASSET_STRENGTH_56);
-     addBadgeText(sX + sIconS + sGap, sY + Math.floor((sIconS - sPillH) / 2), sPillW, sPillH, String(view.strength), STR_FONT, COLOR_WHITE, hmUI.align.LEFT);
+     addStrengthStars(Math.floor(width / 2), DRAGON_STARS_Y, view.strength);
    }
 
 // Bottom action row — pinned to the very bottom (no roster strip on this
@@ -1005,9 +1003,7 @@ list.forEach((m, i) => {
      addImg(PANEL_X + MONSTER_IMG_X, rowY, MONSTER_IMG_S, MONSTER_IMG_S, monsterAsset72(m.image));
      addText(PANEL_X + MONSTER_NAME_X, rowY, MONSTER_NAME_W, MONSTER_NAME_H, m.difficulty, MONSTER_NAME_FONT, COLOR_WHITE, hmUI.align.LEFT);
      addText(PANEL_X + MONSTER_NAME_X, rowY + MONSTER_GAIN_Y, MONSTER_GAIN_W, MONSTER_GAIN_H, 'win: +' + m.strengthGainWinMin + '-' + m.strengthGainWinMax + ' str', MONSTER_GAIN_FONT, COLOR_SUCCESS, hmUI.align.LEFT);
-     const strIconS = MONSTER_STR_ICON_S;
-     addImg(PANEL_X + MONSTER_NAME_X, rowY + MONSTER_STR_Y, strIconS, strIconS, ASSET_STRENGTH_56);
-     addText(PANEL_X + MONSTER_NAME_X + strIconS + MONSTER_STR_VAL_GAP, rowY + MONSTER_STR_VAL_Y, MONSTER_STR_VAL_W, MONSTER_STR_VAL_H, String(m.strength), MONSTER_STR_VAL_FONT, COLOR_MUTED, hmUI.align.LEFT);
+     addStrengthStars(PANEL_X + MONSTER_IMG_X + Math.floor(MONSTER_IMG_S / 2), rowY + MONSTER_STARS_Y_OFFSET, m.strength);
      addButton(PANEL_X + MONSTER_FIGHT_BTN_X, rowY + MONSTER_FIGHT_BTN_Y, MONSTER_FIGHT_BTN_W, MONSTER_FIGHT_BTN_H, 'Fight', () => startMonsterFight(view.dragon.id, m.id), { size: MONSTER_FIGHT_BTN_FONT });
    });
 }
@@ -1026,12 +1022,16 @@ function renderMonsterFight() {
   const view = engine.getDragonView(modal.dragonId);
   const monster = engine.getSpawnedMonsters().find((m) => m.id === modal.monsterId);
   renderModalShell('Fight', modal.locked);
-  if (monster) addImg(PANEL_X + FIGHT_MONSTER_IMG_X, PANEL_Y + FIGHT_MONSTER_IMG_Y, FIGHT_MONSTER_IMG_S, FIGHT_MONSTER_IMG_S, monsterAsset72(monster.image));
-  if (view) addImg(PANEL_X + PANEL_W - FIGHT_DRAGON_IMG_OFFSET_X, PANEL_Y + FIGHT_DRAGON_IMG_Y, FIGHT_DRAGON_IMG_S, FIGHT_DRAGON_IMG_S, dragonAsset60(view.breed.assetKey));
+  if (monster) {
+    addImg(PANEL_X + FIGHT_MONSTER_IMG_X, PANEL_Y + FIGHT_MONSTER_IMG_Y, FIGHT_MONSTER_IMG_S, FIGHT_MONSTER_IMG_S, monsterAsset72(monster.image));
+    addStrengthStars(PANEL_X + FIGHT_MONSTER_IMG_X + Math.floor(FIGHT_MONSTER_IMG_S / 2), PANEL_Y + FIGHT_STARS_Y, monster.strength);
+  }
+  if (view) {
+    addImg(PANEL_X + PANEL_W - FIGHT_DRAGON_IMG_OFFSET_X, PANEL_Y + FIGHT_DRAGON_IMG_Y, FIGHT_DRAGON_IMG_S, FIGHT_DRAGON_IMG_S, dragonAsset60(view.breed.assetKey));
+    addStrengthStars(PANEL_X + PANEL_W - FIGHT_DRAGON_IMG_OFFSET_X + Math.floor(FIGHT_DRAGON_IMG_S / 2), PANEL_Y + FIGHT_STARS_Y, view.strength);
+  }
   if (monster && view) {
     addText(PANEL_X + FIGHT_VS_X, PANEL_Y + FIGHT_VS_Y, PANEL_W - FIGHT_VS_X * 2, FIGHT_VS_H, 'vs', FIGHT_VS_FONT, COLOR_COIN);
-    addImg(PANEL_X + FIGHT_STR_ICON_X, PANEL_Y + FIGHT_STR_ICON_Y, FIGHT_STR_ICON_S, FIGHT_STR_ICON_S, ASSET_STRENGTH_56);
-    addText(PANEL_X + FIGHT_STR_ICON_X + FIGHT_STR_ICON_S + FIGHT_STR_VAL_GAP, PANEL_Y + FIGHT_STR_ICON_Y + FIGHT_STR_VAL_Y, FIGHT_STR_VAL_W, FIGHT_STR_VAL_H, String(view.strength), FIGHT_STR_VAL_FONT, COLOR_MUTED, hmUI.align.LEFT);
   }
   renderFightLines(FIGHT_MAX_LINES);
   if (!modal.locked && modal.outcome) {
@@ -1054,6 +1054,7 @@ function renderBeastIntro() {
     addText(PANEL_X + MODAL_PAD, PANEL_Y + BEAST_VANISHED_Y, PANEL_W - MODAL_PAD * 2, BEAST_VANISHED_H, 'Vanished - back in ~' + hrs + 'h', BEAST_VANISHED_FONT, COLOR_MUTED);
     return;
   }
+  addStrengthStars(PANEL_X + BEAST_IMG_X + Math.floor(BEAST_IMG_S / 2), PANEL_Y + BEAST_STARS_Y, CONFIG.beast.strengthConstant);
   addEnergyBar(PANEL_X + BEAST_BAR_X, PANEL_Y + BEAST_BAR_Y, BEAST_BAR_W, BEAST_BAR_H, ASSET_ENERGY_BAR_300, beast.currentHp, beast.maxHp);
   const team = engine.getBeastParticipants();
   addText(
@@ -1078,6 +1079,7 @@ function renderBeastFight() {
   const beast = engine.getState().beast;
   renderModalShell('Beast Battle', modal.locked);
   addImg(PANEL_X + FIGHT_MONSTER_IMG_X, PANEL_Y + FIGHT_MONSTER_IMG_Y, FIGHT_MONSTER_IMG_S, FIGHT_MONSTER_IMG_S, ASSET_BEAST_72);
+  addStrengthStars(PANEL_X + FIGHT_MONSTER_IMG_X + Math.floor(FIGHT_MONSTER_IMG_S / 2), PANEL_Y + FIGHT_STARS_Y, CONFIG.beast.strengthConstant);
   const hp = modal.outcome && modal.revealed >= modal.lines.length
     ? modal.outcome.hpAfter
     : beast.currentHp;

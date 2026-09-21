@@ -202,6 +202,21 @@ export const STR_X = 12;
 export const STR_Y = 132;
 export const STR_FONT = FONT_22;
 
+// Strength stars (5 str = 1 silver, 5 silver = 1 gold, max 125 = 5 gold).
+// 16px with a tiny 2px gap; rows are centered via addStrengthStars().
+export const STAR_S = 16;
+export const STAR_GAP = 2;
+export const ASSET_SILVER_STAR_16 = 'ui/silver_star_16x16.png';
+export const ASSET_GOLD_STAR_16 = 'ui/gold_star_16x16.png';
+// Dragon page: centered right below the energy bar (bar ends at 126).
+export const DRAGON_STARS_Y = 132;
+// Beast-intro modal: centered below the beast image (img 56..128, bar at 150).
+export const BEAST_STARS_Y = 130;
+// Monster-select rows: offset below the 72px monster image (rowY + 74).
+export const MONSTER_STARS_Y_OFFSET = 74;
+// Fight modal: below the monster/dragon images, above the turn lines (150).
+export const FIGHT_STARS_Y = 130;
+
 // Bottom action row (pinned to the very bottom).
 export const ACTION_SIDE_PAD = 20;
 export const ACTION_BOTTOM_PAD = 12;

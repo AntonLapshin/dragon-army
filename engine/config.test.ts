@@ -14,6 +14,7 @@ import {
   ageDaysForDragonInstance,
   ageDaysFromMs,
   applyEnergyDrain,
+  applyStrengthGain,
   battleDamage,
   breedForDragon,
   breedForIndex,
@@ -23,6 +24,7 @@ import {
   canTrain,
   canTrainDragon,
   clamp,
+  clampStrength,
   collectibleCoins,
   drawBreedIndex,
   dragonStage,
@@ -59,6 +61,7 @@ import {
   sellPrice,
   sellPriceForDragon,
   shouldSpawnMonster,
+  starsForStrength,
   trainingCost,
   trainingCostForDragon,
   trainingEnergyCost,
@@ -419,8 +422,8 @@ describe("levelForStrength (display-only)", () => {
       [60, 6],
       [75, 7],
       [90, 8],
-      [110, 9],
-      [135, 10],
+      [105, 9],
+      [120, 10],
     ];
     for (const [strength, level] of cases) {
       expect(levelForStrength(strength)).toBe(level);
@@ -428,7 +431,7 @@ describe("levelForStrength (display-only)", () => {
     }
   });
   it("caps at level 10 above max threshold", () => {
-    expect(levelForStrength(135)).toBe(10);
+    expect(levelForStrength(120)).toBe(10);
     expect(levelForStrength(1000)).toBe(10);
   });
 });
@@ -456,12 +459,12 @@ describe("training", () => {
         CONFIG.training.strengthGainMax,
       );
     });
-    it("stays within [3, 7]", () => {
+    it("stays within [2, 5]", () => {
       // rand01 contract is [0, 1) — never pass exactly 1.0
       for (let i = 0; i < 10; i++) {
         const v = rollTrainingGain(i / 10);
-        expect(v).toBeGreaterThanOrEqual(3);
-        expect(v).toBeLessThanOrEqual(7);
+        expect(v).toBeGreaterThanOrEqual(2);
+        expect(v).toBeLessThanOrEqual(5);
       }
     });
   });
@@ -792,13 +795,13 @@ describe("trainingEnergyCost / win strength gains", () => {
       expect(rollMonsterWinStrengthGain(m, 0.999999)).toBe(m.strengthGainWinMax);
     }
   });
-  it("rollBeastWinStrengthGain stays in [3, 5]", () => {
+  it("rollBeastWinStrengthGain stays in [2, 4]", () => {
     expect(rollBeastWinStrengthGain(0)).toBe(CONFIG.beast.winStrengthGainMin);
     expect(rollBeastWinStrengthGain(0.999999)).toBe(CONFIG.beast.winStrengthGainMax);
     for (let i = 0; i < 10; i++) {
       const v = rollBeastWinStrengthGain(i / 10);
-      expect(v).toBeGreaterThanOrEqual(3);
-      expect(v).toBeLessThanOrEqual(5);
+      expect(v).toBeGreaterThanOrEqual(2);
+      expect(v).toBeLessThanOrEqual(4);
     }
   });
   it("resolveMonsterFight grants win-range strength on win, 0 on loss", () => {
@@ -928,6 +931,29 @@ describe("dragon-instance helpers (computed-not-stored)", () => {
       expect(isBeastEligible(stubDragon({ energy: 0, lastEnergyUpdateMs: 0 }), 0)).toBe(false);
       expect(isBeastEligible(stubDragon({ energy: 50, lastEnergyUpdateMs: 0 }), 0)).toBe(true);
     });
+  });
+});
+
+describe("strength cap + stars (max 125, 5 str = 1 silver, 5 silver = 1 gold)", () => {
+  it("caps strength at CONFIG.strength.max (125)", () => {
+    expect(CONFIG.strength.max).toBe(125);
+    expect(clampStrength(0)).toBe(0);
+    expect(clampStrength(125)).toBe(125);
+    expect(clampStrength(200)).toBe(125);
+    expect(clampStrength(-5)).toBe(0);
+    expect(applyStrengthGain(124, 5)).toBe(125);
+    expect(applyStrengthGain(125, 5)).toBe(125);
+    expect(applyStrengthGain(10, 3)).toBe(13);
+  });
+  it("maps strength to stars: 5 -> 1 silver, 25 -> 1 gold, 30 -> 1 gold + 1 silver", () => {
+    expect(starsForStrength(0)).toEqual({ gold: 0, silver: 0 });
+    expect(starsForStrength(4)).toEqual({ gold: 0, silver: 0 });
+    expect(starsForStrength(5)).toEqual({ gold: 0, silver: 1 });
+    expect(starsForStrength(24)).toEqual({ gold: 0, silver: 4 });
+    expect(starsForStrength(25)).toEqual({ gold: 1, silver: 0 });
+    expect(starsForStrength(30)).toEqual({ gold: 1, silver: 1 });
+    expect(starsForStrength(125)).toEqual({ gold: 5, silver: 0 });
+    expect(starsForStrength(999)).toEqual({ gold: 5, silver: 0 });
   });
 });
 

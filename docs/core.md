@@ -8,7 +8,7 @@
    - **Buy Egg** (top-left) – purchases a new egg via spin-then-pay; disabled when coins are insufficient.
    - **Bewilder Beast** (top-right) – always visible; opens the boss intro modal with the boss image and a **Fight** button.
    - **Earn Coins** (bottom-left) – tap-to-collect hourly generation; the icon is shown **only when collectible coins are available** and opens the coin summary modal on tap. Nothing is credited without tapping.
-6. **Dragon detail screen** – Shows a dragon's **Breed (type name), Level (display-only tier derived from Strength via config), Age, Energy, and Strength** with a central image. Egg screens show the egg + "Hatching..." and no actions. Hatched-dragon actions via modals:
+6. **Dragon detail screen** – Shows a dragon's **Breed + age in the name ("Wooly Howl (2 days)"), Energy bar, and Strength stars** (5 str = 1 silver, 5 silver = 1 gold, max 125) centered below the bar, with a central image. No "Lv N · Age Nd" line. Egg screens show the egg + "Hatching..." and no actions. Hatched-dragon actions via modals:
    - **Train** – costs coins (scales with dragon strength) and drains a flat 15 energy; raises strength by a random amount. Blocked at 0 energy.
    - **Sell** – returns coins based on the dragon's age, strength, energy, and breed.
    - **Monster** – opens the monster selection modal (0–3 spawned monsters).
@@ -16,12 +16,12 @@
 8. **Monster battles** –
    - Spawn-based: Easy spawns frequently, Medium rarely, Hard rarest; the selection modal shows only spawned monsters (0–3 rows) or an empty state.
    - The selected dragon fights using: `damage = (effectiveStrength + random(0–10)) – monsterConstantStrength`, where `effectiveStrength = floor(strength × liveEnergy / 100)` — a tired dragon hits weaker, so winning on a sliver of energy is (almost) impossible.
-   - **Win → receives coins (random, based on difficulty) plus a permanent strength gain** (Easy +1–2, Medium +2–3, Hard +3–5). No egg reward. Energy drains by the rolled effort cost (usually leaves the dragon tired but standing).
+   - **Win → receives coins (random, based on difficulty) plus a permanent strength gain** (Easy +1–2, Medium +1–2, Hard +2–4, clamped at 125). No egg reward. Energy drains by the rolled effort cost (usually leaves the dragon tired but standing).
    - **Lose → knocked out: energy drops to 0** (must recover before fighting again)**; strength unchanged.**
-9. **Training** – Paying the coin cost increases the dragon's strength by a random value within a range and drains a flat 15 energy; cost scales with the dragon's current strength (config-defined). Requires energy > 0.
+9. **Training** – Paying the coin cost increases the dragon's strength by +2–5 (clamped at 125 max) and drains a flat 15 energy; cost scales with the dragon's current strength (config-defined). Requires energy > 0.
 10. **Selling** – Provides coins whose amount depends on the dragon's age, strength, energy, and breed. Selling can supply coins for multiple egg purchases.
 11. **Dragon turns against Bewilder Beast** – Turn-based with retaliation: each dragon attacks in roster order using the damage formula (scaled by its energy when it steps in — an exhausted dragon chips weakly), the beast hits back on that dragon's Energy (config-defined counter-damage; Energy = Health here). A dragon at 0 energy is out and **removed**. The modal logs each turn and is locked (not closable) until the outcome. If all dragons are removed before the beast falls, the player loses with an empty roster and must buy a new egg (waiting for hourly coins if broke).
-12. **Bewilder Beast boss** – The final boss with an HP bar. Defeating it keeps survivors at their remaining (drained) energy, grants each surviving dragon a permanent +3–5 strength gain, and removes dragons dropped to 0; the beast vanishes for a day and then respawns.
+12. **Bewilder Beast boss** – The final boss with an HP bar plus strength stars (constant 20 = 4 silver). Defeating it keeps survivors at their remaining (drained) energy, grants each surviving dragon a permanent +2–4 strength gain, and removes dragons dropped to 0; the beast vanishes for a day and then respawns.
 13. **Win condition** – Progress is measured by defeating monsters and the Bewilder Beast; there is no separate "win-end" state, the loop continues with new eggs and dragons.
 14. **Modal design** – No animation; semi-transparent dark overlay. Every modal contains a close (X) button **except Fight modals while turns auto-resolve** (locked until outcome). Modals: egg-spin purchase outcome + "Not enough coins", training price/result, sell confirmation, monster selection & fight result, Bewilder Beast intro/fight, and coin-earning summary ("Yo hoo" to close/collect).
 15. **Hourly coin generation** – Coins accrue hourly but are credited **only by tapping the Earn Coins icon** (visible only when collectible), enabling the first training after the first egg hatches.

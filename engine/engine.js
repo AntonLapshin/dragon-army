@@ -6,10 +6,12 @@ import {
   MONSTERS,
   ageDaysForDragonInstance,
   applyEnergyDrain,
+  applyStrengthGain,
   breedForDragon,
   breedForIndex,
   canAffordEgg,
   canTrainDragon,
+  clampStrength,
   collectibleCoins,
   drawBreedIndex,
   dragonStage,
@@ -106,7 +108,7 @@ function migrateLegacySave(raw, nowMs) {
     breedId: breedForIndex(
       typeof d.breedIdx === "number" ? d.breedIdx : 0
     ).id,
-    strength: asFiniteNumber(d.strength) ?? 0,
+    strength: clampStrength(asFiniteNumber(d.strength) ?? 0),
     energy: asFiniteNumber(d.energy) ?? CONFIG.energy.initial,
     purchasedAtMs: asFiniteNumber(d.purchasedAt) ?? nowMs,
     hatchAtMs: asFiniteNumber(d.hatchAt) ?? nowMs,
@@ -125,7 +127,11 @@ function coerceLoadedSave(raw, nowMs) {
   if (!raw || typeof raw !== "object") return null;
   const candidate = raw;
   if (candidate.player && Array.isArray(candidate.player.dragons)) {
-    return candidate;
+    const state = candidate;
+    for (const d of state.player.dragons) {
+      if (typeof d.strength === "number") d.strength = clampStrength(d.strength);
+    }
+    return state;
   }
   if (typeof candidate.coins === "number" && Array.isArray(candidate.dragons)) {
     return migrateLegacySave(candidate, nowMs);
@@ -416,7 +422,7 @@ function createGameEngine(deps) {
     );
     s.player.totalTrainings += 1;
     const after = findDragon(dragonId);
-    const strengthAfter = after?.strength ?? dragon.strength + gain;
+    const strengthAfter = after?.strength ?? applyStrengthGain(dragon.strength, gain);
     save();
     return {
       ok: true,
@@ -503,7 +509,7 @@ function createGameEngine(deps) {
         rolls?.energyRand01 ?? rand(),
         rolls?.strengthRand01 ?? rand()
       );
-      const strengthAfter = dragon.strength + result.strengthGain;
+      const strengthAfter = applyStrengthGain(dragon.strength, result.strengthGain);
       replaceDragon({
         ...dragon,
         strength: strengthAfter,
@@ -652,7 +658,7 @@ function createGameEngine(deps) {
           strengthGains[id] = gain;
           replaceDragon({
             ...current,
-            strength: current.strength + gain,
+            strength: applyStrengthGain(current.strength, gain),
             energy,
             lastEnergyUpdateMs: atMs
           });

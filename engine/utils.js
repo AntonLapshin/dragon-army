@@ -1,7 +1,7 @@
 // GENERATED from engine/utils.ts — do not edit by hand.
 // Regenerate with: npm run build:engine
 // (zeus build only bundles .js; the .ts sources are for vitest.)
-import { CONFIG, collectibleCoins } from "./config.js";
+import { CONFIG, applyStrengthGain, clampStrength, collectibleCoins } from "./config.js";
 function createDragonId(rand01, nowMs) {
   const randPart = Math.floor(rand01 * 36 ** 6).toString(36);
   return `dragon-${nowMs.toString(36)}-${randPart}`;
@@ -19,13 +19,13 @@ function createEggDragon(params) {
   };
 }
 function hatchDragonInstance(dragon, nowMs, baseStrength) {
-  return { ...dragon, hatchedAtMs: nowMs, strength: baseStrength };
+  return { ...dragon, hatchedAtMs: nowMs, strength: clampStrength(baseStrength) };
 }
 function withEnergyAnchor(dragon, energy, nowMs) {
   return { ...dragon, energy, lastEnergyUpdateMs: nowMs };
 }
 function withTrainingGain(dragon, gain) {
-  return { ...dragon, strength: dragon.strength + gain };
+  return { ...dragon, strength: applyStrengthGain(dragon.strength, gain) };
 }
 function advanceCollectAnchor(lastCoinCollectMs, nowMs) {
   const elapsed = Math.max(0, nowMs - lastCoinCollectMs);

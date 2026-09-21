@@ -152,8 +152,8 @@ describe("scenario 2: fresh dragon vs Easy monster (underdog, costly wins)", () 
     void rng;
   });
 
-  it("after 2-3 trainings the dragon turns the tables (progression intact)", () => {
-    // +5 avg per training: 11 -> ~21-26 after 2-3 trainings
+  it("after 3-4 trainings the dragon turns the tables (progression intact)", () => {
+    // +3.5 avg per training: 11 -> ~21-26 after 3-4 trainings
     expect(winRateVs(21, 0, 1000, 55)).toBeGreaterThan(0.85);
     expect(winRateVs(26, 0, 500, 56)).toBe(1);
   });

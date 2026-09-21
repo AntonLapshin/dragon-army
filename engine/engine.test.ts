@@ -424,21 +424,21 @@ describe("training", () => {
   it("trains: coins deducted, strength gained, energy drained, level tracked", () => {
     const saved = stateWith([hatchedDragon({ id: "d", strength: 14 })]);
     saved.player.coins = 1000;
-    const t = setup(saved, 0); // gain roll 0 => +3
+    const t = setup(saved, 0); // gain roll 0 => +min (2)
     t.engine.init();
     const before = t.engine.getState().player.coins;
     const res = t.engine.trainDragon("d", 0);
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.gain).toBe(CONFIG.training.strengthGainMin);
-    expect(res.strengthAfter).toBe(17);
+    expect(res.strengthAfter).toBe(16);
     expect(res.levelBefore).toBe(1);
     expect(res.levelAfter).toBe(2);
     expect(res.energyAfter).toBe(100 - CONFIG.training.energyCost);
     const s = t.engine.getState();
     expect(s.player.coins).toBeLessThan(before);
     expect(s.player.totalTrainings).toBe(1);
-    expect(s.player.dragons[0].strength).toBe(17);
+    expect(s.player.dragons[0].strength).toBe(16);
   });
   it("blocked training changes nothing", () => {
     ctx.engine.init();

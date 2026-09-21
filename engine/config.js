@@ -43,8 +43,8 @@ const CONFIG = {
       { level: 6, minStrength: 60 },
       { level: 7, minStrength: 75 },
       { level: 8, minStrength: 90 },
-      { level: 9, minStrength: 110 },
-      { level: 10, minStrength: 135 }
+      { level: 9, minStrength: 105 },
+      { level: 10, minStrength: 120 }
     ]
   },
   age: {
@@ -52,13 +52,22 @@ const CONFIG = {
     ageGainPerTick: 1,
     note: "Age is computed as nowMs - hatchedAtMs (0 for eggs); no ageDays/lastAgeTickMs stored. Lifespan is per-breed (DragonBreed.lifespanDays 30-45d)."
   },
+  strength: {
+    // Absolute combat-strength ceiling. All gains clamp here so the
+    // star display tops out at 5 gold stars (125 = 5 x 25).
+    max: 125,
+    // Star display: 5 strength = 1 silver star, 5 silver = 1 gold star
+    // (so 25 strength = 1 gold star). See starsForStrength().
+    perSilverStar: 5,
+    silverPerGold: 5
+  },
   training: {
     requiresEnergyAbove: 0,
     requiresCoins: true,
     costBase: 8,
     costPerStrength: 0.8,
-    strengthGainMin: 3,
-    strengthGainMax: 7,
+    strengthGainMin: 2,
+    strengthGainMax: 5,
     // Training is hard work: each session drains this much energy (flat,
     // clamped at 0). Cheap next to a monster fight (70-100) but enough that
     // ~6 back-to-back sessions empty a full bar; recovery is 10/hour.
@@ -95,8 +104,8 @@ const CONFIG = {
     winRewardMin: 300,
     winRewardMax: 300,
     // Survivors of a victorious beast battle grow stronger (rolled per dragon).
-    winStrengthGainMin: 3,
-    winStrengthGainMax: 5,
+    winStrengthGainMin: 2,
+    winStrengthGainMax: 4,
     respawnAfterWinMs: 24 * 60 * 60 * 1e3
   },
   timers: {
@@ -120,9 +129,9 @@ const CONFIG = {
     timeToFirstHatch: "24-48h",
     hourlyIncome: 2,
     trainingsPerHourIncome: "~0.12 early (passive only; fights fund training)",
-    easyBeatableAt: "strength ~19 (fresh ~11 wins ~25%; reliable after 2-3 trainings)",
-    mediumBeatableAt: "strength ~30 (about 3-5 trainings)",
-    hardBeatableAt: "strength ~55 (about 7-12 trainings or epic breed)",
+    easyBeatableAt: "strength ~19 (fresh ~11 wins ~25%; reliable after 3-4 trainings)",
+    mediumBeatableAt: "strength ~30 (about 4-7 trainings)",
+    hardBeatableAt: "strength ~55 (about 9-15 trainings or epic breed)",
     beastBeatableAt: "roster of 3-5 dragons at strength 40-60"
   }
 };
@@ -177,8 +186,8 @@ const MONSTERS = [
     energyLossWinMax: 100,
     energyLossLoseMin: 90,
     energyLossLoseMax: 100,
-    strengthGainWinMin: 2,
-    strengthGainWinMax: 3,
+    strengthGainWinMin: 1,
+    strengthGainWinMax: 2,
     image: "monsters/deadly_nadder.png"
   },
   {
@@ -193,8 +202,8 @@ const MONSTERS = [
     energyLossWinMax: 100,
     energyLossLoseMin: 95,
     energyLossLoseMax: 100,
-    strengthGainWinMin: 3,
-    strengthGainWinMax: 5,
+    strengthGainWinMin: 2,
+    strengthGainWinMax: 4,
     image: "monsters/monstrous_nightmare.png"
   }
 ];
@@ -272,6 +281,19 @@ function levelForStrength(strength) {
     if (strength >= t.minStrength) level = t.level;
   }
   return level;
+}
+function clampStrength(strength) {
+  return clamp(strength, 0, CONFIG.strength.max);
+}
+function applyStrengthGain(current, gain) {
+  return clampStrength(current + gain);
+}
+function starsForStrength(strength) {
+  const capped = clampStrength(Math.floor(strength));
+  const perGold = CONFIG.strength.perSilverStar * CONFIG.strength.silverPerGold;
+  const gold = Math.floor(capped / perGold);
+  const silver = Math.floor((capped - gold * perGold) / CONFIG.strength.perSilverStar);
+  return { gold, silver };
 }
 function trainingCost(strength) {
   return Math.floor(CONFIG.training.costBase + strength * CONFIG.training.costPerStrength);
@@ -455,6 +477,7 @@ export {
   ageDaysForDragonInstance,
   ageDaysFromMs,
   applyEnergyDrain,
+  applyStrengthGain,
   battleDamage,
   breedForDragon,
   breedForIndex,
@@ -464,6 +487,7 @@ export {
   canTrain,
   canTrainDragon,
   clamp,
+  clampStrength,
   collectibleCoins,
   dragonStage,
   drawBreedIndex,
@@ -500,6 +524,7 @@ export {
   sellPrice,
   sellPriceForDragon,
   shouldSpawnMonster,
+  starsForStrength,
   trainingCost,
   trainingCostForDragon,
   trainingEnergyCost

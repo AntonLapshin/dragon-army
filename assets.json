@@ -184,6 +184,12 @@
   "ui/strength.png": [
     "56x56"
   ],
+  "ui/silver_star.png": [
+    "16x16"
+  ],
+  "ui/gold_star.png": [
+    "16x16"
+  ],
   "ui/training.png": [
     "84x84"
   ],

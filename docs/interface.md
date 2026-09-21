@@ -21,11 +21,10 @@
 ### 2. Dragon Detail Screen
 - **Center** – large dragon illustration (style similar to the Koala game); unhatched eggs show an **egg illustration + "Hatching..."** (no timer, no stats beyond breed).
 - **Above the image** – tags showing:
-  - **Breed** (type name, one of 15 — revealed at spin time)
-  - **Level** (display-only tier derived from Strength via config thresholds)
-  - **Age**
-  - **Energy** (visual bar / number)
-  - **Strength** (number)
+  - **Breed + age** in the name line, e.g. "Wooly Howl (2 days)" / "(1 day)"
+  - **Energy** (segmented bar)
+  - **Strength** as stars centered below the energy bar (5 strength = 1 silver,
+    5 silver = 1 gold, max 125 = 5 gold). No "Lv N · Age Nd" line.
 - **Bottom row** three icons (equally spaced, spanning the width; **hatched dragons only** — hidden on egg screens):
   - **Train** (left) – opens Train modal. Disabled at 0 energy.
   - **Sell** (center) – opens Sell modal.

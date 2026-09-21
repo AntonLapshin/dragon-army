@@ -14,14 +14,15 @@ Hatch dragon eggs, train them, fight spawn-based monsters, and take down the
    thumbnails; dragon detail screens return via **Home**.
    (There is no swipe navigation — it proved unreliable on the real device.)
 3. **Train** a hatched dragon — costs coins (scales with strength) **and 15
-   energy** per session, raises strength by +3–7.
+   energy** per session, raises strength by +2–5 (clamped at 125 max).
+   Strength renders as stars: 5 strength = 1 silver star, 5 silver = 1 gold.
 4. **Fight monsters** — only spawned monsters (0–3) are listed. Winning gives
-   coins **plus permanent strength** (Easy +1–2, Medium +2–3, Hard +3–5);
+   coins **plus permanent strength** (Easy +1–2, Medium +1–2, Hard +2–4);
    losing costs energy, strength unchanged.
 5. **Fight the Bewilder Beast** (top-right) — all hatched dragons with energy
    > 0 attack in roster order; the beast retaliates on energy. Dragons dropped
    to 0 are removed. Winning vanishes the beast for a day and grants every
-   survivor **+3–5 permanent strength** plus 300 coins.
+   survivor **+2–4 permanent strength** plus 300 coins.
 6. **Earn Coins** — hourly coins accrue but are credited only by tapping the
    coin icon when it appears. Energy recovers passively (10/hour).
 
@@ -44,9 +45,9 @@ Project layout: `engine/` (pure rules: `config.ts`, `engine.ts`, `utils.ts`,
 | Action | Cost | Reward |
 |---|---|---|
 | Egg | 100 coins | random of 16 breeds |
-| Train | coins (8 + 0.8×str) + 15 energy | +3–7 strength |
-| Monster win | 70–100 energy | coins + strength (+1–2 / +2–3 / +3–5) |
-| Beast win | energy per turn (18–28 counter) | 300 coins + 3–5 strength per survivor |
+| Train | coins (8 + 0.8×str) + 15 energy | +2–5 strength (max 125) |
+| Monster win | 70–100 energy | coins + strength (+1–2 / +1–2 / +2–4) |
+| Beast win | energy per turn (18–28 counter) | 300 coins + 2–4 strength per survivor |
 
 ## What could look better (from a playtest pass)
 
