@@ -504,21 +504,31 @@ describe("selling", () => {
   });
 
   describe("sellPrice", () => {
-    it("follows floor((base + str*perStr + age*perAge) * mult * energyFactor)", () => {
+    it("follows floor((base + (str*perStr + age*perAge) * mult) * energyFactor)", () => {
       const expected = Math.floor(
         (CONFIG.selling.basePrice +
-          10 * CONFIG.selling.perStrength +
-          2 * CONFIG.selling.perAgeDay) *
-          1.0 *
+          (10 * CONFIG.selling.perStrength +
+            2 * CONFIG.selling.perAgeDay) *
+            1.0) *
           sellEnergyFactor(100),
       );
       expect(sellPrice(10, 2, 100, 1.0)).toBe(expected);
     });
-    it("scales with breed multiplier", () => {
+    it("ignores the breed multiplier for eggs (strength 0, age 0)", () => {
+      expect(sellPrice(0, 0, 100, 1.0)).toBe(sellPrice(0, 0, 100, 1.7));
+      expect(sellPrice(0, 0, 100, 1.0)).toBe(CONFIG.selling.basePrice);
+    });
+    it("scales the earned part with breed multiplier", () => {
       const low = sellPrice(10, 0, 100, 1.0);
       const high = sellPrice(10, 0, 100, 1.6);
       expect(high).toBeGreaterThan(low);
-      expect(high).toBe(Math.floor(low * 1.6));
+      expect(high).toBe(
+        Math.floor(
+          (CONFIG.selling.basePrice +
+            10 * CONFIG.selling.perStrength * 1.6) *
+            sellEnergyFactor(100),
+        ),
+      );
     });
     it("drops at low energy (0.5x factor)", () => {
       const full = sellPrice(20, 5, 100, 1.0);

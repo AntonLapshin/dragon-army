@@ -451,30 +451,30 @@ describe("selling", () => {
     const t = setup(stateWith([eggDragon({ id: "egg" })]));
     t.engine.init();
     expect(t.engine.sellPreview("nope")).toBeNull();
-    expect(t.engine.sellPreview("egg")).toBe(10); // floor((10 + 0) * 1.0 * 1.0)
+    expect(t.engine.sellPreview("egg")).toBe(70); // base price, breed-independent
   });
   it("sells: dragon removed, price credited, stats updated", () => {
     const t = setup(stateWith([hatchedDragon({ strength: 20, hatchedAtMs: T0 })]));
     t.engine.init();
     const price = t.engine.sellPreview("dragon-test");
-    expect(price).toBe(40); // floor((10 + 20*1.5) * 1.0 * 1.0)
+    expect(price).toBe(90); // floor(70 + 20*1.0*1.0)
     const res = t.engine.sellDragon("dragon-test");
-    expect(res).toEqual({ ok: true, price: 40 });
+    expect(res).toEqual({ ok: true, price: 90 });
     const s = t.engine.getState();
     expect(s.player.dragons).toEqual([]);
-    expect(s.player.coins).toBe(CONFIG.economy.startingCoins + 40);
+    expect(s.player.coins).toBe(CONFIG.economy.startingCoins + 90);
     expect(s.player.totalDragonsSold).toBe(1);
   });
   it("sells eggs: egg removed, price credited, stats updated", () => {
     const t = setup(stateWith([eggDragon({ id: "egg" })]));
     t.engine.init();
     const price = t.engine.sellPreview("egg");
-    expect(price).toBe(10);
+    expect(price).toBe(70);
     const res = t.engine.sellDragon("egg");
-    expect(res).toEqual({ ok: true, price: 10 });
+    expect(res).toEqual({ ok: true, price: 70 });
     const s = t.engine.getState();
     expect(s.player.dragons).toEqual([]);
-    expect(s.player.coins).toBe(CONFIG.economy.startingCoins + 10);
+    expect(s.player.coins).toBe(CONFIG.economy.startingCoins + 70);
     expect(s.player.totalDragonsSold).toBe(1);
   });
   it("cannot sell unknown dragons", () => {

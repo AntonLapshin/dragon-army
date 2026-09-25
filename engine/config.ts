@@ -112,8 +112,12 @@ export const CONFIG = {
     cooldownMs: 0,
   },
   selling: {
-    basePrice: 10,
-    perStrength: 1.5,
+    // Egg resale is the base alone (strength 0, age 0, breed-independent):
+    // 70 vs the 100-coin buy price, so an instant flip always loses 30.
+    // A fresh common hatch (~11 str) sells for ~81; training/age push it
+    // toward 100 over several sessions — selling feels fair, not punitive.
+    basePrice: 70,
+    perStrength: 1.0,
     perAgeDay: 2,
   },
   battle: {
@@ -497,6 +501,11 @@ export function sellEnergyFactor(energy: number): number {
  * Sale price. Callers MUST pass computed values, never stored ones:
  * `ageDays = ageDaysForDragon(hatchedAtMs, nowMs)`,
  * `energy = energyAt(energyAnchor, lastEnergyUpdateMs, nowMs)`. Pure.
+ *
+ * The breed multiplier applies only to the earned part (strength + age),
+ * not to the base: an unhatched egg (strength 0, age 0) always resells for
+ * `basePrice` regardless of its hidden breed, while a trained dragon keeps
+ * its breed premium.
  */
 export function sellPrice(
   strength: number,
@@ -506,9 +515,9 @@ export function sellPrice(
 ): number {
   return Math.floor(
     (CONFIG.selling.basePrice +
-      strength * CONFIG.selling.perStrength +
-      ageDays * CONFIG.selling.perAgeDay) *
-      breedSellMultiplier *
+      (strength * CONFIG.selling.perStrength +
+        ageDays * CONFIG.selling.perAgeDay) *
+        breedSellMultiplier) *
       sellEnergyFactor(energy),
   );
 }

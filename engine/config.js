@@ -75,8 +75,12 @@ const CONFIG = {
     cooldownMs: 0
   },
   selling: {
-    basePrice: 10,
-    perStrength: 1.5,
+    // Egg resale is the base alone (strength 0, age 0, breed-independent):
+    // 70 vs the 100-coin buy price, so an instant flip always loses 30.
+    // A fresh common hatch (~11 str) sells for ~81; training/age push it
+    // toward 100 over several sessions — selling feels fair, not punitive.
+    basePrice: 70,
+    perStrength: 1,
     perAgeDay: 2
   },
   battle: {
@@ -339,7 +343,7 @@ function sellEnergyFactor(energy) {
 }
 function sellPrice(strength, ageDays, energy, breedSellMultiplier) {
   return Math.floor(
-    (CONFIG.selling.basePrice + strength * CONFIG.selling.perStrength + ageDays * CONFIG.selling.perAgeDay) * breedSellMultiplier * sellEnergyFactor(energy)
+    (CONFIG.selling.basePrice + (strength * CONFIG.selling.perStrength + ageDays * CONFIG.selling.perAgeDay) * breedSellMultiplier) * sellEnergyFactor(energy)
   );
 }
 function rollDamageBonus(rand01) {

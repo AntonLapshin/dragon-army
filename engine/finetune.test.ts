@@ -10,7 +10,8 @@
  * 3) Passive coins: a casual player (half collected, sleep/school misses)
  *    earns an egg in ~5 days
  * 4) Full energy recovery (0 -> 100) fits within a day
- * 5) Selling a fresh young dragon always yields < 100 coins (no quick flip)
+ * 5) Selling feels fair: egg ~70, fresh common ~80, trained ~100
+ *    (instant egg flip always loses vs the 100-coin buy price)
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -231,43 +232,46 @@ describe("scenario 4: full energy recovery fits within a day", () => {
 
 // ---------------------------------------------------------------------------
 
-describe("scenario 5: fresh dragon resale is always < 100 (no quick flip)", () => {
-  it("selling formula is tuned down (base 10 / 1.5 per str / 2 per day)", () => {
-    expect(CONFIG.selling.basePrice).toBe(10);
-    expect(CONFIG.selling.perStrength).toBe(1.5);
+describe("scenario 5: selling feels fair (egg ~70, fresh ~80, trained ~100)", () => {
+  it("selling formula is tuned up (base 70 / 1.0 per str / 2 per day)", () => {
+    expect(CONFIG.selling.basePrice).toBe(70);
+    expect(CONFIG.selling.perStrength).toBe(1.0);
     expect(CONFIG.selling.perAgeDay).toBe(2);
   });
 
-  it("every breed at max fresh roll, age 0, full energy sells for < 100", () => {
+  it("an unhatched egg sells for the base price (~70), always below buy price", () => {
     for (const breed of DRAGONS) {
-      const maxFresh = rollBaseStrength(breed, 0.999999);
-      const price = sellPrice(maxFresh, 0, 100, breed.sellMultiplier);
-      expect(price).toBeLessThan(100);
+      const price = sellPrice(0, 0, 100, breed.sellMultiplier);
+      expect(price).toBe(70);
+      expect(price).toBeLessThan(CONFIG.egg.price);
     }
   });
 
-  it("even the strongest epic (Night Fury 28 x1.7) cannot flip for profit", () => {
-    const nightFury = DRAGONS[DRAGONS.length - 1];
-    const topRoll = rollBaseStrength(nightFury, 0.999999);
-    expect(topRoll).toBe(28);
-    expect(sellPrice(topRoll, 0, 100, nightFury.sellMultiplier)).toBeLessThan(
-      100,
-    );
-    expect(
-      sellPrice(topRoll, 0, 100, nightFury.sellMultiplier),
-    ).toBeLessThan(CONFIG.egg.price);
-  });
-
-  it("a typical fresh common (strength 8-14, age 0) sells for pocket change", () => {
+  it("a typical fresh common (strength 8-14, age 0) sells for ~80", () => {
     const common = DRAGONS[0];
     for (let s = 8; s <= 14; s++) {
       const price = sellPrice(s, 0, 100, common.sellMultiplier);
-      expect(price).toBeLessThan(100);
+      expect(price).toBeGreaterThanOrEqual(75);
+      expect(price).toBeLessThanOrEqual(90);
       expect(price).toBeLessThan(CONFIG.egg.price);
     }
-    // drained energy sells for even less (0.5x factor at 0 energy)
+    // drained energy sells for less (0.5x factor at 0 energy)
     expect(sellPrice(11, 0, 0, 1.0)).toBeLessThan(
       sellPrice(11, 0, 100, 1.0),
     );
+  });
+
+  it("common/uncommon fresh hatches never flip for profit", () => {
+    for (const breed of DRAGONS.slice(0, 10)) {
+      const maxFresh = rollBaseStrength(breed, 0.999999);
+      const price = sellPrice(maxFresh, 0, 100, breed.sellMultiplier);
+      expect(price).toBeLessThan(CONFIG.egg.price);
+    }
+  });
+
+  it("a trained common (~30 strength) reaches ~100", () => {
+    const price = sellPrice(30, 0, 100, DRAGONS[0].sellMultiplier);
+    expect(price).toBeGreaterThanOrEqual(95);
+    expect(price).toBeLessThanOrEqual(110);
   });
 });
