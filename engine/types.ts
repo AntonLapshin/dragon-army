@@ -124,7 +124,8 @@ export type DragonStage = "egg" | "hatched";
  * Eggs: `strength` is 0 until hatch, `hatchedAtMs` is null,
  * `hatchAtMs` holds the hidden 1–2 day timer encoded at purchase.
  * Hatched: `hatchedAtMs` is set once, `strength` >= breed base, actions
- * Train / Sell / Monster available (blocked at 0 energy).
+ * Train / Monster available (blocked at 0 energy). Sell is available in
+ * both egg and hatched stages.
  */
 export interface Dragon {
   /** Unique instance id (uuid), distinct from `breedId`. */
@@ -357,7 +358,7 @@ export type TrainResult =
 
 export type SellResult =
   | { ok: true; price: number }
-  | { ok: false; reason: "unknown-dragon" | "egg" };
+  | { ok: false; reason: "unknown-dragon" };
 
 export type MonsterFightOutcome =
   | {

@@ -447,11 +447,11 @@ describe("training", () => {
 });
 
 describe("selling", () => {
-  it("previews null for eggs / unknown dragons", () => {
+  it("previews null for unknown dragons, priced for eggs and hatched", () => {
     const t = setup(stateWith([eggDragon({ id: "egg" })]));
     t.engine.init();
-    expect(t.engine.sellPreview("egg")).toBeNull();
     expect(t.engine.sellPreview("nope")).toBeNull();
+    expect(t.engine.sellPreview("egg")).toBe(10); // floor((10 + 0) * 1.0 * 1.0)
   });
   it("sells: dragon removed, price credited, stats updated", () => {
     const t = setup(stateWith([hatchedDragon({ strength: 20, hatchedAtMs: T0 })]));
@@ -465,10 +465,21 @@ describe("selling", () => {
     expect(s.player.coins).toBe(CONFIG.economy.startingCoins + 40);
     expect(s.player.totalDragonsSold).toBe(1);
   });
-  it("cannot sell eggs or unknown dragons", () => {
+  it("sells eggs: egg removed, price credited, stats updated", () => {
     const t = setup(stateWith([eggDragon({ id: "egg" })]));
     t.engine.init();
-    expect(t.engine.sellDragon("egg")).toEqual({ ok: false, reason: "egg" });
+    const price = t.engine.sellPreview("egg");
+    expect(price).toBe(10);
+    const res = t.engine.sellDragon("egg");
+    expect(res).toEqual({ ok: true, price: 10 });
+    const s = t.engine.getState();
+    expect(s.player.dragons).toEqual([]);
+    expect(s.player.coins).toBe(CONFIG.economy.startingCoins + 10);
+    expect(s.player.totalDragonsSold).toBe(1);
+  });
+  it("cannot sell unknown dragons", () => {
+    const t = setup(stateWith([eggDragon({ id: "egg" })]));
+    t.engine.init();
     expect(t.engine.sellDragon("nope")).toEqual({ ok: false, reason: "unknown-dragon" });
   });
 });

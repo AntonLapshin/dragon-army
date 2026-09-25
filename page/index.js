@@ -816,7 +816,7 @@ function renderDragon(width, view) {
    }
 
 // Bottom action row — pinned to the very bottom (no roster strip on this
-   // page). Eggs show just Home at bottom-right; hatched dragons always show
+   // page). Eggs show Sell + Home; hatched dragons always show
    // 4 fixed slots: Home / Sell / Danger / Training, evenly spread with 20px
    // side paddings. Fixed slots keep Training pinned right when Danger is
    // unavailable. Danger is 50% opacity when no monsters wait or the dragon
@@ -827,11 +827,19 @@ function renderDragon(width, view) {
    // danger 72x72 -> rendered at ACTION_ICON_S), bottom-aligned.
    const sidePad = ACTION_SIDE_PAD;
    const bottom = DEVICE_HEIGHT - ACTION_BOTTOM_PAD;
-   if (egg) {
-     const eggIconS = ACTION_ICON_S;
-     const eggY = bottom - eggIconS;
-     addIconButton(width - sidePad - eggIconS, eggY, eggIconS, ASSET_HOME_84, () => goTo(0), false);
-   } else {
+    if (egg) {
+      const cells = [
+        { src: ASSET_SELL_84, size: ACTION_ICON_S, dimmed: false, tap: () => openModal({ kind: 'sell', dragonId: view.dragon.id }) },
+        { src: ASSET_HOME_84, size: ACTION_ICON_S, dimmed: false, tap: () => goTo(0) },
+      ];
+      const maxS = ACTION_ICON_S;
+      const step = (width - sidePad * 2 - maxS) / (cells.length - 1);
+      cells.forEach((cell, i) => {
+        const ix = Math.round(sidePad + i * step);
+        const iy = bottom - cell.size;
+        addIconButton(ix, iy, cell.size, cell.src, cell.tap, cell.dimmed);
+      });
+    } else {
      const hasMonsters = engine.getSpawnedMonsters().length > 0;
      const cells = [
        { src: ASSET_HOME_84, size: ACTION_ICON_S, dimmed: false, tap: () => goTo(0) },
@@ -992,8 +1000,9 @@ function renderSell() {
     closeModal();
     return;
   }
-  renderModalShell('Sell ' + view.breed.name, false);
-  addImg(PANEL_X + Math.floor((PANEL_W - SELL_ICON_S) / 2), PANEL_Y + SELL_ICON_Y, SELL_ICON_S, SELL_ICON_S, dragonAsset60(view.breed.assetKey));
+  const isEgg = view.stage === 'egg';
+  renderModalShell(isEgg ? 'Sell Egg' : 'Sell ' + view.breed.name, false);
+  addImg(PANEL_X + Math.floor((PANEL_W - SELL_ICON_S) / 2), PANEL_Y + SELL_ICON_Y, SELL_ICON_S, SELL_ICON_S, isEgg ? eggAsset60(view.breed.assetKey) : dragonAsset60(view.breed.assetKey));
   addText(PANEL_X + MODAL_PAD, PANEL_Y + SELL_LABEL_Y, PANEL_W - MODAL_PAD * 2, SELL_LABEL_H, 'Will receive:', SELL_LABEL_FONT, COLOR_WHITE);
   addCoinBig(PANEL_X + PANEL_W / 2, PANEL_Y + SELL_COIN_Y, price, PANEL_Y + SELL_COIN_TEXT_Y, SELL_COIN_TEXT_H, SELL_COIN_FONT, COLOR_WHITE);
   addButton(PANEL_X + SELL_BTN_X, PANEL_Y + PANEL_H - BTN_BOTTOM_OFFSET, SELL_BTN_W, BTN_H, 'Sell', () => confirmSell(view.dragon.id), { normal: COLOR_BTN_SELL });

@@ -437,7 +437,7 @@ function createGameEngine(deps) {
   }
   function sellPreview(dragonId, atMs = now()) {
     const dragon = findDragon(dragonId);
-    if (!dragon || !isDragonHatched(dragon)) return null;
+    if (!dragon) return null;
     return sellPriceForDragon(dragon, atMs);
   }
   function sellDragon(dragonId) {
@@ -445,7 +445,6 @@ function createGameEngine(deps) {
     const atMs = now();
     const dragon = findDragon(dragonId);
     if (!dragon) return { ok: false, reason: "unknown-dragon" };
-    if (!isDragonHatched(dragon)) return { ok: false, reason: "egg" };
     const price = sellPriceForDragon(dragon, atMs);
     removeDragons(/* @__PURE__ */ new Set([dragonId]));
     s.player.coins += price;
