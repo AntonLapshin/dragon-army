@@ -1,0 +1,88 @@
+{
+  "_comment": "Zepp OS (console.zepp.com) submission bundle for Dragon Army. Fill these values into Console > Create App > Submit for review. Spec sources: https://docs.zepp.com/docs/distribute/ (submission fields, 360x360 screenshots, 240x240 icon), https://docs.zepp.com/docs/designs/visual/icons/ (circle icon rules), https://docs.zepp.com/docs/reference/app-json/ (app.json), https://docs.zepp.com/docs/reference/related-resources/device-list/ (devices), https://docs.zepp.com/docs/reference/related-resources/language-list/ (language codes).",
+  "appId": 20003,
+  "appName": {
+    "en-US": "Dragon Army"
+  },
+  "countryOrRegion": {
+    "selected": ["Global"],
+    "note": "Publish to all regions available on console.zepp.com. The game is English-only and contains no region-specific content. If Console forces per-country checkboxes, tick all non-China-mainland countries first; add Mainland China only after confirming deviceSource variants (* = China) install correctly. See device-list docs for *-marked China variants."
+  },
+  "appCategory": {
+    "selected": "Games",
+    "note": "Select the Games/Entertainment category (Console > App Classification). Fallback if 'Games' is absent: 'Entertainment'."
+  },
+  "package": {
+    "zabPath": "dist/20003-Dragon_Army-1.0.0-20260921154259.zab",
+    "appIdMustMatch": 20003,
+    "howToRebuild": "zeus build (zpm 3.x) from repo root, or `npm run build:engine` + Console upload. Rebuild the .zab immediately before submitting so version.code/name and appId match app.json. The .zab in dist/ was built 2026-09-21 from app.json version 1.0.0 (code 1).",
+    "note": "Upload in Console > Application Package. appId inside the package must equal the registered appId (20003) and the app name must not collide with your other apps."
+  },
+  "supportedDevices": {
+    "detection": "Auto-filled by Console after the .zab upload, from app.json targets + runtime.apiVersion.minVersion.",
+    "appJsonTargets": {
+      "designWidth": 480,
+      "platforms": [
+        { "st": "r", "dw": 480 },
+        { "st": "s", "dw": 390 }
+      ],
+      "runtimeMinVersion": "4.0"
+    },
+    "primaryTestedDevice": "Amazfit Bip 6 (square 390x450, API_LEVEL 4.2, deviceSource 9765120) — tap-only UI, no swipe.",
+    "expectedDevices": [
+      "Amazfit Bip 6 (390x450, square) — primary, tested",
+      "Other Zepp OS 4.0+ square 390x450 devices (e.g. Amazfit Active, GTS 4, Active 2 Square, Cheetah Square)",
+      "Zepp OS 4.0+ round devices 480x480 / 466x466 (e.g. Balance / Balance 2, T-Rex 3 / Ultra 2, Active 2 Round, Cheetah 2 series) via the round 480 target"
+    ],
+    "note": "Requires Zepp OS runtime >= 4.0 (app.json runtime.apiVersion.minVersion). If Console lists unexpected devices after upload, update app.json targets/platforms to explicit deviceSource numbers from the device-list docs and rebuild."
+  },
+  "version": {
+    "code": 1,
+    "name": "1.0.0",
+    "note": "Auto-recognized from the .zab on upload. Bump BOTH code (+1) and name (semver) in app.json for every Version Upgrade submission."
+  },
+  "supportedLanguages": {
+    "selected": ["en-US"],
+    "defaultLanguage": "en-US",
+    "note": "Only en-US is declared in app.json i18n. All in-game strings are English. Add more locales to app.json i18n + in-game text before ticking other languages in Console > Language."
+  },
+  "shortDescription": {
+    "en-US": "Hatch, train and battle dragons. Defeat monsters and the Bewilder Beast!"
+  },
+  "fullDescription": {
+    "en-US": "Dragon Army is a tap-only pet-battler for Zepp OS, inspired by How to Train Your Dragon.\n\nHatch dragon eggs, train your dragons, and fight spawn-based monsters to earn coins and permanent strength. When ready, take your whole roster into turn-based battle against the Bewilder Beast boss — survivors gain bonus strength, the fallen are removed, and the beast respawns after a day.\n\nHOW TO PLAY\n- Buy Egg (top-left): spin-then-pay — tap to freeze the spin, OK to pay 100 coins. Eggs hatch in 24-48h real time.\n- Train: costs coins (scales with strength) + 15 energy, +2-5 strength (max 125). Strength shows as stars: 5 strength = 1 silver star, 5 silver = 1 gold.\n- Fight monsters: only spawned monsters (0-3) can be fought. Wins give coins + permanent strength; losses cost energy.\n- Bewilder Beast (top-right): all dragons with energy > 0 attack in roster order; the beast hits back on energy. Win: +2-4 strength per survivor + 300 coins, beast vanishes for a day.\n- Earn Coins: hourly coins are credited only by tapping the coin icon when it appears. Energy recovers passively (10/hour).\n\nDETAILS\n- Tap-only navigation (roster strip + Home); no swipe.\n- Progress is stored on-device only; no account, no network.\n- Tested on Amazfit Bip 6 (390x450). Also supports Zepp OS 4.0+ round and square watches (see Supported devices).\n- Version 1.0.0."
+  },
+  "previewScreenshots": {
+    "spec": "PNG, 360x360px, transparent background, app UI maximally displayed. Rectangular (square-watch) screenshots: UI height fills 360px, centered horizontally with equal left/right transparent margins and no top/bottom margins. 3+ screenshots recommended. Source: docs/distribute App Introduction Screenshots.",
+    "files": [
+      { "file": "store/screenshot_1.png", "caption": "Main hub (home background, 390x450 UI fitted to 360px height, 24px transparent margins left/right)" },
+      { "file": "store/screenshot_2.png", "caption": "Dragon detail — Light Fury on dragon background" },
+      { "file": "store/screenshot_3.png", "caption": "Egg hatching — Light Fury egg on dragon background" },
+      { "file": "store/screenshot_4.png", "caption": "Bewilder Beast boss intro" }
+    ],
+    "size": "360x360",
+    "format": "PNG with transparent margins"
+  },
+  "appIcon": {
+    "file": "store/icon.png",
+    "spec": "PNG, 240x240px, circular artwork on transparent background with no filled margins (store icon). Source: docs/distribute Application icon + designs/visual/icons. Device icon (assets/icon.png, 248x248 incl. 4px safe area) is a separate build asset — do NOT upload it to the store slot.",
+    "size": "240x240",
+    "format": "PNG, circle, transparent surroundings"
+  },
+  "privacyStatement": {
+    "en-US": "Dragon Army does not collect, transmit, or share any personal data. All game progress (coins, dragons, eggs, settings) is stored locally on the watch only (device local storage, file dragon_army_data.txt) and never leaves the device. The app requests on-device permissions only (device info for runtime compatibility, local storage for save data), shows no ads, uses no analytics, requires no account, and makes no network requests. Contact: dragon-army vendor via the Zepp developer console."
+  },
+  "requiredPermissions": {
+    "appJson": ["data:os.device.info", "device:os.local_storage"],
+    "consoleMapping": "In Console > Calling Permissions tick only what the app uses. Both permissions are on-device only, no user/sensor data:",
+    "purposes": [
+      { "permission": "data:os.device.info", "purpose": "Read device model/runtime info for screen compatibility. No personal data collected." },
+      { "permission": "device:os.local_storage", "purpose": "Save/load game progress locally on the watch (dragon_army_data.txt). Never transmitted." }
+    ],
+    "sensitiveData": "None — no contacts, location, health/sensor, microphone, or account data accessed. If Console offers 'None', do NOT select it: the app genuinely uses the two permissions above."
+  },
+  "containsThirdPartySDKs": {
+    "value": false,
+    "details": "No third-party SDKs. The package bundles only first-party Zepp OS APIs plus @zeppos/zml (Zepp official UI helper, no data collection) and self-authored game code. No ads, analytics, crash-reporting, or network SDKs."
+  }
+}

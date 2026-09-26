@@ -827,8 +827,6 @@ function renderDragon(width, view) {
      // Manual hatch: the hidden timer is due — satisfying green button tap.
      addBadgeText(0, HATCH_TEXT_Y, width, HATCH_TEXT_H, 'Ready to hatch!', HATCH_TEXT_FONT, COLOR_SUCCESS);
      addButton(Math.round((width - BTN_W) / 2), HATCH_BTN_Y, BTN_W, BTN_H, 'Hatch', () => hatchEgg(view.dragon.id));
-   } else {
-     addBadgeText(0, HATCH_TEXT_Y, width, HATCH_TEXT_H, 'Hatching...', HATCH_TEXT_FONT, COLOR_WHITE);
    }
 
 // Bottom action row — pinned to the very bottom (no roster strip on this
