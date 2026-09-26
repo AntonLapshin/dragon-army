@@ -186,19 +186,17 @@ describe("lifecycle (init / resume / save / reset / tick)", () => {
 // ---------------------------------------------------------------------------
 
 describe("tick", () => {
-  it("hatches due eggs once (idempotent) with rolled base strength", () => {
+  it("never auto-hatches: due eggs stay eggs until the Hatch button is tapped", () => {
     const t = setup(stateWith([eggDragon({ hatchAtMs: T0 + HOUR })]), 0.5);
     t.engine.init();
     expect(t.engine.getState().player.dragons[0].hatchedAtMs).toBeNull();
     t.setNow(T0 + 2 * HOUR);
     t.engine.tick();
     const d = t.engine.getState().player.dragons[0];
-    expect(d.hatchedAtMs).toBe(T0 + 2 * HOUR);
-    expect(d.strength).toBeGreaterThanOrEqual(DRAGONS[0].baseStrengthMin);
-    expect(d.strength).toBeLessThanOrEqual(DRAGONS[0].baseStrengthMax);
-    expect(t.engine.getState().player.totalEggsHatched).toBe(1);
-    t.engine.tick();
-    expect(t.engine.getState().player.totalEggsHatched).toBe(1);
+    expect(d.hatchedAtMs).toBeNull();
+    expect(d.strength).toBe(0);
+    expect(t.engine.getState().player.totalEggsHatched).toBe(0);
+    expect(t.engine.getDragonView("egg-test")?.canHatch).toBe(true);
   });
   it("removes dragons past their breed lifespan", () => {
     const nightFury = DRAGONS[DRAGONS.length - 1]; // 30d lifespan
@@ -310,6 +308,44 @@ describe("egg flow", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Manual hatch (green Hatch button)
+// ---------------------------------------------------------------------------
+
+describe("manual hatch", () => {
+  it("is blocked before the hidden timer is due", () => {
+    const t = setup(stateWith([eggDragon({ hatchAtMs: T0 + 2 * DAY })]), 0.5);
+    t.engine.init();
+    expect(t.engine.getDragonView("egg-test")?.canHatch).toBe(false);
+    expect(t.engine.hatchDragon("egg-test")).toEqual({ ok: false, reason: "not-due" });
+    expect(t.engine.getState().player.dragons[0].hatchedAtMs).toBeNull();
+    expect(t.engine.getState().player.totalEggsHatched).toBe(0);
+  });
+  it("hatches a due egg with rolled base strength and counts it once", () => {
+    const t = setup(stateWith([eggDragon({ hatchAtMs: T0 + HOUR })]), 0.5);
+    t.engine.init();
+    t.setNow(T0 + 2 * HOUR);
+    expect(t.engine.getDragonView("egg-test")?.canHatch).toBe(true);
+    const res = t.engine.hatchDragon("egg-test");
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.strength).toBeGreaterThanOrEqual(DRAGONS[0].baseStrengthMin);
+    expect(res.strength).toBeLessThanOrEqual(DRAGONS[0].baseStrengthMax);
+    const d = t.engine.getState().player.dragons[0];
+    expect(d.hatchedAtMs).toBe(T0 + 2 * HOUR);
+    expect(d.strength).toBe(res.strength);
+    expect(t.engine.getState().player.totalEggsHatched).toBe(1);
+    expect(t.engine.getDragonView("egg-test")).toMatchObject({ stage: "hatched", canHatch: false });
+    // second tap is a no-op gated as already-hatched
+    expect(t.engine.hatchDragon("egg-test")).toEqual({ ok: false, reason: "already-hatched" });
+    expect(t.engine.getState().player.totalEggsHatched).toBe(1);
+  });
+  it("returns unknown-dragon for a bad id", () => {
+    ctx.engine.init();
+    expect(ctx.engine.hatchDragon("nope")).toEqual({ ok: false, reason: "unknown-dragon" });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Coins (tap-to-collect)
 // ---------------------------------------------------------------------------
 
@@ -363,7 +399,7 @@ describe("dragon views", () => {
     const t = setup(stateWith([eggDragon()]));
     t.engine.init();
     const view = t.engine.getDragonView("egg-test");
-    expect(view).toMatchObject({ stage: "egg", ageDays: 0, canTrain: false, canFight: false });
+    expect(view).toMatchObject({ stage: "egg", ageDays: 0, canTrain: false, canFight: false, canHatch: false });
     expect(view?.level).toBe(1);
     expect(t.engine.hatchedCount()).toBe(0);
   });

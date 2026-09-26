@@ -223,6 +223,14 @@ export const ACTION_SIDE_PAD = 20;
 export const ACTION_BOTTOM_PAD = 12;
 export const ACTION_ICON_S = 84;
 
+// Manual hatch (egg detail screen): status line in the free slot where the
+// energy bar would be, plus a centered green Hatch button above the bottom
+// action row once the hidden timer is due.
+export const HATCH_TEXT_Y = 76;
+export const HATCH_TEXT_H = 30;
+export const HATCH_TEXT_FONT = FONT_20;
+export const HATCH_BTN_Y = 294;
+
 // ---------------------------------------------------------------------------
 // Roster strip (bottom thumbnail navigation)
 // ---------------------------------------------------------------------------

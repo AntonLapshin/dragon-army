@@ -179,17 +179,6 @@ function createGameEngine(deps) {
       s.ui.currentScreen = { kind: "main" };
     }
   }
-  function hatchDueEggs(atMs) {
-    const s = requireState();
-    for (const dragon of s.player.dragons) {
-      if (dragon.hatchedAtMs !== null) continue;
-      if (!isHatchDue(dragon.hatchAtMs, atMs)) continue;
-      const breed = breedForDragon(dragon);
-      const strength = rollBaseStrength(breed, rand());
-      replaceDragon(hatchDragonInstance(dragon, atMs, strength));
-      s.player.totalEggsHatched += 1;
-    }
-  }
   function removeExpiredDragons(atMs) {
     const s = requireState();
     const expired = s.player.dragons.filter(
@@ -217,7 +206,6 @@ function createGameEngine(deps) {
   function tick(atMs = now()) {
     const s = requireState();
     s.nowMs = atMs;
-    hatchDueEggs(atMs);
     removeExpiredDragons(atMs);
     respawnBeastIfDue(atMs);
     refreshSpawnIfStale(atMs);
@@ -317,6 +305,25 @@ function createGameEngine(deps) {
     save();
     return { ok: true, dragon: { ...egg } };
   }
+  function hatchDragon(dragonId, strengthRand01) {
+    const s = requireState();
+    const atMs = now();
+    const dragon = findDragon(dragonId);
+    if (!dragon) return { ok: false, reason: "unknown-dragon" };
+    if (dragon.hatchedAtMs !== null) {
+      return { ok: false, reason: "already-hatched" };
+    }
+    if (!isHatchDue(dragon.hatchAtMs, atMs)) {
+      return { ok: false, reason: "not-due" };
+    }
+    const breed = breedForDragon(dragon);
+    const strength = rollBaseStrength(breed, strengthRand01 ?? rand());
+    const hatched = hatchDragonInstance(dragon, atMs, strength);
+    replaceDragon(hatched);
+    s.player.totalEggsHatched += 1;
+    save();
+    return { ok: true, dragon: { ...hatched }, strength: hatched.strength };
+  }
   function collectibleAmount(atMs = now()) {
     const s = requireState();
     return collectibleCoins(Math.max(0, atMs - s.player.lastCoinCollectMs));
@@ -364,7 +371,8 @@ function createGameEngine(deps) {
       remainingLifespanDays: remainingLifespanForDragon(dragon, atMs),
       expired: isDragonInstanceExpired(dragon, atMs),
       canTrain: canTrainDragon(dragon, s.player.coins, atMs),
-      canFight: isBeastEligible(dragon, atMs)
+      canFight: isBeastEligible(dragon, atMs),
+      canHatch: dragon.hatchedAtMs === null && isHatchDue(dragon.hatchAtMs, atMs)
     };
   }
   function listDragonViews(atMs = now()) {
@@ -717,9 +725,10 @@ function createGameEngine(deps) {
     save,
     reset,
     tick,
-    // egg flow (spin-then-pay)
+    // egg flow (spin-then-pay + manual hatch)
     spinEggPreview,
     confirmEggPurchase,
+    hatchDragon,
     canBuyEgg: () => canAffordEgg(requireState().player.coins) && !rosterFull(),
     // coins (tap-to-collect)
     collectibleAmount,

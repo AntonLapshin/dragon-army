@@ -360,6 +360,13 @@ export type SellResult =
   | { ok: true; price: number }
   | { ok: false; reason: "unknown-dragon" };
 
+export type HatchResult =
+  | { ok: true; dragon: Dragon; strength: number }
+  | {
+      ok: false;
+      reason: "unknown-dragon" | "already-hatched" | "not-due";
+    };
+
 export type MonsterFightOutcome =
   | {
       ok: true;
@@ -412,6 +419,8 @@ export interface DragonView {
   expired: boolean;
   canTrain: boolean;
   canFight: boolean;
+  /** True when the egg's hidden timer has elapsed and it can be hatched manually. */
+  canHatch: boolean;
 }
 
 /** Derived main-hub icon state (§1). */

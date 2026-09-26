@@ -19,7 +19,7 @@
 ---
 
 ### 2. Dragon Detail Screen
-- **Center** – large dragon illustration (style similar to the Koala game); unhatched eggs show an **egg illustration + "Hatching..."** (no timer, no stats beyond breed).
+- **Center** – large dragon illustration (style similar to the Koala game); unhatched eggs show an **egg illustration + "Hatching..."** (no timer, no stats beyond breed), or **"Ready to hatch!" + a green Hatch button** once the hidden timer is due (manual tap, never automatic).
 - **Above the image** – tags showing:
   - **Breed + age** in the name line, e.g. "Wooly Howl (2 days)" / "(1 day)"
   - **Energy** (segmented bar)
@@ -96,7 +96,7 @@
 2. Taps **Buy Egg** (top-left). **Egg-Spin Purchase Modal** appears (or "Not enough coins" if broke).
 3. Symbol wheel spins; player taps to stop and reveal the breed.
 4. Player taps **"Yo hoo"** → coins deducted, egg added with hidden 1–2 day hatch timer.
-5. Egg gets its own detail screen (egg image + "Hatching...", no actions). Once hatched, the dragon appears with Train/Sell/Monster actions.
+5. Egg gets its own detail screen (egg image + "Hatching...", Sell + Home only). Once due it shows "Ready to hatch!" + a green **Hatch** button; tapping it hatches the dragon, which then appears with Train/Sell/Monster actions.
 
 #### B. Fighting a Monster
 1. Player selects a hatched dragon (energy > 0) on the **Dragon Detail Screen** and taps **Monster** (bottom-right).

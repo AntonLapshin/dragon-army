@@ -154,6 +154,10 @@ import {
   FIGHT_VS_H,
   FIGHT_VS_X,
   FIGHT_VS_Y,
+  HATCH_BTN_Y,
+  HATCH_TEXT_FONT,
+  HATCH_TEXT_H,
+  HATCH_TEXT_Y,
   ICON_SIZE,
   IMG_DISABLED_ALPHA,
   KEEP_BTN_X,
@@ -630,6 +634,12 @@ function confirmEgg() {
   if (_page) _page.render();
 }
 
+function hatchEgg(dragonId) {
+  const res = engine.hatchDragon(dragonId);
+  if (!res.ok) return;
+  if (_page) _page.render();
+}
+
 function startTrain(dragonId) {
   const res = engine.trainDragon(dragonId);
   if (!res.ok) return;
@@ -813,6 +823,12 @@ function renderDragon(width, view) {
    if (!egg) {
       addEnergyBar(ENERGY_BAR_X, ENERGY_BAR_Y, ENERGY_BAR_W, ENERGY_BAR_H, ASSET_ENERGY_BAR_250, view.energy, CONFIG.energy.max);
      addStrengthStars(Math.floor(width / 2), DRAGON_STARS_Y, view.strength);
+   } else if (view.canHatch) {
+     // Manual hatch: the hidden timer is due — satisfying green button tap.
+     addBadgeText(0, HATCH_TEXT_Y, width, HATCH_TEXT_H, 'Ready to hatch!', HATCH_TEXT_FONT, COLOR_SUCCESS);
+     addButton(Math.round((width - BTN_W) / 2), HATCH_BTN_Y, BTN_W, BTN_H, 'Hatch', () => hatchEgg(view.dragon.id));
+   } else {
+     addBadgeText(0, HATCH_TEXT_Y, width, HATCH_TEXT_H, 'Hatching...', HATCH_TEXT_FONT, COLOR_WHITE);
    }
 
 // Bottom action row — pinned to the very bottom (no roster strip on this

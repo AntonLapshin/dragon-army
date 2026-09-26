@@ -9,8 +9,9 @@
  * - fixed starting coins, manual Buy Egg (no auto-modal on launch)
  * - spin-then-pay egg purchase (spin preview draws the breed, "Yo hoo"
  *   deducts + adds the egg with a hidden 1–2 day hatch timer)
- * - idempotent wall-clock tick: hatching, lifespan expiry, beast respawn,
- *   monster-spawn refresh (recovery/coins/age are derived, never tick-written)
+ * - idempotent wall-clock tick: lifespan expiry, beast respawn,
+ *   monster-spawn refresh (recovery/coins/age are derived, never tick-written;
+ *   hatching is a manual tap on the green Hatch button, never automatic)
  * - tap-to-collect hourly coins (nothing credited without tapping)
  * - Train (coin cost scales with strength, random gain, drains flat energy,
  *   blocked at 0 energy)
@@ -73,6 +74,7 @@ import type {
   EconomyView,
   EggSpinPreview,
   GameState,
+  HatchResult,
   LegacySave,
   ModalKind,
   MonsterDef,
@@ -275,18 +277,8 @@ export function createGameEngine(deps: CreateEngineDeps) {
   }
 
   // -- tick: idempotent wall-clock derivations (never writes recovery) --
-
-  function hatchDueEggs(atMs: number): void {
-    const s = requireState();
-    for (const dragon of s.player.dragons) {
-      if (dragon.hatchedAtMs !== null) continue;
-      if (!isHatchDue(dragon.hatchAtMs, atMs)) continue;
-      const breed = breedForDragon(dragon);
-      const strength = rollBaseStrength(breed, rand());
-      replaceDragon(hatchDragonInstance(dragon, atMs, strength));
-      s.player.totalEggsHatched += 1;
-    }
-  }
+  // NOTE: hatching is manual (green Hatch button → hatchDragon()), never
+  // automatic — tick must NOT hatch due eggs on its own.
 
   function removeExpiredDragons(atMs: number): void {
     const s = requireState();
@@ -322,11 +314,10 @@ export function createGameEngine(deps: CreateEngineDeps) {
     }
   }
 
-  /** Advance the clock: hatch, expiry, beast respawn, spawn refresh. */
+  /** Advance the clock: expiry, beast respawn, spawn refresh (never auto-hatch). */
   function tick(atMs: number = now()): GameState {
     const s = requireState();
     s.nowMs = atMs;
-    hatchDueEggs(atMs);
     removeExpiredDragons(atMs);
     respawnBeastIfDue(atMs);
     refreshSpawnIfStale(atMs);
@@ -453,6 +444,33 @@ export function createGameEngine(deps: CreateEngineDeps) {
     return { ok: true, dragon: { ...egg } };
   }
 
+  // -- manual hatch: green Hatch button once the hidden timer is due --
+
+  /**
+   * Hatch a due egg into a dragon. Manual only — tick never calls this.
+   * Blocked while the hidden timer hasn't elapsed (`not-due`) and once
+   * already hatched (`already-hatched`).
+   */
+  function hatchDragon(dragonId: string, strengthRand01?: number): HatchResult {
+    const s = requireState();
+    const atMs = now();
+    const dragon = findDragon(dragonId);
+    if (!dragon) return { ok: false, reason: "unknown-dragon" };
+    if (dragon.hatchedAtMs !== null) {
+      return { ok: false, reason: "already-hatched" };
+    }
+    if (!isHatchDue(dragon.hatchAtMs, atMs)) {
+      return { ok: false, reason: "not-due" };
+    }
+    const breed = breedForDragon(dragon);
+    const strength = rollBaseStrength(breed, strengthRand01 ?? rand());
+    const hatched = hatchDragonInstance(dragon, atMs, strength);
+    replaceDragon(hatched);
+    s.player.totalEggsHatched += 1;
+    save();
+    return { ok: true, dragon: { ...hatched }, strength: hatched.strength };
+  }
+
   // -- hourly coins: tap-to-collect only (§3.7) --
 
   function collectibleAmount(atMs: number = now()): number {
@@ -510,6 +528,8 @@ export function createGameEngine(deps: CreateEngineDeps) {
       expired: isDragonInstanceExpired(dragon, atMs),
       canTrain: canTrainDragon(dragon, s.player.coins, atMs),
       canFight: isBeastEligible(dragon, atMs),
+      canHatch:
+        dragon.hatchedAtMs === null && isHatchDue(dragon.hatchAtMs, atMs),
     };
   }
 
@@ -939,9 +959,10 @@ export function createGameEngine(deps: CreateEngineDeps) {
     save,
     reset,
     tick,
-    // egg flow (spin-then-pay)
+    // egg flow (spin-then-pay + manual hatch)
     spinEggPreview,
     confirmEggPurchase,
+    hatchDragon,
     canBuyEgg: () =>
       canAffordEgg(requireState().player.coins) && !rosterFull(),
     // coins (tap-to-collect)

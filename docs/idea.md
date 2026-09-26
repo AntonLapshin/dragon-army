@@ -12,7 +12,7 @@ A Zepp OS / Amazfit Bip 6 game inspired by *How to Train Your Dragon*. The playe
 - Tapping **Buy Egg** opens the **Egg-Spin Purchase Modal** with a "symbol-spinning" animation (`167468123?!-+`) that changes one symbol at a time.
 - Flow is **spin-then-pay**: symbols spin → player taps anywhere on the modal to **freeze** the spinning symbols → the displayed combination determines the **egg type / breed** (randomly assigned from the 15) → player taps **"Yo hoo"** (or similar) to pay the egg price and add the egg to the collection.
 - If the balance is below the egg price, **Buy Egg is disabled/dimmed**; tapping it (or opening the modal) shows a **"Not enough coins"** state and no spin starts.
-- The egg's hatch time is **random between 1 and 2 days** (real-time), encoded at time of purchase. **No timer is shown.**
+- The egg's hatch time is **random between 1 and 2 days** (real-time), encoded at time of purchase. **No timer is shown.** Once due, the egg screen shows **"Ready to hatch!" + a green Hatch button — hatching is a manual tap, never automatic.**
 
 ## Interface Layout
 - The game consists of multiple **screens** switched by **tap-only button navigation** (roster-strip thumbnails on the main hub, Home on detail screens; no swipe).
@@ -38,7 +38,7 @@ Central hub with fixed-position icons:
 3. **Earn Coins** (bottom-left) – **Tap-to-collect hourly generation.** The icon is **only displayed when collectible coins are available**; tapping it opens the Coin-Earning Summary modal (`+X coins`) and adds the coins. Nothing is added automatically without tapping.
 
 ## Dragon Detail Screen
-Appears per dragon (or per unhatched egg). Displays at the top the dragon's **Breed (= type name, one of 15), Level (display-only tier derived from Strength via config thresholds), Age, Energy (bar/number), and Strength**. Center shows the dragon image (similar to koala); unhatched eggs show an **egg image + "Hatching..."** with no timer.
+Appears per dragon (or per unhatched egg). Displays at the top the dragon's **Breed (= type name, one of 15), Level (display-only tier derived from Strength via config thresholds), Age, Energy (bar/number), and Strength**. Center shows the dragon image (similar to koala); unhatched eggs show an **egg image + "Hatching..."** with no timer, or **"Ready to hatch!" + green Hatch button** once due.
 
 - **Breed** is revealed at spin time and shown as the dragon's name/image on its detail screen.
 - **Level** does not drive formulas directly; it is a display tier computed from Strength (config thresholds).
@@ -52,7 +52,7 @@ Appears per dragon (or per unhatched egg). Displays at the top the dragon's **Br
     - Fighting follows the same strength-+-random vs. monster-strength formula.
     - **Win → receives coins** (amount random, based on monster difficulty) **plus permanent strength gain** (Easy +1–2, Medium +2–3, Hard +3–5). No free egg.
     - **Lose → strength unchanged**; energy drained by damage taken (see Energy & Recovery).
-- **Unhatched egg screens have no Train / Sell / Monster actions**; they only display the egg until it hatches into a dragon.
+- **Unhatched egg screens have no Train / Monster actions** (Sell + Home only); they only display the egg until the user taps the green **Hatch** button once due.
 
 ## Energy & Recovery
 - Energy **drains after every battle (win or lose), proportional to damage taken** during the fight. There is no full-restore on win and no forced set-to-0 on lose — the bar simply drops by the damage amount (reaching 0 only if damage depletes it).

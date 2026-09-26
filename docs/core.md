@@ -2,13 +2,13 @@
 
 1. **Fixed start-up resources** – The player begins with a set amount of coins sufficient to purchase a single random egg. No modal auto-appears on launch; the player starts the flow manually via Buy Egg.
 2. **Random egg selection (spin-then-pay)** – Tapping Buy Egg opens a modal with a symbol-spinning animation; the player's tap freezes it and the resulting combination assigns the egg type (one of 15 possible dragons = 15 breeds). Tapping "Yo hoo" then deducts the egg price and adds the egg. Insufficient coins = Buy Egg disabled / "Not enough coins" state, no spin.
-3. **Hatch timer** – After purchase the egg hatches after 1–2 days of real time; the timer is not displayed but is encoded at purchase. The egg gets its own detail screen (egg image + "Hatching...", no actions) until hatched.
+3. **Hatch timer** – After purchase the egg is ready to hatch after 1–2 days of real time; the timer is not displayed but is encoded at purchase. The egg gets its own detail screen (egg image + "Hatching...", Sell + Home only). Once due it shows "Ready to hatch!" with a green **Hatch** button — hatching is a manual tap, never automatic.
 4. **Button navigation (no swipe)** – The UI consists of the main control screen plus one dragon detail screen per owned dragon or unhatched egg. Navigation is tap-only: the main hub has a bottom roster-strip of thumbnails, detail screens return via Home. There is no swipe/GESTURE logic (unreliable on the real device).
 5. **Main control screen hub** – Central screen holding fixed icons that open modals:
    - **Buy Egg** (top-left) – purchases a new egg via spin-then-pay; disabled when coins are insufficient.
    - **Bewilder Beast** (top-right) – always visible; opens the boss intro modal with the boss image and a **Fight** button.
    - **Earn Coins** (bottom-left) – tap-to-collect hourly generation; the icon is shown **only when collectible coins are available** and opens the coin summary modal on tap. Nothing is credited without tapping.
-6. **Dragon detail screen** – Shows a dragon's **Breed + age in the name ("Wooly Howl (2 days)"), Energy bar, and Strength stars** (5 str = 1 silver, 5 silver = 1 gold, max 125) centered below the bar, with a central image. No "Lv N · Age Nd" line. Egg screens show the egg + "Hatching..." and no actions. Hatched-dragon actions via modals:
+6. **Dragon detail screen** – Shows a dragon's **Breed + age in the name ("Wooly Howl (2 days)"), Energy bar, and Strength stars** (5 str = 1 silver, 5 silver = 1 gold, max 125) centered below the bar, with a central image. No "Lv N · Age Nd" line. Egg screens show the egg + "Hatching..." (or "Ready to hatch!" + green **Hatch** button once due) and Sell + Home only. Hatched-dragon actions via modals:
    - **Train** – costs coins (scales with dragon strength) and drains a flat 15 energy; raises strength by a random amount. Blocked at 0 energy.
    - **Sell** – returns coins based on the dragon's age, strength, energy, and breed.
    - **Monster** – opens the monster selection modal (0–3 spawned monsters).
