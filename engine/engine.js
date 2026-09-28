@@ -13,6 +13,8 @@ import {
   canTrainDragon,
   clampStrength,
   collectibleCoins,
+  collectibleStepCoins,
+  collectibleTotalCoins,
   drawBreedIndex,
   dragonStage,
   isBeastEligible,
@@ -36,6 +38,7 @@ import {
 } from "./config.js";
 import {
   advanceCollectAnchor,
+  advanceStepAnchor,
   beastTurnLogText,
   createDragonId,
   createEggDragon,
@@ -63,6 +66,7 @@ function createNewGameState(params) {
       createdAtMs: nowMs,
       lastSeenMs: nowMs,
       lastCoinCollectMs: nowMs,
+      lastCollectedSteps: 0,
       totalCoinsEarned: 0,
       totalEggsBought: 0,
       totalEggsHatched: 0,
@@ -100,6 +104,7 @@ function migrateLegacySave(raw, nowMs) {
   state.player.createdAtMs = asFiniteNumber(raw.createdAt) ?? nowMs;
   state.player.lastSeenMs = nowMs;
   state.player.lastCoinCollectMs = asFiniteNumber(raw.lastCoinCollectMs) ?? nowMs;
+  state.player.lastCollectedSteps = asFiniteNumber(raw.lastCollectedSteps) ?? 0;
   const entries = Array.isArray(raw.dragons) ? raw.dragons : [];
   state.player.dragons = entries.filter(
     (d) => typeof d === "object" && d !== null && typeof d.id === "string"
@@ -131,6 +136,9 @@ function coerceLoadedSave(raw, nowMs) {
     for (const d of state.player.dragons) {
       if (typeof d.strength === "number") d.strength = clampStrength(d.strength);
     }
+    if (asFiniteNumber(state.player.lastCollectedSteps) === null) {
+      state.player.lastCollectedSteps = 0;
+    }
     return state;
   }
   if (typeof candidate.coins === "number" && Array.isArray(candidate.dragons)) {
@@ -152,6 +160,15 @@ function createGameEngine(deps) {
   const rand = deps.rand01 ?? Math.random;
   const generateId = deps.generateId ?? createDragonId;
   const playerId = deps.playerId ?? "player-1";
+  const getStepsRaw = deps.getSteps ?? (() => 0);
+  function currentSteps() {
+    try {
+      const v = getStepsRaw();
+      return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0;
+    } catch {
+      return 0;
+    }
+  }
   let state = null;
   let fightLocked = false;
   function now() {
@@ -222,6 +239,9 @@ function createGameEngine(deps) {
     const saved = storage.load();
     if (saved && isLoadedState(saved)) {
       state = saved;
+      if (typeof state.player.lastCollectedSteps !== "number") {
+        state.player.lastCollectedSteps = 0;
+      }
       if (!state.ui) {
         state.ui = {
           currentScreen: { kind: "main" },
@@ -324,34 +344,69 @@ function createGameEngine(deps) {
     save();
     return { ok: true, dragon: { ...hatched }, strength: hatched.strength };
   }
-  function collectibleAmount(atMs = now()) {
+  function timeCollectibleAmount(atMs = now()) {
     const s = requireState();
     return collectibleCoins(Math.max(0, atMs - s.player.lastCoinCollectMs));
+  }
+  function stepCollectibleAmount() {
+    const s = requireState();
+    return collectibleStepCoins(
+      currentSteps(),
+      s.player.lastCollectedSteps
+    );
+  }
+  function collectibleAmount(atMs = now()) {
+    const s = requireState();
+    return collectibleTotalCoins(
+      Math.max(0, atMs - s.player.lastCoinCollectMs),
+      currentSteps(),
+      s.player.lastCollectedSteps
+    );
   }
   function hasCollectible(atMs = now()) {
     return collectibleAmount(atMs) > 0;
   }
   function getEconomyView(atMs = now()) {
     const s = requireState();
-    const collectible = collectibleAmount(atMs);
+    const timeCollectible = timeCollectibleAmount(atMs);
+    const stepCollectible = stepCollectibleAmount();
+    const collectible = timeCollectible + stepCollectible;
     return {
       coins: s.player.coins,
       collectible,
       hasCollectible: collectible > 0,
-      canAffordEgg: canAffordEgg(s.player.coins)
+      canAffordEgg: canAffordEgg(s.player.coins),
+      timeCollectible,
+      stepCollectible
     };
   }
   function collectCoins() {
     const s = requireState();
     const atMs = now();
-    const advanced = advanceCollectAnchor(s.player.lastCoinCollectMs, atMs);
-    if (advanced.collected > 0) {
-      s.player.coins += advanced.collected;
-      s.player.totalCoinsEarned += advanced.collected;
-      s.player.lastCoinCollectMs = advanced.newLastCollectMs;
-      save();
+    const steps = currentSteps();
+    const timeAdvanced = advanceCollectAnchor(s.player.lastCoinCollectMs, atMs);
+    const stepAdvanced = advanceStepAnchor(s.player.lastCollectedSteps, steps);
+    const collected = timeAdvanced.collected + stepAdvanced.collected;
+    let dirty = false;
+    if (timeAdvanced.collected > 0) {
+      s.player.lastCoinCollectMs = timeAdvanced.newLastCollectMs;
+      dirty = true;
     }
-    return { collected: advanced.collected };
+    if (stepAdvanced.newLastCollectedSteps !== s.player.lastCollectedSteps) {
+      s.player.lastCollectedSteps = stepAdvanced.newLastCollectedSteps;
+      dirty = true;
+    }
+    if (collected > 0) {
+      s.player.coins += collected;
+      s.player.totalCoinsEarned += collected;
+      dirty = true;
+    }
+    if (dirty) save();
+    return {
+      collected,
+      timeCoins: timeAdvanced.collected,
+      stepCoins: stepAdvanced.collected
+    };
   }
   function getDragonView(dragonId, atMs = now()) {
     const dragon = findDragon(dragonId);
@@ -730,8 +785,10 @@ function createGameEngine(deps) {
     confirmEggPurchase,
     hatchDragon,
     canBuyEgg: () => canAffordEgg(requireState().player.coins) && !rosterFull(),
-    // coins (tap-to-collect)
+    // coins (hybrid tap-to-collect: hourly + steps)
     collectibleAmount,
+    timeCollectibleAmount,
+    stepCollectibleAmount,
     hasCollectible,
     getEconomyView,
     collectCoins,

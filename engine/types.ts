@@ -183,6 +183,12 @@ export interface Player {
    * Collectible amount = `collectibleCoins(nowMs - lastCoinCollectMs)`.
    */
   lastCoinCollectMs: number;
+  /**
+   * Watch-step counter reading at the last Earn-Coins tap-collect.
+   * Step bonus = `collectibleStepCoins(currentSteps - lastCollectedSteps)`
+   * (100 steps = 1 coin, remainder preserved). Resets resync on collect.
+   */
+  lastCollectedSteps: number;
   // -- lifetime stats (progression, no gameplay effect) --
   totalCoinsEarned: number;
   totalEggsBought: number;
@@ -316,6 +322,11 @@ export interface EngineStorage {
 export interface CreateEngineDeps {
   storage: EngineStorage;
   getTime: () => number;
+  /**
+   * Watch step-counter reading (Zepp `Step.getCurrent()` / web manual
+   * adapter). Defaults to `() => 0` (no step bonus). Injected in tests.
+   */
+  getSteps?: () => number;
   /** Random source in [0,1). Defaults to Math.random. Injected in tests. */
   rand01?: Random01;
   /** Id factory (rand01, nowMs) => id. Defaults to `createDragonId`. */
@@ -430,6 +441,16 @@ export interface EconomyView {
   /** Earn Coins icon visibility: shown only when collectible > 0. */
   hasCollectible: boolean;
   canAffordEgg: boolean;
+  /** Breakdown of the hybrid total (time + steps). */
+  timeCollectible: number;
+  stepCollectible: number;
+}
+
+/** Result of tapping Earn Coins (hybrid time + step bonus). */
+export interface CollectCoinsResult {
+  collected: number;
+  timeCoins: number;
+  stepCoins: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -475,6 +496,7 @@ export interface LegacySave {
   dragons?: unknown;
   createdAt?: unknown;
   lastCoinCollectMs?: unknown;
+  lastCollectedSteps?: unknown;
   beastHp?: unknown;
   beastStatus?: unknown;
   beastRespawnAt?: unknown;

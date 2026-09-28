@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 import {
   advanceCollectAnchor,
+  advanceStepAnchor,
   appendFightLog,
   beastTurnLogText,
   createDragonId,
@@ -122,6 +123,33 @@ describe("advanceCollectAnchor", () => {
     const res = advanceCollectAnchor(0, 1000 * HOUR);
     expect(res.collected).toBe(24);
     expect(advanceCollectAnchor(5000, 1000).collected).toBe(0);
+  });
+});
+
+describe("advanceStepAnchor", () => {
+  it("collects nothing below 100 steps and keeps the anchor", () => {
+    expect(advanceStepAnchor(0, 99)).toEqual({
+      collected: 0,
+      newLastCollectedSteps: 0,
+    });
+  });
+  it("consumes whole 100-step groups and preserves the remainder", () => {
+    const res = advanceStepAnchor(0, 250);
+    expect(res.collected).toBe(2);
+    expect(res.newLastCollectedSteps).toBe(200);
+  });
+  it("tapping early loses no progress (remainder accrues next time)", () => {
+    const first = advanceStepAnchor(0, 110);
+    expect(first.collected).toBe(1);
+    const second = advanceStepAnchor(first.newLastCollectedSteps, 210);
+    expect(second.collected).toBe(1);
+    expect(second.newLastCollectedSteps).toBe(200);
+  });
+  it("resyncs on counter reset (e.g. daily rollover) with 0 collected", () => {
+    expect(advanceStepAnchor(5000, 50)).toEqual({
+      collected: 0,
+      newLastCollectedSteps: 50,
+    });
   });
 });
 

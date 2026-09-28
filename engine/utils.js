@@ -1,7 +1,13 @@
 // GENERATED from engine/utils.ts — do not edit by hand.
 // Regenerate with: npm run build:engine
 // (zeus build only bundles .js; the .ts sources are for vitest.)
-import { CONFIG, applyStrengthGain, clampStrength, collectibleCoins } from "./config.js";
+import {
+  CONFIG,
+  applyStrengthGain,
+  clampStrength,
+  collectibleCoins,
+  collectibleStepCoins
+} from "./config.js";
 function createDragonId(rand01, nowMs) {
   const randPart = Math.floor(rand01 * 36 ** 6).toString(36);
   return `dragon-${nowMs.toString(36)}-${randPart}`;
@@ -41,6 +47,25 @@ function advanceCollectAnchor(lastCoinCollectMs, nowMs) {
     newLastCollectMs: lastCoinCollectMs + intervals * CONFIG.economy.coinAccrualIntervalMs
   };
 }
+function advanceStepAnchor(lastCollectedSteps, currentSteps) {
+  if (!Number.isFinite(currentSteps) || !Number.isFinite(lastCollectedSteps)) {
+    return {
+      collected: 0,
+      newLastCollectedSteps: Number.isFinite(currentSteps) ? currentSteps : lastCollectedSteps
+    };
+  }
+  if (currentSteps < lastCollectedSteps) {
+    return { collected: 0, newLastCollectedSteps: currentSteps };
+  }
+  const collected = collectibleStepCoins(currentSteps, lastCollectedSteps);
+  if (collected <= 0) {
+    return { collected: 0, newLastCollectedSteps: lastCollectedSteps };
+  }
+  return {
+    collected,
+    newLastCollectedSteps: lastCollectedSteps + collected * CONFIG.economy.stepsPerCoin
+  };
+}
 function screensForRoster(dragonIds) {
   return [
     { kind: "main" },
@@ -58,6 +83,7 @@ function appendFightLog(log, entry) {
 }
 export {
   advanceCollectAnchor,
+  advanceStepAnchor,
   appendFightLog,
   beastTurnLogText,
   createDragonId,

@@ -8,7 +8,13 @@
  * orchestrates shapes defined in `types.ts`.
  */
 
-import { CONFIG, applyStrengthGain, clampStrength, collectibleCoins } from "./config";
+import {
+  CONFIG,
+  applyStrengthGain,
+  clampStrength,
+  collectibleCoins,
+  collectibleStepCoins,
+} from "./config";
 import type {
   CollectAdvance,
   Dragon,
@@ -100,6 +106,38 @@ export function advanceCollectAnchor(
     collected,
     newLastCollectMs:
       lastCoinCollectMs + intervals * CONFIG.economy.coinAccrualIntervalMs,
+  };
+}
+
+/**
+ * Advance the step-coin anchor to `currentSteps`. Whole 100-step groups
+ * are consumed; the leftover remainder stays so no progress is lost by
+ * tapping early. A counter reset (current < anchor, e.g. daily rollover)
+ * resyncs to current with 0 collected. Pure.
+ */
+export function advanceStepAnchor(
+  lastCollectedSteps: number,
+  currentSteps: number,
+): { collected: number; newLastCollectedSteps: number } {
+  if (!Number.isFinite(currentSteps) || !Number.isFinite(lastCollectedSteps)) {
+    return {
+      collected: 0,
+      newLastCollectedSteps: Number.isFinite(currentSteps)
+        ? currentSteps
+        : lastCollectedSteps,
+    };
+  }
+  if (currentSteps < lastCollectedSteps) {
+    return { collected: 0, newLastCollectedSteps: currentSteps };
+  }
+  const collected = collectibleStepCoins(currentSteps, lastCollectedSteps);
+  if (collected <= 0) {
+    return { collected: 0, newLastCollectedSteps: lastCollectedSteps };
+  }
+  return {
+    collected,
+    newLastCollectedSteps:
+      lastCollectedSteps + collected * CONFIG.economy.stepsPerCoin,
   };
 }
 

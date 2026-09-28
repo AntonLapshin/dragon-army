@@ -13,7 +13,10 @@ const CONFIG = {
     hourlyCoins: 2,
     coinAccrualIntervalMs: 60 * 60 * 1e3,
     maxUncollectedMs: 12 * 60 * 60 * 1e3,
-    collectRequiresTap: true
+    collectRequiresTap: true,
+    // Hybrid income: hourly coins accrue unconditionally (capped) PLUS
+    // 1 bonus coin per `stepsPerCoin` watch steps (uncapped, koala-style).
+    stepsPerCoin: 100
   },
   egg: {
     price: 100,
@@ -236,6 +239,19 @@ function collectibleCoins(elapsedMs) {
 }
 function hasCollectibleCoins(elapsedMs) {
   return collectibleCoins(elapsedMs) > 0;
+}
+function stepCoinsForSteps(stepDelta) {
+  if (!Number.isFinite(stepDelta) || stepDelta < CONFIG.economy.stepsPerCoin)
+    return 0;
+  return Math.floor(stepDelta / CONFIG.economy.stepsPerCoin);
+}
+function collectibleStepCoins(currentSteps, lastCollectedSteps) {
+  if (!Number.isFinite(currentSteps) || !Number.isFinite(lastCollectedSteps))
+    return 0;
+  return stepCoinsForSteps(currentSteps - lastCollectedSteps);
+}
+function collectibleTotalCoins(elapsedMs, currentSteps, lastCollectedSteps) {
+  return collectibleCoins(elapsedMs) + collectibleStepCoins(currentSteps, lastCollectedSteps);
 }
 function canAffordEgg(coins) {
   return coins >= CONFIG.egg.price;
@@ -506,6 +522,8 @@ export {
   clamp,
   clampStrength,
   collectibleCoins,
+  collectibleStepCoins,
+  collectibleTotalCoins,
   dragonStage,
   drawBreedIndex,
   effectiveStrength,
@@ -542,6 +560,7 @@ export {
   sellPriceForDragon,
   shouldSpawnMonster,
   starsForStrength,
+  stepCoinsForSteps,
   trainingCost,
   trainingCostForDragon,
   trainingEnergyCost

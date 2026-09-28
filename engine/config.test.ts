@@ -27,6 +27,8 @@ import {
   clamp,
   clampStrength,
   collectibleCoins,
+  collectibleStepCoins,
+  collectibleTotalCoins,
   drawBreedIndex,
   dragonStage,
   effectiveStrength,
@@ -63,6 +65,7 @@ import {
   sellPriceForDragon,
   shouldSpawnMonster,
   starsForStrength,
+  stepCoinsForSteps,
   trainingCost,
   trainingCostForDragon,
   trainingEnergyCost,
@@ -190,6 +193,54 @@ describe("economy", () => {
     it("is true once an interval elapsed", () => {
       expect(hasCollectibleCoins(HOUR)).toBe(true);
       expect(hasCollectibleCoins(10 * HOUR)).toBe(true);
+    });
+  });
+
+  describe("stepCoinsForSteps", () => {
+    it("returns 0 below 100 steps", () => {
+      expect(stepCoinsForSteps(0)).toBe(0);
+      expect(stepCoinsForSteps(99)).toBe(0);
+    });
+    it("returns 1 coin per 100 steps, floored", () => {
+      expect(stepCoinsForSteps(100)).toBe(1);
+      expect(stepCoinsForSteps(250)).toBe(2);
+      expect(stepCoinsForSteps(500)).toBe(5);
+    });
+    it("returns 0 for non-positive / non-finite deltas", () => {
+      expect(stepCoinsForSteps(-50)).toBe(0);
+      expect(stepCoinsForSteps(NaN)).toBe(0);
+    });
+    it("uses CONFIG.economy.stepsPerCoin = 100 (koala parity)", () => {
+      expect(CONFIG.economy.stepsPerCoin).toBe(100);
+    });
+  });
+
+  describe("collectibleStepCoins", () => {
+    it("floors the delta between current and anchor", () => {
+      expect(collectibleStepCoins(250, 0)).toBe(2);
+      expect(collectibleStepCoins(350, 100)).toBe(2);
+    });
+    it("returns 0 when the counter reset (current < anchor)", () => {
+      expect(collectibleStepCoins(50, 5000)).toBe(0);
+    });
+    it("returns 0 for non-finite readings", () => {
+      expect(collectibleStepCoins(NaN, 0)).toBe(0);
+      expect(collectibleStepCoins(500, NaN)).toBe(0);
+    });
+  });
+
+  describe("collectibleTotalCoins", () => {
+    it("sums capped hourly coins and the uncapped step bonus", () => {
+      expect(collectibleTotalCoins(HOUR, 250, 0)).toBe(
+        CONFIG.economy.hourlyCoins + 2,
+      );
+      expect(collectibleTotalCoins(0, 500, 0)).toBe(5);
+      expect(collectibleTotalCoins(HOUR, 50, 0)).toBe(CONFIG.economy.hourlyCoins);
+    });
+    it("does not cap the step bonus", () => {
+      expect(collectibleTotalCoins(1000 * HOUR, 100000, 0)).toBe(
+        maxUncollectedCoins() + 1000,
+      );
     });
   });
 

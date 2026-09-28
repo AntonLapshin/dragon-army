@@ -83,9 +83,9 @@
   - **Beast defeated** – "Bewilder Beast vanishes for a day. Continue adventure." Survivors keep remaining energy and each gains permanent +3–5 strength; removed dragons stay removed. Beast respawns after a day.
   - **All dragons removed** – "Defeat — roster empty. Buy a new egg. Return to Main Screen." Player buys a new egg, waiting/collecting hourly coins if broke (no game-over).
 
-#### 3.7 Coin-Earning Summary Modal (hourly, tap-to-collect)
+#### 3.7 Coin-Earning Summary Modal (hybrid time + steps, tap-to-collect)
 - Triggered only by tapping the **Earn Coins** icon (visible only when collectible coins exist).
-- Shows "+X coins added (hourly generation)". Button "Yo hoo" (or similar) credits the coins and closes the modal.
+- Shows "+X coins added (hourly generation + walking bonus)". Button "Yo hoo" (or similar) credits the coins and closes the modal.
 
 ---
 

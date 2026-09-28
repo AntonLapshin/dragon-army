@@ -51,6 +51,9 @@ export const CONFIG = {
     coinAccrualIntervalMs: 60 * 60 * 1000,
     maxUncollectedMs: 12 * 60 * 60 * 1000,
     collectRequiresTap: true,
+    // Hybrid income: hourly coins accrue unconditionally (capped) PLUS
+    // 1 bonus coin per `stepsPerCoin` watch steps (uncapped, koala-style).
+    stepsPerCoin: 100,
   },
   egg: {
     price: 100,
@@ -292,6 +295,42 @@ export function collectibleCoins(elapsedMs: number): number {
 
 export function hasCollectibleCoins(elapsedMs: number): boolean {
   return collectibleCoins(elapsedMs) > 0;
+}
+
+/** Bonus coins for a delta of watch steps since the last collect. Pure. */
+export function stepCoinsForSteps(stepDelta: number): number {
+  if (!Number.isFinite(stepDelta) || stepDelta < CONFIG.economy.stepsPerCoin)
+    return 0;
+  return Math.floor(stepDelta / CONFIG.economy.stepsPerCoin);
+}
+
+/**
+ * Collectible step bonus from the sensor counter: current reading minus
+ * the anchor stored at the last collect. Counter resets (e.g. daily
+ * rollover) yield 0 — callers resync the anchor instead. Pure.
+ */
+export function collectibleStepCoins(
+  currentSteps: number,
+  lastCollectedSteps: number,
+): number {
+  if (!Number.isFinite(currentSteps) || !Number.isFinite(lastCollectedSteps))
+    return 0;
+  return stepCoinsForSteps(currentSteps - lastCollectedSteps);
+}
+
+/**
+ * Hybrid collectible total: capped hourly coins + uncapped step bonus.
+ * Pure.
+ */
+export function collectibleTotalCoins(
+  elapsedMs: number,
+  currentSteps: number,
+  lastCollectedSteps: number,
+): number {
+  return (
+    collectibleCoins(elapsedMs) +
+    collectibleStepCoins(currentSteps, lastCollectedSteps)
+  );
 }
 
 export function canAffordEgg(coins: number): boolean {

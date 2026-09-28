@@ -58,8 +58,13 @@ interface Setup {
   getStored: () => GameState | null;
 }
 
-function setup(initial?: GameState | null, randValue = 0.5): Setup {
+function setup(
+  initial?: GameState | null,
+  randValue = 0.5,
+  stepsValue = 0,
+): Setup & { setSteps: (v: number) => void } {
   let now = T0;
+  let steps = stepsValue;
   let stored: GameState | null =
     initial === undefined
       ? null
@@ -75,12 +80,16 @@ function setup(initial?: GameState | null, randValue = 0.5): Setup {
       },
     },
     getTime: () => now,
+    getSteps: () => steps,
     rand01: () => randValue,
   });
   return {
     engine,
     setNow: (v: number) => {
       now = v;
+    },
+    setSteps: (v: number) => {
+      steps = v;
     },
     getNow: () => now,
     getStored: () =>
@@ -371,18 +380,88 @@ describe("coins", () => {
     saved.player.lastCoinCollectMs = T0 - (2 * HOUR + HOUR / 2);
     const t = setup(saved);
     t.engine.init();
-    expect(t.engine.collectCoins()).toEqual({ collected: 2 * CONFIG.economy.hourlyCoins });
+    expect(t.engine.collectCoins()).toEqual({
+      collected: 2 * CONFIG.economy.hourlyCoins,
+      timeCoins: 2 * CONFIG.economy.hourlyCoins,
+      stepCoins: 0,
+    });
     const s = t.engine.getState();
     expect(s.player.coins).toBe(CONFIG.economy.startingCoins + 2 * CONFIG.economy.hourlyCoins);
     expect(s.player.lastCoinCollectMs).toBe(T0 - HOUR / 2);
     // remainder accrues: half an hour later another hour completes
     t.setNow(T0 + HOUR / 2);
-    expect(t.engine.collectCoins()).toEqual({ collected: CONFIG.economy.hourlyCoins });
+    expect(t.engine.collectCoins()).toEqual({
+      collected: CONFIG.economy.hourlyCoins,
+      timeCoins: CONFIG.economy.hourlyCoins,
+      stepCoins: 0,
+    });
   });
   it("collect is a no-op below one interval", () => {
     ctx.engine.init();
-    expect(ctx.engine.collectCoins()).toEqual({ collected: 0 });
+    expect(ctx.engine.collectCoins()).toEqual({
+      collected: 0,
+      timeCoins: 0,
+      stepCoins: 0,
+    });
     expect(ctx.engine.hasCollectible()).toBe(false);
+  });
+  it("credits 1 coin per 100 steps on top of hourly coins", () => {
+    const saved = stateWith();
+    saved.player.lastCollectedSteps = 0;
+    const t = setup(saved, 0.5, 250);
+    t.engine.init();
+    expect(t.engine.collectibleAmount()).toBe(2);
+    expect(t.engine.getEconomyView()).toMatchObject({
+      collectible: 2,
+      hasCollectible: true,
+      timeCollectible: 0,
+      stepCollectible: 2,
+    });
+    expect(t.engine.collectCoins()).toEqual({
+      collected: 2,
+      timeCoins: 0,
+      stepCoins: 2,
+    });
+    const s = t.engine.getState();
+    expect(s.player.coins).toBe(CONFIG.economy.startingCoins + 2);
+    // remainder preserved: 50 steps carry over, next 50 complete another coin
+    expect(s.player.lastCollectedSteps).toBe(200);
+    t.setSteps(300);
+    expect(t.engine.collectCoins()).toEqual({
+      collected: 1,
+      timeCoins: 0,
+      stepCoins: 1,
+    });
+    expect(t.engine.getState().player.lastCollectedSteps).toBe(300);
+  });
+  it("sums time and step coins in one tap", () => {
+    const saved = stateWith();
+    saved.player.lastCoinCollectMs = T0 - 2 * HOUR;
+    saved.player.lastCollectedSteps = 0;
+    const t = setup(saved, 0.5, 350);
+    t.engine.init();
+    expect(t.engine.collectCoins()).toEqual({
+      collected: 2 * CONFIG.economy.hourlyCoins + 3,
+      timeCoins: 2 * CONFIG.economy.hourlyCoins,
+      stepCoins: 3,
+    });
+  });
+  it("shows the coin icon for steps alone and resyncs on counter reset", () => {
+    const saved = stateWith();
+    saved.player.lastCollectedSteps = 5000;
+    const t = setup(saved, 0.5, 5150);
+    t.engine.init();
+    expect(t.engine.hasCollectible()).toBe(true);
+    expect(t.engine.collectCoins().stepCoins).toBe(1);
+    // daily rollover: counter drops below the anchor -> resync, no payout
+    t.setSteps(20);
+    expect(t.engine.hasCollectible()).toBe(false);
+    expect(t.engine.collectCoins()).toEqual({
+      collected: 0,
+      timeCoins: 0,
+      stepCoins: 0,
+    });
+    expect(t.engine.getState().player.lastCollectedSteps).toBe(20);
   });
 });
 
@@ -817,6 +896,7 @@ describe("save migration", () => {
     expect(s?.player.createdAtMs).toBe(50);
     expect(s?.player.lastSeenMs).toBe(T0);
     expect(s?.player.lastCoinCollectMs).toBe(60);
+    expect(s?.player.lastCollectedSteps).toBe(0);
     expect(s?.player.dragons).toHaveLength(1);
     expect(s?.player.dragons[0]).toMatchObject({
       id: "d1",

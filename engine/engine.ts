@@ -42,6 +42,8 @@ import {
   canTrainDragon,
   clampStrength,
   collectibleCoins,
+  collectibleStepCoins,
+  collectibleTotalCoins,
   drawBreedIndex,
   dragonStage,
   isBeastEligible,
@@ -67,6 +69,7 @@ import type {
   BeastBattleTurn,
   BeastBattleOutcome,
   BeastState,
+  CollectCoinsResult,
   ConfirmEggResult,
   CreateEngineDeps,
   Dragon,
@@ -88,6 +91,7 @@ import type {
 } from "./types";
 import {
   advanceCollectAnchor,
+  advanceStepAnchor,
   beastTurnLogText,
   createDragonId,
   createEggDragon,
@@ -120,6 +124,7 @@ export function createNewGameState(params: NewGameStateParams): GameState {
       createdAtMs: nowMs,
       lastSeenMs: nowMs,
       lastCoinCollectMs: nowMs,
+      lastCollectedSteps: 0,
       totalCoinsEarned: 0,
       totalEggsBought: 0,
       totalEggsHatched: 0,
@@ -169,6 +174,8 @@ export function migrateLegacySave(raw: LegacySave, nowMs: number): GameState {
   state.player.createdAtMs = asFiniteNumber(raw.createdAt) ?? nowMs;
   state.player.lastSeenMs = nowMs;
   state.player.lastCoinCollectMs = asFiniteNumber(raw.lastCoinCollectMs) ?? nowMs;
+  state.player.lastCollectedSteps =
+    asFiniteNumber(raw.lastCollectedSteps) ?? 0;
   const entries = Array.isArray(raw.dragons) ? raw.dragons : [];
   state.player.dragons = entries
     .filter(
@@ -209,6 +216,10 @@ export function coerceLoadedSave(raw: unknown, nowMs: number): GameState | null 
     for (const d of state.player.dragons) {
       if (typeof d.strength === "number") d.strength = clampStrength(d.strength);
     }
+    // Backfill the step anchor for saves written before step coins existed.
+    if (asFiniteNumber(state.player.lastCollectedSteps) === null) {
+      state.player.lastCollectedSteps = 0;
+    }
     return state;
   }
   if (typeof candidate.coins === "number" && Array.isArray(candidate.dragons)) {
@@ -241,6 +252,16 @@ export function createGameEngine(deps: CreateEngineDeps) {
   const rand: Random01 = deps.rand01 ?? Math.random;
   const generateId = deps.generateId ?? createDragonId;
   const playerId = deps.playerId ?? "player-1";
+  const getStepsRaw = deps.getSteps ?? (() => 0);
+  /** Current watch-step counter reading; sensor failures count as 0. */
+  function currentSteps(): number {
+    try {
+      const v = getStepsRaw();
+      return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0;
+    } catch {
+      return 0;
+    }
+  }
 
   let state: GameState | null = null;
   /** Locked while fight turns auto-resolve (fight modals show no X). */
@@ -338,6 +359,9 @@ export function createGameEngine(deps: CreateEngineDeps) {
     const saved = storage.load();
     if (saved && isLoadedState(saved)) {
       state = saved;
+      if (typeof state.player.lastCollectedSteps !== "number") {
+        state.player.lastCollectedSteps = 0;
+      }
       if (!state.ui) {
         state.ui = {
           currentScreen: { kind: "main" },
@@ -471,11 +495,30 @@ export function createGameEngine(deps: CreateEngineDeps) {
     return { ok: true, dragon: { ...hatched }, strength: hatched.strength };
   }
 
-  // -- hourly coins: tap-to-collect only (§3.7) --
+  // -- hybrid coins: hourly (unconditional, capped) + steps (100 = 1 coin) --
+  // Both halves are tap-to-collect (§3.7): nothing is credited without
+  // tapping the Earn Coins icon.
+
+  function timeCollectibleAmount(atMs: number = now()): number {
+    const s = requireState();
+    return collectibleCoins(Math.max(0, atMs - s.player.lastCoinCollectMs));
+  }
+
+  function stepCollectibleAmount(): number {
+    const s = requireState();
+    return collectibleStepCoins(
+      currentSteps(),
+      s.player.lastCollectedSteps,
+    );
+  }
 
   function collectibleAmount(atMs: number = now()): number {
     const s = requireState();
-    return collectibleCoins(Math.max(0, atMs - s.player.lastCoinCollectMs));
+    return collectibleTotalCoins(
+      Math.max(0, atMs - s.player.lastCoinCollectMs),
+      currentSteps(),
+      s.player.lastCollectedSteps,
+    );
   }
 
   function hasCollectible(atMs: number = now()): boolean {
@@ -484,27 +527,51 @@ export function createGameEngine(deps: CreateEngineDeps) {
 
   function getEconomyView(atMs: number = now()): EconomyView {
     const s = requireState();
-    const collectible = collectibleAmount(atMs);
+    const timeCollectible = timeCollectibleAmount(atMs);
+    const stepCollectible = stepCollectibleAmount();
+    const collectible = timeCollectible + stepCollectible;
     return {
       coins: s.player.coins,
       collectible,
       hasCollectible: collectible > 0,
       canAffordEgg: canAffordEgg(s.player.coins),
+      timeCollectible,
+      stepCollectible,
     };
   }
 
-  /** Tap Earn Coins: credit accrued hourly coins, preserve partial time. */
-  function collectCoins(): { collected: number } {
+  /** Tap Earn Coins: credit hourly + step coins, preserve remainders. */
+  function collectCoins(): CollectCoinsResult {
     const s = requireState();
     const atMs = now();
-    const advanced = advanceCollectAnchor(s.player.lastCoinCollectMs, atMs);
-    if (advanced.collected > 0) {
-      s.player.coins += advanced.collected;
-      s.player.totalCoinsEarned += advanced.collected;
-      s.player.lastCoinCollectMs = advanced.newLastCollectMs;
-      save();
+    const steps = currentSteps();
+    const timeAdvanced = advanceCollectAnchor(s.player.lastCoinCollectMs, atMs);
+    const stepAdvanced = advanceStepAnchor(s.player.lastCollectedSteps, steps);
+    const collected = timeAdvanced.collected + stepAdvanced.collected;
+    // A step-counter reset (daily rollover) still resyncs the anchor even
+    // when nothing was collected.
+    let dirty = false;
+    if (timeAdvanced.collected > 0) {
+      s.player.lastCoinCollectMs = timeAdvanced.newLastCollectMs;
+      dirty = true;
     }
-    return { collected: advanced.collected };
+    if (
+      stepAdvanced.newLastCollectedSteps !== s.player.lastCollectedSteps
+    ) {
+      s.player.lastCollectedSteps = stepAdvanced.newLastCollectedSteps;
+      dirty = true;
+    }
+    if (collected > 0) {
+      s.player.coins += collected;
+      s.player.totalCoinsEarned += collected;
+      dirty = true;
+    }
+    if (dirty) save();
+    return {
+      collected,
+      timeCoins: timeAdvanced.collected,
+      stepCoins: stepAdvanced.collected,
+    };
   }
 
   // -- dragon views (§2) --
@@ -965,8 +1032,10 @@ export function createGameEngine(deps: CreateEngineDeps) {
     hatchDragon,
     canBuyEgg: () =>
       canAffordEgg(requireState().player.coins) && !rosterFull(),
-    // coins (tap-to-collect)
+    // coins (hybrid tap-to-collect: hourly + steps)
     collectibleAmount,
+    timeCollectibleAmount,
+    stepCollectibleAmount,
     hasCollectible,
     getEconomyView,
     collectCoins,

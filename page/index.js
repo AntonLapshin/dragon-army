@@ -2,6 +2,7 @@ import hmUI from '@zos/ui';
 import { DEVICE_WIDTH, DEVICE_HEIGHT } from '../utils/constants.js';
 import { storageAdapter } from '../utils/storageAdapter.js';
 import { timeAdapter } from '../utils/timeAdapter.js';
+import { sensorAdapter } from '../utils/sensorAdapter.js';
 import {
   ACTION_BOTTOM_PAD,
   ACTION_ICON_S,
@@ -303,6 +304,7 @@ const engine = createGameEngine({
     },
   },
   getTime: () => timeAdapter.getTime(),
+  getSteps: () => sensorAdapter.getSteps(),
 });
 
 // ---------------------------------------------------------------------------

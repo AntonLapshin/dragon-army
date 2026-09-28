@@ -50,7 +50,7 @@
     "en-US": "Hatch, train and battle dragons. Defeat monsters and the Bewilder Beast!"
   },
   "fullDescription": {
-    "en-US": "Dragon Army is a tap-only pet-battler for Zepp OS, inspired by How to Train Your Dragon.\n\nHatch dragon eggs, train your dragons, and fight spawn-based monsters to earn coins and permanent strength. When ready, take your whole roster into turn-based battle against the Bewilder Beast boss — survivors gain bonus strength, the fallen are removed, and the beast respawns after a day.\n\nHOW TO PLAY\n- Buy Egg (top-left): spin-then-pay — tap to freeze the spin, OK to pay 100 coins. Eggs hatch in 24-48h real time.\n- Train: costs coins (scales with strength) + 15 energy, +2-5 strength (max 125). Strength shows as stars: 5 strength = 1 silver star, 5 silver = 1 gold.\n- Fight monsters: only spawned monsters (0-3) can be fought. Wins give coins + permanent strength; losses cost energy.\n- Bewilder Beast (top-right): all dragons with energy > 0 attack in roster order; the beast hits back on energy. Win: +2-4 strength per survivor + 300 coins, beast vanishes for a day.\n- Earn Coins: hourly coins are credited only by tapping the coin icon when it appears. Energy recovers passively (10/hour).\n\nDETAILS\n- Tap-only navigation (roster strip + Home); no swipe.\n- Progress is stored on-device only; no account, no network.\n- Tested on Amazfit Bip 6 (390x450). Also supports Zepp OS 4.0+ round and square watches (see Supported devices).\n- Version 1.0.0."
+    "en-US": "Dragon Army is a tap-only pet-battler for Zepp OS, inspired by How to Train Your Dragon.\n\nHatch dragon eggs, train your dragons, and fight spawn-based monsters to earn coins and permanent strength. When ready, take your whole roster into turn-based battle against the Bewilder Beast boss — survivors gain bonus strength, the fallen are removed, and the beast respawns after a day.\n\nHOW TO PLAY\n- Buy Egg (top-left): spin-then-pay — tap to freeze the spin, OK to pay 100 coins. Eggs hatch in 24-48h real time.\n- Train: costs coins (scales with strength) + 15 energy, +2-5 strength (max 125). Strength shows as stars: 5 strength = 1 silver star, 5 silver = 1 gold.\n- Fight monsters: only spawned monsters (0-3) can be fought. Wins give coins + permanent strength; losses cost energy.\n- Bewilder Beast (top-right): all dragons with energy > 0 attack in roster order; the beast hits back on energy. Win: +2-4 strength per survivor + 300 coins, beast vanishes for a day.\n- Earn Coins: hourly coins (2/hour, up to 12h) plus a walking bonus (100 steps = 1 coin) are credited only by tapping the coin icon when it appears. Energy recovers passively (10/hour).\n\nDETAILS\n- Tap-only navigation (roster strip + Home); no swipe.\n- Progress is stored on-device only; no account, no network.\n- Tested on Amazfit Bip 6 (390x450). Also supports Zepp OS 4.0+ round and square watches (see Supported devices).\n- Version 1.0.0."
   },
   "previewScreenshots": {
     "spec": "PNG, 360x360px, transparent background, app UI maximally displayed. Rectangular (square-watch) screenshots: UI height fills 360px, centered horizontally with equal left/right transparent margins and no top/bottom margins. 3+ screenshots recommended. Source: docs/distribute App Introduction Screenshots.",
@@ -70,16 +70,17 @@
     "format": "PNG, circle, transparent surroundings"
   },
   "privacyStatement": {
-    "en-US": "Dragon Army does not collect, transmit, or share any personal data. All game progress (coins, dragons, eggs, settings) is stored locally on the watch only (device local storage, file dragon_army_data.txt) and never leaves the device. The app requests on-device permissions only (device info for runtime compatibility, local storage for save data), shows no ads, uses no analytics, requires no account, and makes no network requests. Contact: dragon-army vendor via the Zepp developer console."
+    "en-US": "Dragon Army does not collect, transmit, or share any personal data. All game progress (coins, dragons, eggs, settings) is stored locally on the watch only (device local storage, file dragon_army_data.txt) and never leaves the device. The app requests on-device permissions only (device info for runtime compatibility, local storage for save data, step counter for the walking coin bonus), shows no ads, uses no analytics, requires no account, and makes no network requests. Contact: dragon-army vendor via the Zepp developer console."
   },
   "requiredPermissions": {
-    "appJson": ["data:os.device.info", "device:os.local_storage"],
-    "consoleMapping": "In Console > Calling Permissions tick only what the app uses. Both permissions are on-device only, no user/sensor data:",
+    "appJson": ["data:os.device.info", "device:os.local_storage", "data:user.hd.step"],
+    "consoleMapping": "In Console > Calling Permissions tick only what the app uses. All permissions are on-device only:",
     "purposes": [
       { "permission": "data:os.device.info", "purpose": "Read device model/runtime info for screen compatibility. No personal data collected." },
-      { "permission": "device:os.local_storage", "purpose": "Save/load game progress locally on the watch (dragon_army_data.txt). Never transmitted." }
+      { "permission": "device:os.local_storage", "purpose": "Save/load game progress locally on the watch (dragon_army_data.txt). Never transmitted." },
+      { "permission": "data:user.hd.step", "purpose": "Read the on-device step counter for the walking coin bonus (100 steps = 1 coin). Steps never leave the device." }
     ],
-    "sensitiveData": "None — no contacts, location, health/sensor, microphone, or account data accessed. If Console offers 'None', do NOT select it: the app genuinely uses the two permissions above."
+    "sensitiveData": "Step count only (on-device, for the coin bonus) — no contacts, location, microphone, or account data accessed."
   },
   "containsThirdPartySDKs": {
     "value": false,
