@@ -1,5 +1,6 @@
 import hmUI from '@zos/ui';
-import { DEVICE_WIDTH, DEVICE_HEIGHT } from '../utils/constants.js';
+import { deviceAdapter } from '../utils/deviceAdapter.js';
+import { BG_X, BG_Y, BG_W, BG_H, DEVICE, refreshLayout } from './layouts.js';
 import { storageAdapter } from '../utils/storageAdapter.js';
 import { timeAdapter } from '../utils/timeAdapter.js';
 import { sensorAdapter } from '../utils/sensorAdapter.js';
@@ -270,8 +271,11 @@ import { createGameEngine, coerceLoadedSave } from '../engine/engine.js';
  *   save migration); the only module allowed to mutate game state.
  * - engine/types.ts   — every shared type.
  *
- * All visual constants (palette, fonts, geometry, assets) live in
- * ./index.style.js — this file holds no colors, sizes or image paths.
+ * All visual constants (palette, fonts, assets) live in ./index.style.js
+ * and all placement coordinates/sizes live in ./layouts.js (per-device
+ * tables: Bip 6 rect vs round 480x480, selected at startup via
+ * deviceAdapter.getInfo() + refreshLayout()). This file holds no colors,
+ * sizes, positions or image paths — and no device forks.
  *
  * This file keeps only presentation: widget helpers, screen rendering,
  * navigation index, and transient animation state (egg-spin frames,
@@ -763,7 +767,7 @@ function openLockedFight(base, lines, outcome, delayMs) {
 
 function renderMain(width) {
   const economy = engine.getEconomyView();
-  addImg(0, 0, width, DEVICE_HEIGHT, ASSET_BG_HOME);
+  addImg(BG_X, BG_Y, BG_W, BG_H, ASSET_BG_HOME);
 
   // Balance: large coin centered with the amount on a dark pill right below.
   const balanceCx = Math.floor(width / 2);
@@ -796,9 +800,9 @@ function renderMain(width) {
 function renderDragon(width, view) {
   const breed = view.breed;
   const egg = view.stage === 'egg';
-  addImg(0, 0, width, DEVICE_HEIGHT, ASSET_BG_DRAGON);
+  addImg(BG_X, BG_Y, BG_W, BG_H, ASSET_BG_DRAGON);
   // Dim the bright bg artwork so the dragon and UI stay visible.
-  addShade(0, 0, width, DEVICE_HEIGHT);
+  addShade(0, 0, width, DEVICE.height);
 
   if (egg) {
      // Still hatching: hide the breed so the dragon stays a surprise.
@@ -842,7 +846,7 @@ function renderDragon(width, view) {
    // Each icon uses its exact pre-scaled size (home/sell/training 84x84,
    // danger 72x72 -> rendered at ACTION_ICON_S), bottom-aligned.
    const sidePad = ACTION_SIDE_PAD;
-   const bottom = DEVICE_HEIGHT - ACTION_BOTTOM_PAD;
+   const bottom = DEVICE.height - ACTION_BOTTOM_PAD;
     if (egg) {
       const cells = [
         { src: ASSET_SELL_84, size: ACTION_ICON_S, dimmed: false, tap: () => openModal({ kind: 'sell', dragonId: view.dragon.id }) },
@@ -885,7 +889,7 @@ function renderRosterStrip(width) {
   const thumbS = ROSTER_THUMB;
   const frameS = ROSTER_FRAME;
   const left = ROSTER_LEFT;
-  const y = DEVICE_HEIGHT - thumbS - ROSTER_BOTTOM_PAD;
+  const y = DEVICE.height - thumbS - ROSTER_BOTTOM_PAD;
   const pad = Math.round((frameS - thumbS) / 2);
   let start = 0;
   let visible = list;
@@ -926,12 +930,12 @@ function renderNav(width) {
 // ---------------------------------------------------------------------------
 
 function renderModalShell(title, locked) {
-  const width = DEVICE_WIDTH;
+  const width = DEVICE.width;
   // Dim shade with a no-op tap so it also swallows clicks in the web
   // runner (where a non-clickable layer has pointer-events:none and
   // would let clicks fall through to icons behind the modal).
   // FILL_RECT with separate alpha (API 3.0+) does the dimming.
-  addShade(0, 0, width, DEVICE_HEIGHT, () => {});
+  addShade(0, 0, width, DEVICE.height, () => {});
   addRect(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, PANEL_COLOR, MODAL_RADIUS, null, PANEL_ALPHA);
   addText(PANEL_X, PANEL_Y + MODAL_TITLE_Y, PANEL_W, MODAL_TITLE_H, title, MODAL_TITLE_FONT, COLOR_WHITE);
   if (!locked) {
@@ -1206,6 +1210,10 @@ function stopTickTimer() {
 Page({
   build() {
     _page = this;
+    // Data-driven device support: pick the layout table for this watch
+    // (Bip 6 rect vs round) before the first render. All coordinates used
+    // below are live bindings onto that table — no per-device forks here.
+    refreshLayout(deviceAdapter.getInfo());
     engine.init();
     startTickTimer(this);
     this.render();
@@ -1230,7 +1238,7 @@ Page({
 
   render() {
     engine.tick();
-    const width = DEVICE_WIDTH;
+    const width = DEVICE.width;
 
     _widgets.forEach((w) => hmUI.deleteWidget(w));
     _widgets = [];

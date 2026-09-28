@@ -1,5 +1,24 @@
 # Interface.md
 
+## Multi-device layout (Bip 6 rect + round watches)
+
+- The UI has **no per-device forks**. Every coordinate/size lives in
+  `page/layouts.js` as one table per device profile: `bip6` (Amazfit Bip 6,
+  rect 390x450) and `round480` (perfectly-round 480x480 class: Active /
+  Balance / T-Rex round series; 466/454/416 rounds reuse it with extra
+  margin).
+- At startup `Page.build()` calls `refreshLayout(deviceAdapter.getInfo())`,
+  which reads `@zos/device` `getDeviceInfo()` (resolution + shape, with a
+  `deviceSource` fast-path for confirmed models) and assigns the matching
+  table onto live bindings. `page/index.js` uses those names as plain
+  constants; colors/fonts/assets stay device-independent in
+  `page/index.style.js`.
+- Round-screen rule: sizes never shrink (Zepp OS `IMG` draws 1:1 — a smaller
+  box would crop the art), only positions move inside the safe circle, and
+  the modal panel is centered (320x340) so its bottom edge matches Bip 6.
+- The web preview (`npm run dev --prefix web`) has a Device selector in the
+  debug panel to render either layout.
+
 ## Screen Layout Overview
 - The game is composed of **tap-navigated screens**: the Main Control Screen plus one Dragon Detail Screen per owned dragon or unhatched egg. There is **no swipe/GESTURE navigation** (unreliable on the real device).
 - Main hub navigation uses the bottom roster-strip thumbnails; detail screens return via **Home**.

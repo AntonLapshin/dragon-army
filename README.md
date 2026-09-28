@@ -37,8 +37,19 @@ npm run build --prefix web
 ```
 
 Project layout: `engine/` (pure rules: `config.ts`, `engine.ts`, `utils.ts`,
-`types.ts`), `page/` (Zepp OS UI), `web/` (desktop preview),
+`types.ts`), `page/` (Zepp OS UI: `index.js` screens, `index.style.js` theme,
+`layouts.js` per-device coordinates), `web/` (desktop preview),
 `docs/` (`core.md`, `interface.md`, `idea.md`, screenshot).
+
+## Supported devices
+
+- **Amazfit Bip 6** (rect 390x450) — primary, tested on-device.
+- **Round 480x480 watches** (Active / Balance / T-Rex round series;
+  466/454/416 rounds reuse the same layout) — the app detects the device via
+  `@zos/device` at startup and loads the matching coordinate table from
+  `page/layouts.js`. No UI forks: screens use the loaded coordinates as
+  constants. Preview either device in the web runner via the debug panel's
+  Device selector (`npm run dev --prefix web`).
 
 ## Balance at a glance
 

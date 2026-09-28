@@ -227,12 +227,13 @@ export function triggerRender() {
   if (_pageConfig) _pageConfig.render();
 }
 
-export function WatchPageFixed({ width, height }) {
+export function WatchPageFixed({ width, height, shape }) {
   const [widgets, setWidgets] = useState([]);
   _triggerRender = setWidgets;
 
   const w = width ?? DEVICE_WIDTH;
   const h = height ?? DEVICE_HEIGHT;
+  const round = shape === "round";
 
   useEffect(() => {
     if (!_pageConfig) return;
@@ -251,7 +252,8 @@ export function WatchPageFixed({ width, height }) {
         height: h,
         overflow: "hidden",
         flexShrink: 0,
-        borderRadius: 84,
+        backgroundColor: "#000",
+        borderRadius: round ? "50%" : 84,
         boxShadow: "0 0 0 4px #333, 0 8px 32px rgba(0,0,0,0.5)",
       }}
     >

@@ -55,6 +55,7 @@ export default defineConfig({
         [path.resolve(root, 'utils/storageAdapter.js')]: `export { storageAdapter } from '${path.resolve(webSrc, 'adapters/storageAdapter.js')}';`,
         [path.resolve(root, 'utils/sensorAdapter.js')]: `export { stepsAdapter, sensorAdapter } from '${path.resolve(webSrc, 'adapters/stepsAdapter.js')}';`,
         [path.resolve(root, 'utils/timeAdapter.js')]: `export { timeAdapter } from '${path.resolve(webSrc, 'adapters/timeAdapter.js')}';`,
+        [path.resolve(root, 'utils/deviceAdapter.js')]: `export { deviceAdapter, setDeviceOverride, clearDeviceOverride, BIP6_INFO, ROUND480_INFO } from '${path.resolve(webSrc, 'adapters/deviceAdapter.js')}';`,
       },
     }),
   ],

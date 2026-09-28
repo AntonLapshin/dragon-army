@@ -3,7 +3,7 @@ import styles from "./DebugPanel.module.css";
 import { timeAdapter } from "../adapters/timeAdapter.js";
 import { sensorAdapter } from "../adapters/stepsAdapter.js";
 
-export default function DebugPanel({ onRender }) {
+export default function DebugPanel({ onRender, deviceId, onDeviceChange }) {
   const [steps, setSteps] = useState(100);
   const [hours, setHours] = useState(1);
   const [days, setDays] = useState(1);
@@ -36,6 +36,20 @@ export default function DebugPanel({ onRender }) {
   return (
     <div className={styles.container}>
       <div className={styles.header}>Debug Panel</div>
+
+      {onDeviceChange && (
+        <div className={styles.row}>
+          <label>Device:</label>
+          <select
+            value={deviceId}
+            onChange={(e) => onDeviceChange(e.target.value)}
+            className={styles.input}
+          >
+            <option value="bip6">Bip 6 390x450</option>
+            <option value="round">Round 480x480</option>
+          </select>
+        </div>
+      )}
 
       <div className={styles.row}>
         <label>Steps:</label>
