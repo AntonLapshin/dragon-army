@@ -70,10 +70,15 @@ describe('layout tables', () => {
     expect(r).toEqual(b);
   });
 
-  it('holds only finite numbers', () => {
+  it('holds only finite numbers (plus per-device bg image sources)', () => {
     for (const L of [BIP6_LAYOUT, ROUND480_LAYOUT]) {
       for (const [k, v] of Object.entries(L)) {
-        expect(Number.isFinite(v), k).toBe(true);
+        if (k === 'BG_HOME_SRC' || k === 'BG_DRAGON_SRC') {
+          expect(typeof v, k).toBe('string');
+          expect(v.length, k).toBeGreaterThan(0);
+        } else {
+          expect(Number.isFinite(v), k).toBe(true);
+        }
       }
     }
   });
@@ -102,6 +107,17 @@ describe('layout tables', () => {
     for (const k of artBound) {
       expect(ROUND480_LAYOUT[k], k).toBe(BIP6_LAYOUT[k]);
     }
+  });
+
+  it('uses per-device background art matching the widget box', () => {
+    expect(BIP6_LAYOUT.BG_HOME_SRC).toBe('bg/bg-home_390x450.png');
+    expect(BIP6_LAYOUT.BG_DRAGON_SRC).toBe('bg/bg-dragon_390x450.png');
+    expect([BIP6_LAYOUT.BG_X, BIP6_LAYOUT.BG_Y, BIP6_LAYOUT.BG_W, BIP6_LAYOUT.BG_H])
+      .toEqual([0, 0, 390, 450]);
+    expect(ROUND480_LAYOUT.BG_HOME_SRC).toBe('bg/bg-home_480x480.png');
+    expect(ROUND480_LAYOUT.BG_DRAGON_SRC).toBe('bg/bg-dragon_480x480.png');
+    expect([ROUND480_LAYOUT.BG_X, ROUND480_LAYOUT.BG_Y, ROUND480_LAYOUT.BG_W, ROUND480_LAYOUT.BG_H])
+      .toEqual([0, 0, 480, 480]);
   });
 });
 
@@ -161,19 +177,28 @@ describe('round480 circle containment', () => {
 });
 
 describe('refreshLayout live bindings', () => {
-  it('swaps tables and restores them', () => {
-    refreshLayout({ width: 480, height: 480 });
-    expect(PANEL_W).toBe(320);
-    expect(DEVICE.profileId).toBe('round480');
-    expect(DEVICE.width).toBe(480);
-    expect(DEVICE.height).toBe(480);
-    expect(DEVICE.shape).toBe('round');
+  it('swaps tables and restores them', async () => {
+    const mRound = await import('./layouts.js');
+    mRound.refreshLayout({ width: 480, height: 480 });
+    expect(mRound.PANEL_W).toBe(320);
+    expect(mRound.BG_HOME_SRC).toBe('bg/bg-home_480x480.png');
+    expect(mRound.BG_DRAGON_SRC).toBe('bg/bg-dragon_480x480.png');
+    expect(mRound.BG_W).toBe(480);
+    expect(mRound.BG_H).toBe(480);
+    expect(mRound.DEVICE.profileId).toBe('round480');
+    expect(mRound.DEVICE.width).toBe(480);
+    expect(mRound.DEVICE.height).toBe(480);
+    expect(mRound.DEVICE.shape).toBe('round');
 
-    refreshLayout({ width: 390, height: 450 });
-    expect(PANEL_W).toBe(340);
-    expect(DEVICE.profileId).toBe('bip6');
-    expect(DEVICE.width).toBe(390);
-    expect(DEVICE.height).toBe(450);
-    expect(DEVICE.shape).toBe('rect');
+    mRound.refreshLayout({ width: 390, height: 450 });
+    expect(mRound.PANEL_W).toBe(340);
+    expect(mRound.BG_HOME_SRC).toBe('bg/bg-home_390x450.png');
+    expect(mRound.BG_DRAGON_SRC).toBe('bg/bg-dragon_390x450.png');
+    expect(mRound.BG_W).toBe(390);
+    expect(mRound.BG_H).toBe(450);
+    expect(mRound.DEVICE.profileId).toBe('bip6');
+    expect(mRound.DEVICE.width).toBe(390);
+    expect(mRound.DEVICE.height).toBe(450);
+    expect(mRound.DEVICE.shape).toBe('rect');
   });
 });

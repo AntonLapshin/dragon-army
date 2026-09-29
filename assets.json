@@ -1,9 +1,11 @@
 {
   "bg/bg-dragon.png": [
-    "390x450"
+    "390x450",
+    "480x480"
   ],
   "bg/bg-home.png": [
-    "390x450"
+    "390x450",
+    "480x480"
   ],
   "dragons/deadly_nadder.png": [
     "60x60",

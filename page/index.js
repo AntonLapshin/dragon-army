@@ -1,6 +1,6 @@
 import hmUI from '@zos/ui';
 import { deviceAdapter } from '../utils/deviceAdapter.js';
-import { BG_X, BG_Y, BG_W, BG_H, DEVICE, refreshLayout } from './layouts.js';
+import { BG_X, BG_Y, BG_W, BG_H, BG_HOME_SRC, BG_DRAGON_SRC, DEVICE, refreshLayout } from './layouts.js';
 import { storageAdapter } from '../utils/storageAdapter.js';
 import { timeAdapter } from '../utils/timeAdapter.js';
 import { sensorAdapter } from '../utils/sensorAdapter.js';
@@ -10,8 +10,6 @@ import {
   ACTION_SIDE_PAD,
   ASSET_BEAST_72,
   ASSET_BEAST_128,
-  ASSET_BG_DRAGON,
-  ASSET_BG_HOME,
   ASSET_CLOSE_36,
   ASSET_COIN_64,
   ASSET_DANGER_84,
@@ -272,10 +270,11 @@ import { createGameEngine, coerceLoadedSave } from '../engine/engine.js';
  * - engine/types.ts   — every shared type.
  *
  * All visual constants (palette, fonts, assets) live in ./index.style.js
- * and all placement coordinates/sizes live in ./layouts.js (per-device
- * tables: Bip 6 rect vs round 480x480, selected at startup via
- * deviceAdapter.getInfo() + refreshLayout()). This file holds no colors,
- * sizes, positions or image paths — and no device forks.
+ * and all placement coordinates/sizes plus background image sources live
+ * in ./layouts.js (per-device tables: Bip 6 rect vs round 480x480,
+ * selected at startup via deviceAdapter.getInfo() + refreshLayout()).
+ * This file holds no colors, sizes, positions or image paths — and no
+ * device forks.
  *
  * This file keeps only presentation: widget helpers, screen rendering,
  * navigation index, and transient animation state (egg-spin frames,
@@ -767,7 +766,7 @@ function openLockedFight(base, lines, outcome, delayMs) {
 
 function renderMain(width) {
   const economy = engine.getEconomyView();
-  addImg(BG_X, BG_Y, BG_W, BG_H, ASSET_BG_HOME);
+  addImg(BG_X, BG_Y, BG_W, BG_H, BG_HOME_SRC);
 
   // Balance: large coin centered with the amount on a dark pill right below.
   const balanceCx = Math.floor(width / 2);
@@ -800,7 +799,7 @@ function renderMain(width) {
 function renderDragon(width, view) {
   const breed = view.breed;
   const egg = view.stage === 'egg';
-  addImg(BG_X, BG_Y, BG_W, BG_H, ASSET_BG_DRAGON);
+  addImg(BG_X, BG_Y, BG_W, BG_H, BG_DRAGON_SRC);
   // Dim the bright bg artwork so the dragon and UI stay visible.
   addShade(0, 0, width, DEVICE.height);
 

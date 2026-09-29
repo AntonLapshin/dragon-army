@@ -10,9 +10,11 @@
 //
 // Rules:
 // - This file owns everything that MAY differ per device: positions, sizes,
-//   insets, slot counts. Colors, fonts, alphas, radii, asset paths and
-//   asset-intrinsic numbers (energy-bar slot map, badge heuristics) stay in
-//   ./index.style.js and are identical on all devices.
+//   insets, slot counts, plus the background image sources (BG_HOME_SRC /
+//   BG_DRAGON_SRC — 390x450 art for Bip 6, 480x480 art for round). Colors,
+//   fonts, alphas, radii, other asset paths and asset-intrinsic numbers
+//   (energy-bar slot map, badge heuristics) stay in ./index.style.js and
+//   are identical on all devices.
 // - Zepp OS IMG widgets draw 1:1 (no runtime scaling), so a layout must never
 //   size a widget box smaller than its PNG source — that would crop the art.
 //   All icon/bar/dragon sizes below are therefore identical across profiles;
@@ -53,6 +55,8 @@ const DEVICE_SOURCE_PROFILE = {
 // ---------------------------------------------------------------------------
 export const BIP6_LAYOUT = {
   BG_X: 0, BG_Y: 0, BG_W: 390, BG_H: 450,
+  BG_HOME_SRC: 'bg/bg-home_390x450.png',
+  BG_DRAGON_SRC: 'bg/bg-dragon_390x450.png',
   PANEL_X: 25, PANEL_Y: 40, PANEL_W: 340, PANEL_H: 370,
   BTN_W: 160, BTN_H: 48, BTN_CENTER_X: 90, BTN_BOTTOM_OFFSET: 70,
   MODAL_PAD: 20, MODAL_TITLE_Y: 12, MODAL_TITLE_H: 34,
@@ -118,10 +122,12 @@ export const BIP6_LAYOUT = {
 // bottom-anchored modal element lands on the same absolute Y as before.
 // ---------------------------------------------------------------------------
 export const ROUND480_LAYOUT = {
-  // round: native 390x450 art centered (45,15); full-bleed would leave an
-  // asymmetric empty strip (source is smaller than the box). TODO: add true
-  // 480x480 bg assets, then switch to (0,0,480,480).
-  BG_X: 45, BG_Y: 15, BG_W: 390, BG_H: 450,
+  // round: native 480x480 full-bleed art (see assets.json — bg-home and
+  // bg-dragon are produced in both 390x450 for Bip 6 and 480x480 for
+  // Active 3 / Balance).
+  BG_X: 0, BG_Y: 0, BG_W: 480, BG_H: 480,
+  BG_HOME_SRC: 'bg/bg-home_480x480.png',
+  BG_DRAGON_SRC: 'bg/bg-dragon_480x480.png',
   // round: centered 320x340; see module header for the corner math.
   PANEL_X: 80, PANEL_Y: 70, PANEL_W: 320, PANEL_H: 340,
   BTN_W: 160, BTN_H: 48,
@@ -254,6 +260,8 @@ export let BG_X = BIP6_LAYOUT.BG_X;
 export let BG_Y = BIP6_LAYOUT.BG_Y;
 export let BG_W = BIP6_LAYOUT.BG_W;
 export let BG_H = BIP6_LAYOUT.BG_H;
+export let BG_HOME_SRC = BIP6_LAYOUT.BG_HOME_SRC;
+export let BG_DRAGON_SRC = BIP6_LAYOUT.BG_DRAGON_SRC;
 export let PANEL_X = BIP6_LAYOUT.PANEL_X;
 export let PANEL_Y = BIP6_LAYOUT.PANEL_Y;
 export let PANEL_W = BIP6_LAYOUT.PANEL_W;
@@ -426,6 +434,8 @@ export function refreshLayout(info) {
   BG_Y = L.BG_Y;
   BG_W = L.BG_W;
   BG_H = L.BG_H;
+  BG_HOME_SRC = L.BG_HOME_SRC;
+  BG_DRAGON_SRC = L.BG_DRAGON_SRC;
   PANEL_X = L.PANEL_X;
   PANEL_Y = L.PANEL_Y;
   PANEL_W = L.PANEL_W;

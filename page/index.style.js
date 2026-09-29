@@ -225,8 +225,12 @@ export const BEAST_WARN_FONT = FONT_16;
 export const COINS_FONT = FONT_20;
 
 // ---------------------------------------------------------------------------
-// Assets (every image path used by the page)
+// Assets (every image path used by the page, except the per-device
+// backgrounds — BG_HOME_SRC / BG_DRAGON_SRC live in ./layouts.js and are
+// picked via refreshLayout(): 390x450 art for Bip 6, 480x480 art for round).
 // ---------------------------------------------------------------------------
+// Deprecated Bip 6-only aliases — prefer BG_HOME_SRC / BG_DRAGON_SRC from
+// ./layouts.js (or re-exported below), which follow the active profile.
 export const ASSET_BG_HOME = 'bg/bg-home_390x450.png';
 export const ASSET_BG_DRAGON = 'bg/bg-dragon_390x450.png';
 export const ASSET_COIN_64 = 'ui/coin_64x64.png';
@@ -279,7 +283,7 @@ export function monsterAsset72(image) {
 // device — live in ./layouts.js; nothing is duplicated here.
 // ---------------------------------------------------------------------------
 export {
-  BG_X, BG_Y, BG_W, BG_H,
+  BG_X, BG_Y, BG_W, BG_H, BG_HOME_SRC, BG_DRAGON_SRC,
   PANEL_X, PANEL_Y, PANEL_W, PANEL_H,
   BTN_W, BTN_H, BTN_CENTER_X, BTN_BOTTOM_OFFSET,
   MODAL_PAD, MODAL_TITLE_Y, MODAL_TITLE_H,
