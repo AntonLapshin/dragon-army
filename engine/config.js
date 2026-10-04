@@ -20,6 +20,9 @@ const CONFIG = {
   },
   egg: {
     price: 100,
+    // Pick-a-specific-egg price (choose mode in the Egg modal).
+    // Random spin stays at `price`; choosing a breed costs more.
+    choosePrice: 150,
     breedCount: 16,
     hatchMinMs: 24 * 60 * 60 * 1e3,
     hatchMaxMs: 48 * 60 * 60 * 1e3,
@@ -255,6 +258,9 @@ function collectibleTotalCoins(elapsedMs, currentSteps, lastCollectedSteps) {
 }
 function canAffordEgg(coins) {
   return coins >= CONFIG.egg.price;
+}
+function canAffordChosenEgg(coins) {
+  return coins >= CONFIG.egg.choosePrice;
 }
 function drawBreedIndex(rand01) {
   return Math.floor(rand01 * CONFIG.egg.breedCount);
@@ -514,6 +520,7 @@ export {
   beastCombatDefense,
   breedForDragon,
   breedForIndex,
+  canAffordChosenEgg,
   canAffordEgg,
   canDragonFight,
   canFightDragon,

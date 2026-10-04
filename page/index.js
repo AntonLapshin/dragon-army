@@ -101,6 +101,11 @@ import {
   EGG_DICE_S,
   EGG_DICE_X,
   EGG_DICE_Y,
+  EGG_CHOOSE_S,
+  EGG_CHOOSE_Y,
+  EGG_CHOOSE_BTN_Y,
+  EGG_ARROW_S,
+  EGG_ARROW_Y,
   EGG_PRICE_FONT,
   EGG_PRICE_ICON_Y,
   EGG_PRICE_TEXT_H,
@@ -588,7 +593,7 @@ function startEggSpin() {
     openModal({ kind: 'egg-spin', blocked: true, reason: gate.reason });
     return;
   }
-  _modal = { kind: 'egg-spin', blocked: false, spinning: true, symbolIdx: 0, breedIndex: null };
+  _modal = { kind: 'egg-spin', mode: 'spin', blocked: false, spinning: true, symbolIdx: 0, breedIndex: null };
   if (_page) _page.render();
   if (_spinTimer) clearInterval(_spinTimer);
   const symbols = CONFIG.ui.eggSpinSymbols;
@@ -627,6 +632,47 @@ function confirmEgg() {
   const modal = _modal;
   if (!modal || modal.kind !== 'egg-spin' || modal.blocked || modal.spinning) return;
   const res = engine.confirmEggPurchase(modal.breedIndex);
+  if (!res.ok) {
+    _modal.blocked = true;
+    _modal.reason = res.reason;
+    if (_page) _page.render();
+    return;
+  }
+  _modal = null;
+  closeTimersForScreen();
+  _screenIndex = roster().length;
+  if (_page) _page.render();
+}
+
+// Choose-a-specific-egg mode (150 coins): entered via the ">" arrow in the
+// random-spin modal. Shows the first egg (index 0); left/right arrows cycle
+// the catalogue with wrap-around; Buy deducts CONFIG.egg.choosePrice.
+function enterEggChoose() {
+  const modal = _modal;
+  if (!modal || modal.kind !== 'egg-spin' || modal.blocked) return;
+  if (!engine.canBuyChosenEgg()) return;
+  if (_spinTimer) {
+    clearInterval(_spinTimer);
+    _spinTimer = null;
+  }
+  _modal = { kind: 'egg-spin', mode: 'choose', blocked: false, spinning: false, breedIndex: null, chooseIndex: 0 };
+  if (_page) _page.render();
+}
+
+function cycleEggChoose(delta) {
+  const modal = _modal;
+  if (!modal || modal.kind !== 'egg-spin' || modal.mode !== 'choose') return;
+  const count = CONFIG.egg.breedCount;
+  const cur = typeof modal.chooseIndex === 'number' ? modal.chooseIndex : 0;
+  modal.chooseIndex = ((cur + delta) % count + count) % count;
+  if (_page) _page.render();
+}
+
+function confirmChosenEgg() {
+  const modal = _modal;
+  if (!modal || modal.kind !== 'egg-spin' || modal.mode !== 'choose') return;
+  const idx = typeof modal.chooseIndex === 'number' ? modal.chooseIndex : 0;
+  const res = engine.confirmChosenEggPurchase(idx);
   if (!res.ok) {
     _modal.blocked = true;
     _modal.reason = res.reason;
@@ -954,13 +1000,43 @@ function renderEggSpin() {
     addButton(PANEL_X + BTN_CENTER_X, PANEL_Y + PANEL_H - BTN_BOTTOM_OFFSET, BTN_W, BTN_H, 'OK', closeModal);
     return;
   }
+  // Choose mode: full-size egg (240) with left/right arrows + Buy (150).
+  // Title shows the breed name so no extra text line is needed (the 240 egg
+  // fills title-to-button exactly on both panels). X is visible so the
+  // player can always back out to the random spin (reopen via Buy Egg).
+  if (modal.mode === 'choose') {
+    const idx = typeof modal.chooseIndex === 'number' ? modal.chooseIndex : 0;
+    const breed = breedForIndex(idx);
+    renderModalShell(breed.name, false);
+    const eggS = EGG_CHOOSE_S;
+    addImg(PANEL_X + Math.floor((PANEL_W - eggS) / 2), PANEL_Y + EGG_CHOOSE_Y, eggS, eggS, eggAsset240(breed.assetKey));
+    const arrowS = EGG_ARROW_S;
+    const arrowY = PANEL_Y + EGG_ARROW_Y;
+    addButton(PANEL_X + MODAL_PAD, arrowY, arrowS, arrowS, '<', () => cycleEggChoose(-1));
+    addButton(PANEL_X + PANEL_W - MODAL_PAD - arrowS, arrowY, arrowS, arrowS, '>', () => cycleEggChoose(1));
+    if (engine.canBuyChosenEgg()) {
+      addButton(PANEL_X + BTN_CENTER_X, PANEL_Y + EGG_CHOOSE_BTN_Y, BTN_W, BTN_H, 'Buy (' + CONFIG.egg.choosePrice + ')', confirmChosenEgg);
+    } else {
+      addButton(PANEL_X + BTN_CENTER_X, PANEL_Y + EGG_CHOOSE_BTN_Y, BTN_W, BTN_H, 'Buy (' + CONFIG.egg.choosePrice + ')', null, { normal: COLOR_BTN_DISABLED });
+    }
+    return;
+  }
   renderModalShell('Get a New Egg', true);
+  // Random-spin mode: ">" arrow enters choose mode when the player can
+  // afford a specific egg (150 coins + roster room). Same 48x48 arrow,
+  // right edge mid-modal, on both the spinning and revealed states.
+  const showChooseArrow = engine.canBuyChosenEgg();
+  const chooseArrowX = PANEL_X + PANEL_W - MODAL_PAD - EGG_ARROW_S;
+  const chooseArrowY = PANEL_Y + EGG_ARROW_Y;
   if (modal.spinning) {
     // The dice is tappable too: rapid re-renders can swallow a button click
     // mid-press, so tapping anywhere on the dice also stops the spin.
     addImg(PANEL_X + EGG_DICE_X, PANEL_Y + EGG_DICE_Y, EGG_DICE_S, EGG_DICE_S, ASSET_DICE_80, stopEggSpin);
     addText(PANEL_X + MODAL_PAD, PANEL_Y + EGG_SPIN_HINT_Y, PANEL_W - MODAL_PAD * 2, EGG_SPIN_HINT_H, 'Tap Reveal to see your egg', EGG_SPIN_HINT_FONT, COLOR_MUTED);
     addButton(PANEL_X + BTN_CENTER_X, PANEL_Y + EGG_SPIN_BTN_Y, BTN_W, BTN_H, 'Reveal', stopEggSpin);
+    if (showChooseArrow) {
+      addButton(chooseArrowX, chooseArrowY, EGG_ARROW_S, EGG_ARROW_S, '>', enterEggChoose);
+    }
   } else {
     // Breed stays hidden until it hatches — show the egg, not its name.
     const breed = breedForIndex(modal.breedIndex);
@@ -968,6 +1044,9 @@ function renderEggSpin() {
     addImg(PANEL_X + Math.floor((PANEL_W - eggS) / 2), PANEL_Y + EGG_REVEAL_Y, eggS, eggS, eggAsset60(breed.assetKey));
     addCoinBig(PANEL_X + PANEL_W / 2, PANEL_Y + EGG_REVEAL_PRICE_Y, CONFIG.egg.price, PANEL_Y + EGG_REVEAL_PRICE_TEXT_Y, EGG_PRICE_TEXT_H, EGG_PRICE_FONT, COLOR_WHITE);
     addButton(PANEL_X + BTN_CENTER_X, PANEL_Y + PANEL_H - BTN_BOTTOM_OFFSET, BTN_W, BTN_H, 'OK', confirmEgg);
+    if (showChooseArrow) {
+      addButton(chooseArrowX, chooseArrowY, EGG_ARROW_S, EGG_ARROW_S, '>', enterEggChoose);
+    }
   }
 }
 

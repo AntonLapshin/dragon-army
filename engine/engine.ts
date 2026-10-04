@@ -38,6 +38,7 @@ import {
   applyStrengthGain,
   breedForDragon,
   breedForIndex,
+  canAffordChosenEgg,
   canAffordEgg,
   canTrainDragon,
   clampStrength,
@@ -454,6 +455,37 @@ export function createGameEngine(deps: CreateEngineDeps) {
     if (rosterFull()) return { ok: false, reason: "roster-full" };
     const breed = breedForIndex(breedIndex);
     s.player.coins -= CONFIG.egg.price;
+    const egg = createEggDragon({
+      id: generateId(rand(), atMs),
+      breedId: breed.id,
+      nowMs: atMs,
+      hatchDelayMs: rollHatchMs(hatchRand01 ?? rand()),
+    });
+    s.player.dragons.push(egg);
+    s.player.totalEggsBought += 1;
+    s.ui.selectedDragonId = egg.id;
+    s.ui.currentScreen = { kind: "dragon", dragonId: egg.id };
+    save();
+    return { ok: true, dragon: { ...egg } };
+  }
+
+  /**
+   * "Buy" a SPECIFIC egg from choose mode: same as confirmEggPurchase but
+   * deducts `CONFIG.egg.choosePrice` (150) instead of the random price.
+   * The breed is picked by the player via left/right arrows (chooseIndex).
+   */
+  function confirmChosenEggPurchase(
+    breedIndex: number,
+    hatchRand01?: number,
+  ): ConfirmEggResult {
+    const s = requireState();
+    const atMs = now();
+    if (!canAffordChosenEgg(s.player.coins)) {
+      return { ok: false, reason: "not-enough-coins" };
+    }
+    if (rosterFull()) return { ok: false, reason: "roster-full" };
+    const breed = breedForIndex(breedIndex);
+    s.player.coins -= CONFIG.egg.choosePrice;
     const egg = createEggDragon({
       id: generateId(rand(), atMs),
       breedId: breed.id,
@@ -1029,9 +1061,12 @@ export function createGameEngine(deps: CreateEngineDeps) {
     // egg flow (spin-then-pay + manual hatch)
     spinEggPreview,
     confirmEggPurchase,
+    confirmChosenEggPurchase,
     hatchDragon,
     canBuyEgg: () =>
       canAffordEgg(requireState().player.coins) && !rosterFull(),
+    canBuyChosenEgg: () =>
+      canAffordChosenEgg(requireState().player.coins) && !rosterFull(),
     // coins (hybrid tap-to-collect: hourly + steps)
     collectibleAmount,
     timeCollectibleAmount,

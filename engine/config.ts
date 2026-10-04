@@ -57,6 +57,9 @@ export const CONFIG = {
   },
   egg: {
     price: 100,
+    // Pick-a-specific-egg price (choose mode in the Egg modal).
+    // Random spin stays at `price`; choosing a breed costs more.
+    choosePrice: 150,
     breedCount: 16,
     hatchMinMs: 24 * 60 * 60 * 1000,
     hatchMaxMs: 48 * 60 * 60 * 1000,
@@ -335,6 +338,11 @@ export function collectibleTotalCoins(
 
 export function canAffordEgg(coins: number): boolean {
   return coins >= CONFIG.egg.price;
+}
+
+/** True when the player can afford a specific (chosen) egg (150 coins). Pure. */
+export function canAffordChosenEgg(coins: number): boolean {
+  return coins >= CONFIG.egg.choosePrice;
 }
 
 // ---------- Egg & hatch (pure) ----------
