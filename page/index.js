@@ -881,7 +881,7 @@ function renderDragon(width, view) {
    }
 
 // Bottom action row — pinned to the very bottom (no roster strip on this
-   // page). Eggs show Sell + Home; hatched dragons always show
+   // page). Eggs show Home + Sell; hatched dragons always show
    // 4 fixed slots: Home / Sell / Danger / Training, evenly spread with 20px
    // side paddings. Fixed slots keep Training pinned right when Danger is
    // unavailable. Danger is 50% opacity when no monsters wait or the dragon
@@ -894,8 +894,8 @@ function renderDragon(width, view) {
    const bottom = DEVICE.height - ACTION_BOTTOM_PAD;
     if (egg) {
       const cells = [
-        { src: ASSET_SELL_84, size: ACTION_ICON_S, dimmed: false, tap: () => openModal({ kind: 'sell', dragonId: view.dragon.id }) },
         { src: ASSET_HOME_84, size: ACTION_ICON_S, dimmed: false, tap: () => goTo(0) },
+        { src: ASSET_SELL_84, size: ACTION_ICON_S, dimmed: false, tap: () => openModal({ kind: 'sell', dragonId: view.dragon.id }) },
       ];
       const maxS = ACTION_ICON_S;
       const step = (width - sidePad * 2 - maxS) / (cells.length - 1);

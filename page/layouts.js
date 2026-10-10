@@ -98,7 +98,7 @@ export const BIP6_LAYOUT = {
   TRAIN_RESULT_LEVEL_Y: 196, TRAIN_RESULT_LEVEL_H: 30,
   SELL_ICON_S: 60, SELL_ICON_Y: 50, SELL_LABEL_Y: 120, SELL_LABEL_H: 28,
   SELL_COIN_Y: 155, SELL_COIN_TEXT_Y: 223, SELL_COIN_TEXT_H: 40,
-  SELL_BTN_W: 120, SELL_BTN_X: 40, KEEP_BTN_X: 180,
+  SELL_BTN_W: 120, SELL_BTN_X: 180, KEEP_BTN_X: 40,
   MONSTER_ROW_Y: 64, MONSTER_ROW_H: 92, MONSTER_ROW_MAX_H: 90, MONSTER_ROW_BOTTOM_PAD: 10,
   MONSTER_IMG_X: 24, MONSTER_IMG_S: 72,
   MONSTER_NAME_X: 100, MONSTER_NAME_W: 100, MONSTER_NAME_H: 28,
@@ -149,8 +149,8 @@ export const ROUND480_LAYOUT = {
   // 292..420 (top outer corners at dist ~230 < 240). OFFSET = 480-292 = 188.
   EGG_BTN_X: 60, EGG_BTN_Y: 96, EGG_BTN_S: 128,
   BEAST_BTN_OFFSET_X: 188, BEAST_BTN_Y: 96, BEAST_BTN_S: 128,
-  // round: lifted above the roster strip (frames start at abs y=304);
-  // keeps the 16px gap the Bip 6 has (icon 224..288 vs 304).
+  // round: lifted above the roster strip (frames start at abs y=314);
+  // keeps clearance above the strip (icon 224..288 vs 314).
   EARN_TEXT_Y: 196, EARN_TEXT_H: 24, EARN_ICON_S: 64, EARN_ICON_Y: 224,
   DRAGON_IMG_S: 240,
   // round: name(44..74) -> energy(96..138) -> stars(144) -> img(150..390);
@@ -169,15 +169,18 @@ export const ROUND480_LAYOUT = {
   MONSTER_STARS_Y_OFFSET: 74,
   FIGHT_STARS_Y: 130,
   // round: 84px icons stay (assets are 84x84 — smaller would crop). Row at
-  // y=316..400; side pad 80 keeps the bottom corners at d=226 < 240.
+  // y=326..410 (10px lower than before); side pad 77 is the widest the
+  // 480 circle allows at this height — bottom corners at d=~236, inside
+  // the 4px test margin. Overlap shrinks from ~5px to ~3px; a true gap
+  // needs smaller icon art, not just repositioning.
   // Feet overlap the dragon art more than on Bip 6 — same pattern (icons
   // draw on top), accepted for the curved bottom dead-zone.
-  ACTION_SIDE_PAD: 80, ACTION_BOTTOM_PAD: 80, ACTION_ICON_S: 84,
+  ACTION_SIDE_PAD: 77, ACTION_BOTTOM_PAD: 70, ACTION_ICON_S: 84,
   // round: energy slot (96) + button with a 12px gap above the action row.
   HATCH_TEXT_Y: 96, HATCH_TEXT_H: 30, HATCH_BTN_Y: 256,
   ROSTER_SLOTS: 5, ROSTER_THUMB: 60, ROSTER_FRAME: 72,
-  // round: frames at abs y=304..376, x=64..416; corners d=~229 < 240.
-  ROSTER_LEFT: 70, ROSTER_BOTTOM_PAD: 110,
+  // round: frames at abs y=314..386, x=64..416; corners d=~229 < 240.
+  ROSTER_LEFT: 70, ROSTER_BOTTOM_PAD: 100,
   EGG_BLOCKED_TEXT_Y: 90, EGG_BLOCKED_TEXT_H: 40,
   EGG_PRICE_ICON_Y: 140, EGG_PRICE_TEXT_Y: 208, EGG_PRICE_TEXT_H: 40,
   EGG_DICE_S: 80,
@@ -201,8 +204,8 @@ export const ROUND480_LAYOUT = {
   SELL_ICON_S: 60, SELL_ICON_Y: 50, SELL_LABEL_Y: 120, SELL_LABEL_H: 28,
   SELL_COIN_Y: 155, SELL_COIN_TEXT_Y: 223, SELL_COIN_TEXT_H: 40,
   SELL_BTN_W: 120,
-  // round: symmetric 30px margins (30+120+20+120+30 = 320).
-  SELL_BTN_X: 30, KEEP_BTN_X: 170,
+  // round: symmetric 30px margins (30+120+20+120+30 = 320); Sell right.
+  SELL_BTN_X: 170, KEEP_BTN_X: 30,
   // round: 52 — three 92px rows (52/144/236) fit while rowY+90 <= 330.
   MONSTER_ROW_Y: 52, MONSTER_ROW_H: 92, MONSTER_ROW_MAX_H: 90, MONSTER_ROW_BOTTOM_PAD: 10,
   MONSTER_IMG_X: 24, MONSTER_IMG_S: 72,
