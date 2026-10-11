@@ -49,6 +49,7 @@
   - **Sell** (center) – opens Sell modal.
   - **Monster** (right) – opens Monster Selection modal. Disabled at 0 energy (dragon must recover first).
 - **Home** icon (bottom row) returns to the Main Control Screen.
+- **"?" button** (small, right of the energy bar; **hatched dragons only**) – opens the Battle Record modal for this dragon.
 
 ---
 
@@ -91,7 +92,7 @@
 - **Formula:**
   - `damage = (dragonStrength + random(0–10)) – monsterConstantStrength` (constants per opponent, config-defined; beast counter-damage on Energy likewise config-defined).
 - **Outcome (monster fight):**
-  - **Win** – coins reward (random, based on difficulty) **plus permanent strength gain** (Easy +1–2, Medium +2–3, Hard +3–5). Dragon energy reduced by damage taken (no full restore).
+  - **Win** – coins reward (random, based on difficulty) **plus permanent strength gain** (Easy +1–2, Medium +2–3, Hard +3–5). Dragon energy reduced by damage taken (no full restore). The win is recorded on the dragon's battle record (see 3.8): +1 in the matching difficulty bucket and the coins added to its lifetime earnings.
   - **Lose** – strength unchanged; dragon's energy reduced by damage taken (0 only if depleted); modal note "Dragon is tired, will recover automatically". Train/Monster/Beast blocked until energy recovers.
 
 #### 3.6 Bewilder Beast Modal (from Main Control)
@@ -99,12 +100,21 @@
 - **Turn log** – each dragon attacks in roster order; modal logs "Dragon [name] deals X damage to Bewilder Beast" and retaliation; beast HP bar drains turn-by-turn as lines reveal (realtime replay — the engine resolves + persists the outcome instantly so closing mid-fight cannot reroll, but the bar only shows each turn's HP once its line appears).
 - **Dragon out** – a dragon reduced to 0 energy mid-battle is **removed from the roster**; the next dragon enters.
 - **End conditions:**
-  - **Beast defeated** – "Bewilder Beast vanishes for a day. Continue adventure." Survivors keep remaining energy and each gains permanent +3–5 strength; removed dragons stay removed. Beast respawns after a day.
+  - **Beast defeated** – "Bewilder Beast vanishes for a day. Continue adventure." Survivors keep remaining energy and each gains permanent +3–5 strength; removed dragons stay removed. Beast respawns after a day. The dragon that landed the killing blow gets +1 beast win and the reward coins on its battle record (see 3.8); other participants get no beast credit.
   - **All dragons removed** – "Defeat — roster empty. Buy a new egg. Return to Main Screen." Player buys a new egg, waiting/collecting hourly coins if broke (no game-over).
 
 #### 3.7 Coin-Earning Summary Modal (hybrid time + steps, tap-to-collect)
 - Triggered only by tapping the **Earn Coins** icon (visible only when collectible coins exist).
 - Shows "+X coins added (hourly generation + walking bonus)". Button "Yo hoo" (or similar) credits the coins and closes the modal.
+
+#### 3.8 Battle Record Modal
+- **Trigger** – the small **"?"** button on a hatched dragon's detail screen (right of the energy bar).
+- **Title** – "[Dragon Name] Record".
+- **Rows** – lifetime stats for this dragon (wins only; losses are not tracked):
+  - Easy wins / Medium wins / Hard wins – monsters defeated per difficulty.
+  - Beast wins – Bewilder Beasts this dragon finished with the killing blow.
+  - Coins earned – total coins this dragon's victories paid into the wallet.
+- Saves written before this feature get zeroed records on load (old wins are not backfilled).
 
 ---
 

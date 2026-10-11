@@ -12,6 +12,20 @@ function createDragonId(rand01, nowMs) {
   const randPart = Math.floor(rand01 * 36 ** 6).toString(36);
   return `dragon-${nowMs.toString(36)}-${randPart}`;
 }
+function freshCombatStats() {
+  return { easyWins: 0, mediumWins: 0, hardWins: 0, beastWins: 0, coinsEarned: 0 };
+}
+function normalizeCombatStats(raw) {
+  const r = typeof raw === "object" && raw !== null ? raw : {};
+  const num = (v) => typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0;
+  return {
+    easyWins: num(r.easyWins),
+    mediumWins: num(r.mediumWins),
+    hardWins: num(r.hardWins),
+    beastWins: num(r.beastWins),
+    coinsEarned: num(r.coinsEarned)
+  };
+}
 function createEggDragon(params) {
   return {
     id: params.id,
@@ -21,7 +35,8 @@ function createEggDragon(params) {
     purchasedAtMs: params.nowMs,
     hatchAtMs: params.nowMs + params.hatchDelayMs,
     hatchedAtMs: null,
-    lastEnergyUpdateMs: params.nowMs
+    lastEnergyUpdateMs: params.nowMs,
+    combatStats: freshCombatStats()
   };
 }
 function hatchDragonInstance(dragon, nowMs, baseStrength) {
@@ -88,8 +103,10 @@ export {
   beastTurnLogText,
   createDragonId,
   createEggDragon,
+  freshCombatStats,
   hatchDragonInstance,
   monsterFightLogText,
+  normalizeCombatStats,
   screensForRoster,
   withEnergyAnchor,
   withTrainingGain

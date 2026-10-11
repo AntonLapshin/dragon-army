@@ -72,6 +72,10 @@ export const BIP6_LAYOUT = {
   ENERGY_SEG_COUNT: 8,
   STAR_S: 16, STAR_GAP: 2,
   DRAGON_STARS_Y: 124,
+  // "?": battle-record button right of the energy bar (bar ends at 320).
+  STATS_BTN_S: 40, STATS_BTN_X: 328, STATS_BTN_Y: 76,
+  // Battle-record modal: 5 rows under the title, shared by both devices.
+  STATS_ROW_Y: 64, STATS_ROW_GAP: 40, STATS_ROW_H: 30,
   BEAST_STARS_Y: 130,
   MONSTER_STARS_Y_OFFSET: 74,
   FIGHT_STARS_Y: 130,
@@ -165,6 +169,11 @@ export const ROUND480_LAYOUT = {
   STAR_S: 16, STAR_GAP: 2,
   // round: bar ends at 138, same 6px gap as Bip 6.
   DRAGON_STARS_Y: 144,
+  // round: "?": right of the energy bar (bar ends at 365); worst corner
+  // (415,96) is d~=227 from center — inside the 480 circle with margin.
+  STATS_BTN_S: 40, STATS_BTN_X: 375, STATS_BTN_Y: 96,
+  // Battle-record modal: 5 rows under the title, shared by both devices.
+  STATS_ROW_Y: 64, STATS_ROW_GAP: 40, STATS_ROW_H: 30,
   BEAST_STARS_Y: 130,
   MONSTER_STARS_Y_OFFSET: 74,
   FIGHT_STARS_Y: 130,
@@ -321,6 +330,12 @@ export let ENERGY_SEG_COUNT = BIP6_LAYOUT.ENERGY_SEG_COUNT;
 export let STAR_S = BIP6_LAYOUT.STAR_S;
 export let STAR_GAP = BIP6_LAYOUT.STAR_GAP;
 export let DRAGON_STARS_Y = BIP6_LAYOUT.DRAGON_STARS_Y;
+export let STATS_BTN_S = BIP6_LAYOUT.STATS_BTN_S;
+export let STATS_BTN_X = BIP6_LAYOUT.STATS_BTN_X;
+export let STATS_BTN_Y = BIP6_LAYOUT.STATS_BTN_Y;
+export let STATS_ROW_Y = BIP6_LAYOUT.STATS_ROW_Y;
+export let STATS_ROW_GAP = BIP6_LAYOUT.STATS_ROW_GAP;
+export let STATS_ROW_H = BIP6_LAYOUT.STATS_ROW_H;
 export let BEAST_STARS_Y = BIP6_LAYOUT.BEAST_STARS_Y;
 export let MONSTER_STARS_Y_OFFSET = BIP6_LAYOUT.MONSTER_STARS_Y_OFFSET;
 export let FIGHT_STARS_Y = BIP6_LAYOUT.FIGHT_STARS_Y;
@@ -500,6 +515,12 @@ export function refreshLayout(info) {
   STAR_S = L.STAR_S;
   STAR_GAP = L.STAR_GAP;
   DRAGON_STARS_Y = L.DRAGON_STARS_Y;
+  STATS_BTN_S = L.STATS_BTN_S;
+  STATS_BTN_X = L.STATS_BTN_X;
+  STATS_BTN_Y = L.STATS_BTN_Y;
+  STATS_ROW_Y = L.STATS_ROW_Y;
+  STATS_ROW_GAP = L.STATS_ROW_GAP;
+  STATS_ROW_H = L.STATS_ROW_H;
   BEAST_STARS_Y = L.BEAST_STARS_Y;
   MONSTER_STARS_Y_OFFSET = L.MONSTER_STARS_Y_OFFSET;
   FIGHT_STARS_Y = L.FIGHT_STARS_Y;

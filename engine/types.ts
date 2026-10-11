@@ -108,9 +108,10 @@ export type DragonStage = "egg" | "hatched";
  * One owned dragon OR unhatched egg.
  *
  * STORED vs COMPUTED contract (do not add stored derived fields):
- * - Stored anchors (persist these 8): `id`, `breedId`, `strength`,
+ * - Stored anchors (persist these 9): `id`, `breedId`, `strength`,
  *   `energy` (= value AT `lastEnergyUpdateMs`, not "current"),
- *   `purchasedAtMs`, `hatchAtMs`, `hatchedAtMs`, `lastEnergyUpdateMs`.
+ *   `purchasedAtMs`, `hatchAtMs`, `hatchedAtMs`, `lastEnergyUpdateMs`,
+ *   `combatStats` (lifetime battle record, backfilled as zeros on old saves).
  * - Always computed via `config.ts` pure functions, never stored:
  *   - `stage` = `dragonStage(hatchedAtMs)` ("egg" while null, else "hatched");
  *     hatch is due when `isHatchDue(hatchAtMs, nowMs)`.
@@ -152,6 +153,30 @@ export interface Dragon {
    * passive recovery must NOT tick-write, it is derived.
    */
   lastEnergyUpdateMs: number;
+  /**
+   * Lifetime battle record for this dragon: monster wins by difficulty,
+   * Bewilder Beast kills (killing blow), and coins earned from victories.
+   * Incremented only on wins; losses change nothing.
+   */
+  combatStats: DragonCombatStats;
+}
+
+/**
+ * Per-dragon lifetime battle record. All counters start at 0 for new eggs
+ * and are backfilled as zeros when loading saves written before this field
+ * existed. Wins only — losses are not tracked per dragon.
+ */
+export interface DragonCombatStats {
+  /** Monsters defeated at Easy difficulty. */
+  easyWins: number;
+  /** Monsters defeated at Medium difficulty. */
+  mediumWins: number;
+  /** Monsters defeated at Hard difficulty. */
+  hardWins: number;
+  /** Bewilder Beasts defeated (this dragon landed the killing blow). */
+  beastWins: number;
+  /** Total coins this dragon's victories paid into the player wallet. */
+  coinsEarned: number;
 }
 
 // ---------------------------------------------------------------------------

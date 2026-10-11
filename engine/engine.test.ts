@@ -14,6 +14,7 @@ import {
   migrateLegacySave,
 } from "./engine";
 import type { Dragon, GameState } from "./types";
+import { freshCombatStats } from "./utils";
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -33,6 +34,7 @@ function hatchedDragon(over: Partial<Dragon> = {}): Dragon {
     hatchAtMs: T0,
     hatchedAtMs: T0,
     lastEnergyUpdateMs: T0,
+    combatStats: freshCombatStats(),
     ...over,
   };
 }
@@ -47,6 +49,7 @@ function eggDragon(over: Partial<Dragon> = {}): Dragon {
     hatchAtMs: T0 + 2 * DAY,
     hatchedAtMs: null,
     lastEnergyUpdateMs: T0,
+    combatStats: freshCombatStats(),
     ...over,
   };
 }
@@ -656,6 +659,54 @@ describe("monsters", () => {
     expect(s.player.dragons[0].strength).toBe(res.strengthAfter);
     expect(s.ui.fightLog).toHaveLength(1);
   });
+  it("wins record the per-dragon battle stats (difficulty bucket + coins)", () => {
+    // Easy (MONSTERS[0]), Medium (MONSTERS[1]), Hard (MONSTERS[2]).
+    for (const [idx, bucket] of [
+      [0, "easyWins"],
+      [1, "mediumWins"],
+      [2, "hardWins"],
+    ] as const) {
+      const saved = stateWith([hatchedDragon({ id: "d", strength: 100 })]);
+      saved.monsterSpawn = { spawned: [{ ...MONSTERS[idx] }], lastRefreshMs: T0 };
+      const t = setup(saved);
+      t.engine.init();
+      const res = t.engine.fightMonster("d", MONSTERS[idx].id, {
+        bonusRand01: 0.999,
+        rewardRand01: 0,
+        energyRand01: 0,
+        strengthRand01: 0,
+      });
+      expect(res.ok).toBe(true);
+      if (!res.ok) continue;
+      expect(res.won).toBe(true);
+      const stats = t.engine.getState().player.dragons[0].combatStats;
+      expect(stats[bucket]).toBe(1);
+      expect(stats.coinsEarned).toBe(res.coinReward);
+      const other = (["easyWins", "mediumWins", "hardWins"] as const).filter(
+        (b) => b !== bucket,
+      );
+      for (const b of other) expect(stats[b]).toBe(0);
+      expect(stats.beastWins).toBe(0);
+    }
+  });
+  it("losses leave the per-dragon battle stats untouched", () => {
+    const saved = stateWith([hatchedDragon({ id: "d", strength: 1 })]);
+    saved.monsterSpawn = { spawned: [{ ...MONSTERS[2] }], lastRefreshMs: T0 };
+    const t = setup(saved);
+    t.engine.init();
+    const res = t.engine.fightMonster("d", MONSTERS[2].id, {
+      bonusRand01: 0,
+      rewardRand01: 0.5,
+      energyRand01: 0,
+      strengthRand01: 0.999,
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.won).toBe(false);
+    expect(t.engine.getState().player.dragons[0].combatStats).toEqual(
+      freshCombatStats(),
+    );
+  });
   it("losses: no reward, strength unchanged, loss counter bumps", () => {
     const saved = stateWith([hatchedDragon({ id: "d", strength: 1 })]);
     saved.monsterSpawn = { spawned: [{ ...MONSTERS[2] }], lastRefreshMs: T0 };
@@ -805,6 +856,33 @@ describe("beast", () => {
     expect(s.beast.respawnAtMs).toBe(T0 + CONFIG.beast.respawnAfterWinMs);
     expect(s.player.dragons.find((d) => d.id === "d1")?.strength).toBeGreaterThan(100);
   });
+  it("wins credit the killing blow (and only it) to one dragon's battle stats", () => {
+    const saved = stateWith([
+      hatchedDragon({ id: "d1", strength: 100 }),
+      hatchedDragon({ id: "d2", strength: 100 }),
+    ]);
+    saved.beast.currentHp = 10;
+    const t = setup(saved, 0.5);
+    t.engine.init();
+    const res = t.engine.fightBeast();
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.won).toBe(true);
+    expect(res.turns).toHaveLength(1); // d1 lands the killing blow
+    const s = t.engine.getState();
+    const killer = s.player.dragons.find((d) => d.id === "d1")?.combatStats;
+    expect(killer).toMatchObject({
+      easyWins: 0,
+      mediumWins: 0,
+      hardWins: 0,
+      beastWins: 1,
+      coinsEarned: res.reward,
+    });
+    // d2 never stepped in: no beast win, no coins attributed.
+    expect(s.player.dragons.find((d) => d.id === "d2")?.combatStats).toEqual(
+      freshCombatStats(),
+    );
+  });
   it("losses: drained dragons removed, beast HP persists, no gains", () => {
     const saved = stateWith([hatchedDragon({ id: "weak", strength: 1, energy: 10 })]);
     const t = setup(saved, 0.5);
@@ -866,6 +944,34 @@ describe("save migration", () => {
     const saved = stateWith([hatchedDragon()]);
     expect(coerceLoadedSave(saved, T0)).toBe(saved);
   });
+  it("backfills combatStats on engine-shaped saves written before the field", () => {
+    const saved = stateWith([hatchedDragon()]);
+    // Simulate a pre-feature save: strip the field entirely.
+    const raw = JSON.parse(JSON.stringify(saved)) as GameState;
+    delete (raw.player.dragons[0] as Partial<Dragon>).combatStats;
+    const s = coerceLoadedSave(raw, T0);
+    expect(s?.player.dragons[0].combatStats).toEqual(freshCombatStats());
+  });
+  it("normalizes partial / corrupt combatStats blobs from old saves", () => {
+    const saved = stateWith([hatchedDragon()]);
+    const raw = JSON.parse(JSON.stringify(saved)) as unknown as {
+      player: { dragons: Array<Record<string, unknown>> };
+    };
+    raw.player.dragons[0].combatStats = {
+      easyWins: 3,
+      mediumWins: -2,
+      hardWins: "lots",
+      beastWins: 1.9,
+    };
+    const s = coerceLoadedSave(raw, T0);
+    expect(s?.player.dragons[0].combatStats).toEqual({
+      easyWins: 3,
+      mediumWins: 0,
+      hardWins: 0,
+      beastWins: 1,
+      coinsEarned: 0,
+    });
+  });
   it("migrates the legacy page-owned shape", () => {
     const legacy = {
       coins: 55,
@@ -907,6 +1013,7 @@ describe("save migration", () => {
       hatchAtMs: 200,
       hatchedAtMs: 300,
       lastEnergyUpdateMs: 400,
+      combatStats: freshCombatStats(),
     });
     expect(s?.beast).toMatchObject({
       currentHp: 123,

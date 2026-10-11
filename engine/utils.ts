@@ -18,6 +18,7 @@ import {
 import type {
   CollectAdvance,
   Dragon,
+  DragonCombatStats,
   FightLogEntry,
   NewEggParams,
   ScreenRef,
@@ -39,6 +40,31 @@ export function createDragonId(rand01: number, nowMs: number): string {
 // Roster-entry factories / immutable updates (pure)
 // ---------------------------------------------------------------------------
 
+/** Zeroed lifetime battle record for a fresh egg. Pure. */
+export function freshCombatStats(): DragonCombatStats {
+  return { easyWins: 0, mediumWins: 0, hardWins: 0, beastWins: 0, coinsEarned: 0 };
+}
+
+/**
+ * Coerce an unknown (possibly absent / partial) combat-stats blob from an
+ * old save into a valid record. Pure — used by save migration.
+ */
+export function normalizeCombatStats(raw: unknown): DragonCombatStats {
+  const r = (typeof raw === "object" && raw !== null ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  const num = (v: unknown): number =>
+    typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0;
+  return {
+    easyWins: num(r.easyWins),
+    mediumWins: num(r.mediumWins),
+    hardWins: num(r.hardWins),
+    beastWins: num(r.beastWins),
+    coinsEarned: num(r.coinsEarned),
+  };
+}
+
 /**
  * Fresh unhatched egg: strength 0, full-energy anchor, hidden hatch timer.
  * Pure.
@@ -53,6 +79,7 @@ export function createEggDragon(params: NewEggParams): Dragon {
     hatchAtMs: params.nowMs + params.hatchDelayMs,
     hatchedAtMs: null,
     lastEnergyUpdateMs: params.nowMs,
+    combatStats: freshCombatStats(),
   };
 }
 

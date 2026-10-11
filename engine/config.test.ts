@@ -96,6 +96,7 @@ const stubDragon = (over: Partial<Dragon> = {}): Dragon => ({
   hatchAtMs: 0,
   hatchedAtMs: 0,
   lastEnergyUpdateMs: 0,
+  combatStats: { easyWins: 0, mediumWins: 0, hardWins: 0, beastWins: 0, coinsEarned: 0 },
   ...over,
 });
 

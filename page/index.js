@@ -1,6 +1,6 @@
 import hmUI from '@zos/ui';
 import { deviceAdapter } from '../utils/deviceAdapter.js';
-import { BG_X, BG_Y, BG_W, BG_H, BG_HOME_SRC, BG_DRAGON_SRC, DEVICE, refreshLayout } from './layouts.js';
+import { BG_X, BG_Y, BG_W, BG_H, BG_HOME_SRC, BG_DRAGON_SRC, DEVICE, refreshLayout, STATS_BTN_S, STATS_BTN_X, STATS_BTN_Y, STATS_ROW_Y, STATS_ROW_GAP, STATS_ROW_H } from './layouts.js';
 import { storageAdapter } from '../utils/storageAdapter.js';
 import { timeAdapter } from '../utils/timeAdapter.js';
 import { sensorAdapter } from '../utils/sensorAdapter.js';
@@ -874,6 +874,9 @@ function renderDragon(width, view) {
    if (!egg) {
       addEnergyBar(ENERGY_BAR_X, ENERGY_BAR_Y, ENERGY_BAR_W, ENERGY_BAR_H, ASSET_ENERGY_BAR_250, view.energy, CONFIG.energy.max);
      addStrengthStars(Math.floor(width / 2), DRAGON_STARS_Y, view.strength);
+     // Battle record: small "?" button right of the energy bar opens the
+     // per-dragon combat-stats modal (wins by difficulty + coins earned).
+     addButton(STATS_BTN_X, STATS_BTN_Y, STATS_BTN_S, STATS_BTN_S, '?', () => openModal({ kind: 'combat-stats', dragonId: view.dragon.id }));
    } else if (view.canHatch) {
      // Manual hatch: the hidden timer is due — satisfying green button tap.
      addBadgeText(0, HATCH_TEXT_Y, width, HATCH_TEXT_H, 'Ready to hatch!', HATCH_TEXT_FONT, COLOR_SUCCESS);
@@ -1250,6 +1253,31 @@ function renderCoinSummary() {
   });
 }
 
+function renderCombatStats() {
+  const view = engine.getDragonView(_modal.dragonId);
+  if (!view || view.stage === 'egg') {
+    closeModal();
+    return;
+  }
+  // coerceLoadedSave backfills old saves, but guard anyway so a dragon
+  // object built outside the engine can never crash this modal.
+  const stats = view.dragon.combatStats || { easyWins: 0, mediumWins: 0, hardWins: 0, beastWins: 0, coinsEarned: 0 };
+  renderModalShell(view.breed.name + ' Record', false);
+  const rows = [
+    ['Easy wins', String(stats.easyWins), COLOR_WHITE],
+    ['Medium wins', String(stats.mediumWins), COLOR_WHITE],
+    ['Hard wins', String(stats.hardWins), COLOR_WHITE],
+    ['Beast wins', String(stats.beastWins), COLOR_WHITE],
+    ['Coins earned', '+' + stats.coinsEarned, COLOR_COIN],
+  ];
+  rows.forEach(([label, value, color], i) => {
+    const y = PANEL_Y + STATS_ROW_Y + i * STATS_ROW_GAP;
+    addText(PANEL_X + MODAL_PAD, y, PANEL_W / 2, STATS_ROW_H, label, TRAIN_RESULT_GAIN_FONT, COLOR_MUTED, hmUI.align.LEFT);
+    addText(PANEL_X + PANEL_W / 2, y, PANEL_W / 2 - MODAL_PAD, STATS_ROW_H, value, TRAIN_RESULT_GAIN_FONT, color, hmUI.align.RIGHT);
+  });
+  addButton(PANEL_X + BTN_CENTER_X, PANEL_Y + PANEL_H - BTN_BOTTOM_OFFSET, BTN_W, BTN_H, 'OK', closeModal);
+}
+
 function renderModal() {
   if (!_modal) return;
   switch (_modal.kind) {
@@ -1262,6 +1290,7 @@ function renderModal() {
     case 'beast-intro': renderBeastIntro(); break;
     case 'beast-fight': renderBeastFight(); break;
     case 'coin-summary': renderCoinSummary(); break;
+    case 'combat-stats': renderCombatStats(); break;
     default: break;
   }
 }

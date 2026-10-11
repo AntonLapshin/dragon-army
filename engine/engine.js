@@ -43,8 +43,10 @@ import {
   beastTurnLogText,
   createDragonId,
   createEggDragon,
+  freshCombatStats,
   hatchDragonInstance,
   monsterFightLogText,
+  normalizeCombatStats,
   screensForRoster,
   withEnergyAnchor,
   withTrainingGain
@@ -119,7 +121,8 @@ function migrateLegacySave(raw, nowMs) {
     purchasedAtMs: asFiniteNumber(d.purchasedAt) ?? nowMs,
     hatchAtMs: asFiniteNumber(d.hatchAt) ?? nowMs,
     hatchedAtMs: asFiniteNumber(d.hatchedAt),
-    lastEnergyUpdateMs: asFiniteNumber(d.energyTs) ?? nowMs
+    lastEnergyUpdateMs: asFiniteNumber(d.energyTs) ?? nowMs,
+    combatStats: freshCombatStats()
   }));
   state.beast.currentHp = asFiniteNumber(raw.beastHp) ?? CONFIG.beast.hp;
   state.beast.status = raw.beastStatus === "vanished" ? "vanished" : "alive";
@@ -136,6 +139,7 @@ function coerceLoadedSave(raw, nowMs) {
     const state = candidate;
     for (const d of state.player.dragons) {
       if (typeof d.strength === "number") d.strength = clampStrength(d.strength);
+      d.combatStats = normalizeCombatStats(d.combatStats);
     }
     if (asFiniteNumber(state.player.lastCollectedSteps) === null) {
       state.player.lastCollectedSteps = 0;
@@ -595,11 +599,19 @@ function createGameEngine(deps) {
         rolls?.strengthRand01 ?? rand()
       );
       const strengthAfter = applyStrengthGain(dragon.strength, result.strengthGain);
+      const stats = normalizeCombatStats(dragon.combatStats);
+      if (result.won) {
+        if (target.difficulty === "Easy") stats.easyWins += 1;
+        else if (target.difficulty === "Medium") stats.mediumWins += 1;
+        else stats.hardWins += 1;
+        stats.coinsEarned += result.coinReward;
+      }
       replaceDragon({
         ...dragon,
         strength: strengthAfter,
         energy: result.energyAfter,
-        lastEnergyUpdateMs: atMs
+        lastEnergyUpdateMs: atMs,
+        combatStats: stats
       });
       if (result.won) {
         s.player.coins += result.coinReward;
@@ -678,6 +690,7 @@ function createGameEngine(deps) {
       const finalEnergies = /* @__PURE__ */ new Map();
       let turnIndex = 0;
       let defeated = false;
+      let killerId = null;
       s.ui.activeModal = "beast-fight";
       s.ui.fightLog = [];
       for (const participant of lineup) {
@@ -711,6 +724,7 @@ function createGameEngine(deps) {
           });
           if (turn.beastDefeated) {
             defeated = true;
+            killerId = participant.id;
             break;
           }
           if (turn.dragonRemoved) {
@@ -741,11 +755,17 @@ function createGameEngine(deps) {
         if (defeated) {
           const gain = rollBeastWinStrengthGain(rand());
           strengthGains[id] = gain;
+          const stats = normalizeCombatStats(current.combatStats);
+          if (id === killerId) {
+            stats.beastWins += 1;
+            stats.coinsEarned += reward;
+          }
           replaceDragon({
             ...current,
             strength: applyStrengthGain(current.strength, gain),
             energy,
-            lastEnergyUpdateMs: atMs
+            lastEnergyUpdateMs: atMs,
+            combatStats: stats
           });
         } else {
           replaceDragon(withEnergyAnchor(current, energy, atMs));

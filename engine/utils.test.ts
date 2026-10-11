@@ -12,8 +12,10 @@ import {
   beastTurnLogText,
   createDragonId,
   createEggDragon,
+  freshCombatStats,
   hatchDragonInstance,
   monsterFightLogText,
+  normalizeCombatStats,
   screensForRoster,
   withEnergyAnchor,
   withTrainingGain,
@@ -32,6 +34,7 @@ const stubDragon = (over: Partial<Dragon> = {}): Dragon => ({
   hatchAtMs: HOUR,
   hatchedAtMs: null,
   lastEnergyUpdateMs: 0,
+  combatStats: freshCombatStats(),
   ...over,
 });
 
@@ -65,7 +68,44 @@ describe("createEggDragon", () => {
       hatchAtMs: 5000 + HOUR,
       hatchedAtMs: null,
       lastEnergyUpdateMs: 5000,
+      combatStats: freshCombatStats(),
     });
+  });
+});
+
+describe("combat stats helpers", () => {
+  it("freshCombatStats returns a zeroed record", () => {
+    expect(freshCombatStats()).toEqual({
+      easyWins: 0,
+      mediumWins: 0,
+      hardWins: 0,
+      beastWins: 0,
+      coinsEarned: 0,
+    });
+  });
+  it("normalizeCombatStats backfills missing fields as zeros", () => {
+    expect(normalizeCombatStats(undefined)).toEqual(freshCombatStats());
+    expect(normalizeCombatStats(null)).toEqual(freshCombatStats());
+    expect(normalizeCombatStats({ easyWins: 2 })).toEqual({
+      ...freshCombatStats(),
+      easyWins: 2,
+    });
+  });
+  it("normalizeCombatStats rejects negative / non-numeric / fractional values", () => {
+    expect(
+      normalizeCombatStats({
+        easyWins: -5,
+        mediumWins: "3",
+        hardWins: NaN,
+        beastWins: 2.7,
+        coinsEarned: Infinity,
+      }),
+    ).toEqual({ ...freshCombatStats(), beastWins: 2 });
+  });
+  it("normalizeCombatStats does not mutate its input", () => {
+    const raw = { easyWins: 1 };
+    normalizeCombatStats(raw);
+    expect(raw).toEqual({ easyWins: 1 });
   });
 });
 
