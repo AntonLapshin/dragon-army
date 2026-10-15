@@ -18,7 +18,7 @@
  *   gaps; tick loops must be idempotent (no per-day write jobs).
  *
  * NOTES:
- * - Egg draw is uniform over the 15 breeds (`drawBreedIndex`); the old
+ * - Egg draw is uniform over the 16 breeds (`drawBreedIndex`); the old
  *   per-breed `eggWeight` field was removed (all weights were 1).
  * - Lifespan is per-breed (`DragonBreed.lifespanDays`, 30-45d; cheaper/
  *   weaker breeds live longer, epics shortest). There is no global maxAge.

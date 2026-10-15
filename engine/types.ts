@@ -289,13 +289,6 @@ export interface Player {
   totalDragonsSold: number;
 }
 
-/** Initial-value factory shape (caller supplies ids/timestamps). */
-export interface NewPlayerParams {
-  id: string;
-  coins: number;
-  nowMs: number;
-}
-
 // ---------------------------------------------------------------------------
 // GameState — current global game state (persistent + transient runtime)
 // ---------------------------------------------------------------------------
@@ -598,20 +591,6 @@ export interface CollectAdvance {
 // ---------------------------------------------------------------------------
 // Legacy save (page-owned shape from before the engine refactor)
 // ---------------------------------------------------------------------------
-
-/** One entry of the pre-engine `{ coins, dragons }` persisted shape. */
-export interface LegacyDragonEntry {
-  id?: unknown;
-  breedIdx?: unknown;
-  strength?: unknown;
-  energy?: unknown;
-  purchasedAt?: unknown;
-  hatchAt?: unknown;
-  hatchedAt?: unknown;
-  energyTs?: unknown;
-  equipment?: unknown;
-  combatStats?: unknown;
-}
 
 /** Pre-engine persisted shape (migrated on load, never written). */
 export interface LegacySave {

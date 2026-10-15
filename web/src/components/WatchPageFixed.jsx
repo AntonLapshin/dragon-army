@@ -287,7 +287,3 @@ export function _setPageConfigFixed(config) {
 
   _pageConfig = config;
 }
-
-export function getPageConfig() {
-  return _pageConfig;
-}
