@@ -21,7 +21,6 @@ import type {
   DragonCombatStats,
   DragonEquipment,
   EquipmentSlotId,
-  FightLogEntry,
   NewEggParams,
   ScreenRef,
 } from "./types";
@@ -240,12 +239,4 @@ export function beastTurnLogText(
   counterDamage: number,
 ): string {
   return `Dragon ${dragonName} deals ${Math.max(0, rawDamage)} damage to Bewilder Beast (retaliation ${counterDamage}).`;
-}
-
-/** Append-only log helper returning a new array. Pure. */
-export function appendFightLog(
-  log: FightLogEntry[],
-  entry: FightLogEntry,
-): FightLogEntry[] {
-  return [...log, entry];
 }

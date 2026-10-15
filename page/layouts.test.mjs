@@ -197,6 +197,26 @@ describe('round480 circle containment', () => {
   });
 });
 
+describe('refreshLayout covers every table key', () => {
+  it('assigns all of each table onto the live bindings (no drift)', async () => {
+    const m = await import('./layouts.js');
+    for (const [profileId, table] of [
+      ['bip6', BIP6_LAYOUT],
+      ['round480', ROUND480_LAYOUT],
+    ]) {
+      const info = profileId === 'round480'
+        ? { width: 480, height: 480 }
+        : { width: 390, height: 450 };
+      m.refreshLayout(info);
+      for (const [key, value] of Object.entries(table)) {
+        expect(m[key], `${profileId}.${key}`).toBe(value);
+      }
+    }
+    // Restore the default profile for any test running after this one.
+    m.refreshLayout({ width: 390, height: 450 });
+  });
+});
+
 describe('refreshLayout live bindings', () => {
   it('swaps tables and restores them', async () => {
     const mRound = await import('./layouts.js');

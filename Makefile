@@ -1,4 +1,11 @@
-.PHONY: data bg misc sprites scale optimize zepp clean help
+.PHONY: data bg misc sprites scale optimize zepp clean check help
+
+# Guard: engine/*.js are generated from engine/*.ts (zeus bundles .js
+# only). Regenerate and fail if the committed .js was stale.
+check:
+	npm test
+	npm run build:engine
+	git diff --quiet -- engine/
 
 # Full data pipeline: raw/ -> assets/ -> assets/default.{b,r,s}
 data: frame icon bg misc sprites coin energy_bar stars equipment scale optimize zepp
@@ -78,7 +85,7 @@ clean:
 help:
 	@echo "Targets:"
 	@echo "  make data      - full pipeline: icon + bg + misc + sprites + scale + optimize + zepp"
-	@echo "  make icon      - copy icon raw/ -> assets/"
+	@echo "  make check     - tests + regenerate engine JS (fails if .js is stale)"
 	@echo "  make icon      - copy icon raw/ -> assets/"
 	@echo "  make bg        - copy backgrounds raw/ -> assets/bg/"
 	@echo "  make misc      - copy shadow raw/ -> assets/misc/"

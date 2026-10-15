@@ -8,7 +8,6 @@ import { describe, expect, it } from "vitest";
 import {
   advanceCollectAnchor,
   advanceStepAnchor,
-  appendFightLog,
   beastTurnLogText,
   createDragonId,
   createEggDragon,
@@ -24,7 +23,7 @@ import {
   withTrainingGain,
 } from "./utils";
 import { CONFIG } from "./config";
-import type { Dragon, FightLogEntry } from "./types";
+import type { Dragon } from "./types";
 
 const HOUR = 60 * 60 * 1000;
 
@@ -254,18 +253,5 @@ describe("fight-log text", () => {
     expect(beastTurnLogText("Gronkle", 12, 20)).toContain("12");
     expect(beastTurnLogText("Gronkle", -5, 20)).toContain("0 damage");
     expect(beastTurnLogText("Gronkle", 12, 20)).toContain("Bewilder Beast");
-  });
-  it("appendFightLog returns a new array and never mutates", () => {
-    const log: FightLogEntry[] = [];
-    const entry: FightLogEntry = {
-      turnIndex: 0,
-      dragonId: "d1",
-      text: "hit",
-      damage: 5,
-    };
-    const next = appendFightLog(log, entry);
-    expect(next).toEqual([entry]);
-    expect(next).not.toBe(log);
-    expect(log).toHaveLength(0);
   });
 });

@@ -114,13 +114,9 @@ function monsterFightLogText(dragonName, monsterName, rawDamage, won) {
 function beastTurnLogText(dragonName, rawDamage, counterDamage) {
   return `Dragon ${dragonName} deals ${Math.max(0, rawDamage)} damage to Bewilder Beast (retaliation ${counterDamage}).`;
 }
-function appendFightLog(log, entry) {
-  return [...log, entry];
-}
 export {
   advanceCollectAnchor,
   advanceStepAnchor,
-  appendFightLog,
   beastTurnLogText,
   createDragonId,
   createEggDragon,

@@ -3,7 +3,14 @@
 // these .js bundles (koala-style explicit `.js` imports). The .ts files
 // remain the source of truth for vitest.
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+
+if (!existsSync("./node_modules/.bin/esbuild")) {
+  console.error(
+    'Missing devDependency "esbuild". Run `npm install` first, then re-run.',
+  );
+  process.exit(1);
+}
 
 const targets = [
   ["engine/config.ts", "engine/config.js"],

@@ -59,11 +59,7 @@ export default defineConfig({
       },
     }),
   ],
-  resolve: {
-    alias: {
-      '@shared': path.resolve(root, 'shared'),
-    },
-  },
+  resolve: {},
   optimizeDeps: {
     // zepp-web-runner/shims/hmUI keeps widget state in module scope.
     // Prebundling it into .vite/deps/chunk-*.js creates a second module

@@ -1,0 +1,12 @@
+# Generated: engine/*.js is regenerated from engine/*.ts via `npm run build:engine`.
+engine/*.js
+# Generated / vendored / build output.
+assets/
+node_modules/
+optimize/node_modules/
+web/dist/
+web/node_modules/
+sprites/
+store/
+docs/game-screenshot.png
+package-lock.json

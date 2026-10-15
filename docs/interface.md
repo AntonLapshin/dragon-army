@@ -62,7 +62,7 @@
 #### 3.1 Egg-Spin Purchase Modal
 - **Title** – "Get a New Egg".
 - **Animation** – a spinning wheel/calendar symbol that cycles through symbols (e.g., `167468123?!-+`). One symbol changes per frame; the player taps anywhere on the modal to stop the animation.
-- **Result display** – the frozen combination randomly maps to one of the 15 possible dragon types (breed).
+- **Result display** – the frozen combination randomly maps to one of the 16 possible dragon types (breed).
 - **Button** – "Yo hoo" (or similar). **Spin-then-pay**: tapping it deducts the egg price and adds the egg to the player's collection with a 1–2 day real-time hatch timer encoded (not displayed).
 - **Insufficient funds** – if balance < egg price, no spin starts; the modal shows "Not enough coins" and the confirm button is disabled.
 - **First purchase** – no auto-modal on launch; the player starts with coins for one egg and must tap Buy Egg manually.
@@ -92,17 +92,17 @@
 - **Header** – shows the opponent image (monster or Bewilder Beast) with its HP bar and the participating dragon(s).
 - **Turn area** – auto-resolves and logs each turn: "Dragon [name] attacks – damage X" plus retaliation on the dragon's Energy (beast) / energy drain by damage (monsters). **Locked (no X) until the outcome is shown.**
 - **Formula:**
-  - `damage = (dragonStrength + random(0–10)) – monsterConstantStrength` (constants per opponent, config-defined; beast counter-damage on Energy likewise config-defined).
+  - `damage = (effectiveStrength + random(0–10)) – monsterEffectiveStrength`, where `effectiveStrength = floor(combatStrength × liveEnergy / 100)` and `monsterEffectiveStrength = monster base + its equipment bonus` (see `docs/core.md` §8). Beast counter-damage on Energy is likewise config-defined.
 - **Outcome (monster fight):**
-  - **Win** – coins reward (random, based on difficulty) **plus permanent strength gain** (Easy +1–2, Medium +2–3, Hard +3–5). Dragon energy reduced by damage taken (no full restore). The win is recorded on the dragon's battle record (see 3.8): +1 in the matching difficulty bucket and the coins added to its lifetime earnings.
-  - **Lose** – strength unchanged; dragon's energy reduced by damage taken (0 only if depleted); modal note "Dragon is tired, will recover automatically". Train/Monster/Beast blocked until energy recovers.
+  - **Win** – coins reward (random, based on difficulty) **plus permanent strength gain** (Easy +1–2, Medium +1–2, Hard +2–4). Dragon energy drains by the rolled effort cost (usually leaves the dragon tired but standing). The win is recorded on the dragon's battle record (see 3.8): +1 in the matching difficulty bucket and the coins added to its lifetime earnings.
+  - **Lose** – strength unchanged; dragon is knocked out (energy drops to 0); modal note "Dragon is tired, will recover automatically". Train/Monster/Beast blocked until energy recovers.
 
 #### 3.6 Bewilder Beast Modal (from Main Control)
 - **Intro** – illustration of the Bewilder Beast + **Fight** button. Uses the full roster except 0-energy dragons (excluded) and eggs (never participate).
 - **Turn log** – each dragon attacks in roster order; modal logs "Dragon [name] deals X damage to Bewilder Beast" and retaliation; beast HP bar drains turn-by-turn as lines reveal (realtime replay — the engine resolves + persists the outcome instantly so closing mid-fight cannot reroll, but the bar only shows each turn's HP once its line appears).
 - **Dragon out** – a dragon reduced to 0 energy mid-battle is **removed from the roster**; the next dragon enters.
 - **End conditions:**
-  - **Beast defeated** – "Bewilder Beast vanishes for a day. Continue adventure." Survivors keep remaining energy and each gains permanent +3–5 strength; removed dragons stay removed. Beast respawns after a day. The dragon that landed the killing blow gets +1 beast win and the reward coins on its battle record (see 3.8); other participants get no beast credit.
+  - **Beast defeated** – "Bewilder Beast vanishes for a day. Continue adventure." Survivors keep remaining energy and each gains permanent +2–4 strength; removed dragons stay removed. Beast respawns after a day. The dragon that landed the killing blow gets +1 beast win and the reward coins on its battle record (see 3.8); other participants get no beast credit.
   - **All dragons removed** – "Defeat — roster empty. Buy a new egg. Return to Main Screen." Player buys a new egg, waiting/collecting hourly coins if broke (no game-over).
 
 #### 3.7 Coin-Earning Summary Modal (hybrid time + steps, tap-to-collect)
@@ -134,15 +134,15 @@
 2. **Monster Selection Modal** shows only currently spawned monsters (0–3 rows) each with a Fight button, or the empty state.
 3. Player taps a Fight button; **Fight Modal** opens (locked) with dragon and monster images/HP.
 4. Turns resolve automatically using the damage formula; energy drains by damage taken; outcome is displayed.
-5. **Win** → coins plus strength gain (Easy +1–2, Medium +2–3, Hard +3–5), energy reduced by damage taken (no auto-restore).
-   **Lose** → strength unchanged, energy reduced by damage taken. Player waits for passive recovery (Train/Monster/Beast blocked at 0).
+5. **Win** → coins plus strength gain (Easy +1–2, Medium +1–2, Hard +2–4), energy drained by the rolled effort cost.
+   **Lose** → strength unchanged, knocked out (energy to 0). Player waits for passive recovery (Train/Monster/Beast blocked at 0).
 
 #### C. Bewilder Beast Battle
 1. From **Main Control Screen**, taps **Bewilder Beast** (top-right). Intro modal appears.
 2. Taps **Fight** – turn-based sequence starts with all energy-positive dragons in roster order (locked modal).
 3. Each dragon deals damage; beast retaliates on Energy; modal logs damage and both HP/Energy bars.
 4. Dragons at 0 are removed; next enters.
-5. If the beast's HP reaches 0 → "Bewilder Beast vanishes for a day. Continue." Survivors gain +3–5 strength each (respawns after a day).
+5. If the beast's HP reaches 0 → "Bewilder Beast vanishes for a day. Continue." Survivors gain +2–4 strength each (respawns after a day).
 6. If all dragons are removed → "Defeat — roster empty. Buy a new egg." Player returns to Main, collects hourly coins if needed, and buys a new egg.
 
 ---

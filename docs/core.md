@@ -1,7 +1,7 @@
 # Core Principles
 
 1. **Fixed start-up resources** – The player begins with a set amount of coins sufficient to purchase a single random egg. No modal auto-appears on launch; the player starts the flow manually via Buy Egg.
-2. **Random egg selection (spin-then-pay)** – Tapping Buy Egg opens a modal with a symbol-spinning animation; the player's tap freezes it and the resulting combination assigns the egg type (one of 15 possible dragons = 15 breeds). Tapping "Yo hoo" then deducts the egg price and adds the egg. Insufficient coins = Buy Egg disabled / "Not enough coins" state, no spin.
+2. **Random egg selection (spin-then-pay)** – Tapping Buy Egg opens a modal with a symbol-spinning animation; the player's tap freezes it and the resulting combination assigns the egg type (one of 16 possible dragons = 16 breeds). Tapping "Yo hoo" then deducts the egg price and adds the egg. Insufficient coins = Buy Egg disabled / "Not enough coins" state, no spin.
 3. **Hatch timer** – After purchase the egg is ready to hatch after 1–2 days of real time; the timer is not displayed but is encoded at purchase. The egg gets its own detail screen (egg image + "Hatching...", Sell + Home only). Once due it shows "Ready to hatch!" with a green **Hatch** button — hatching is a manual tap, never automatic.
 4. **Button navigation (no swipe)** – The UI consists of the main control screen plus one dragon detail screen per owned dragon or unhatched egg. Navigation is tap-only: the main hub has a bottom roster-strip of thumbnails, detail screens return via Home. There is no swipe/GESTURE logic (unreliable on the real device).
 5. **Main control screen hub** – Central screen holding fixed icons that open modals:

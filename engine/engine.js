@@ -319,15 +319,15 @@ function createGameEngine(deps) {
     const breedIndex = drawBreedIndex(rand());
     return { ok: true, breedIndex, breed: breedForIndex(breedIndex) };
   }
-  function confirmEggPurchase(breedIndex, hatchRand01) {
+  function purchaseEgg(breedIndex, price, canAfford, hatchRand01) {
     const s = requireState();
     const atMs = now();
-    if (!canAffordEgg(s.player.coins)) {
+    if (!canAfford(s.player.coins)) {
       return { ok: false, reason: "not-enough-coins" };
     }
     if (rosterFull()) return { ok: false, reason: "roster-full" };
     const breed = breedForIndex(breedIndex);
-    s.player.coins -= CONFIG.egg.price;
+    s.player.coins -= price;
     const egg = createEggDragon({
       id: generateId(rand(), atMs),
       breedId: breed.id,
@@ -341,27 +341,16 @@ function createGameEngine(deps) {
     save();
     return { ok: true, dragon: { ...egg } };
   }
+  function confirmEggPurchase(breedIndex, hatchRand01) {
+    return purchaseEgg(breedIndex, CONFIG.egg.price, canAffordEgg, hatchRand01);
+  }
   function confirmChosenEggPurchase(breedIndex, hatchRand01) {
-    const s = requireState();
-    const atMs = now();
-    if (!canAffordChosenEgg(s.player.coins)) {
-      return { ok: false, reason: "not-enough-coins" };
-    }
-    if (rosterFull()) return { ok: false, reason: "roster-full" };
-    const breed = breedForIndex(breedIndex);
-    s.player.coins -= CONFIG.egg.choosePrice;
-    const egg = createEggDragon({
-      id: generateId(rand(), atMs),
-      breedId: breed.id,
-      nowMs: atMs,
-      hatchDelayMs: rollHatchMs(hatchRand01 ?? rand())
-    });
-    s.player.dragons.push(egg);
-    s.player.totalEggsBought += 1;
-    s.ui.selectedDragonId = egg.id;
-    s.ui.currentScreen = { kind: "dragon", dragonId: egg.id };
-    save();
-    return { ok: true, dragon: { ...egg } };
+    return purchaseEgg(
+      breedIndex,
+      CONFIG.egg.choosePrice,
+      canAffordChosenEgg,
+      hatchRand01
+    );
   }
   function hatchDragon(dragonId, strengthRand01) {
     const s = requireState();

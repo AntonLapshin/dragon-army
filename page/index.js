@@ -1,13 +1,203 @@
 import hmUI from '@zos/ui';
 import { deviceAdapter } from '../utils/deviceAdapter.js';
-import { BG_X, BG_Y, BG_W, BG_H, BG_HOME_SRC, BG_DRAGON_SRC, DEVICE, refreshLayout, STATS_BTN_S, STATS_BTN_X, STATS_BTN_Y, STATS_ROW_Y, STATS_ROW_GAP, STATS_ROW_H } from './layouts.js';
 import { storageAdapter } from '../utils/storageAdapter.js';
 import { timeAdapter } from '../utils/timeAdapter.js';
 import { sensorAdapter } from '../utils/sensorAdapter.js';
 import {
+  BG_X,
+  BG_Y,
+  BG_W,
+  BG_H,
+  BG_HOME_SRC,
+  BG_DRAGON_SRC,
+  DEVICE,
+  refreshLayout,
+  STATS_BTN_S,
+  STATS_BTN_X,
+  STATS_BTN_Y,
+  STATS_ROW_Y,
+  STATS_ROW_GAP,
+  STATS_ROW_H,
   ACTION_BOTTOM_PAD,
   ACTION_ICON_S,
   ACTION_SIDE_PAD,
+  BALANCE_ICON_S,
+  BALANCE_ICON_Y,
+  BALANCE_TEXT_H,
+  BALANCE_TEXT_Y,
+  BEAST_BAR_W,
+  BEAST_BAR_X,
+  BEAST_BAR_Y,
+  BEAST_BAR_H,
+  BEAST_FIGHT_BAR_W,
+  BEAST_FIGHT_BAR_X,
+  BEAST_FIGHT_BAR_Y,
+  BEAST_FIGHT_BAR_H,
+  BEAST_IMG_S,
+  BEAST_IMG_X,
+  BEAST_IMG_Y,
+  BEAST_TEAM_H,
+  BEAST_TEAM_Y,
+  BEAST_VANISHED_H,
+  BEAST_VANISHED_Y,
+  BEAST_WARN_H,
+  BEAST_WARN_Y,
+  BTN_BOTTOM_OFFSET,
+  BTN_CENTER_X,
+  BTN_H,
+  BTN_W,
+  COIN_BIG_TEXT_W,
+  COINS_ICON_S,
+  COINS_ICON_X,
+  COINS_ICON_Y,
+  COINS_TEXT_H,
+  COINS_TEXT_Y,
+  DRAGON_IMG_HATCHED_OFFSET,
+  DRAGON_IMG_S,
+  DRAGON_IMG_Y,
+  DRAGON_NAME_H,
+  DRAGON_NAME_Y,
+  DRAGON_STARS_Y,
+  EARN_ICON_S,
+  EARN_ICON_Y,
+  EARN_TEXT_H,
+  EARN_TEXT_Y,
+  EGG_BLOCKED_TEXT_H,
+  EGG_BLOCKED_TEXT_Y,
+  EGG_BTN_S,
+  EGG_BTN_X,
+  EGG_BTN_Y,
+  EGG_DICE_S,
+  EGG_DICE_X,
+  EGG_DICE_Y,
+  EGG_CHOOSE_S,
+  EGG_CHOOSE_Y,
+  EGG_CHOOSE_BTN_Y,
+  EGG_ARROW_S,
+  EGG_ARROW_Y,
+  EGG_PRICE_ICON_Y,
+  EGG_PRICE_TEXT_H,
+  EGG_PRICE_TEXT_Y,
+  EGG_REVEAL_PRICE_TEXT_Y,
+  EGG_REVEAL_PRICE_Y,
+  EGG_REVEAL_S,
+  EGG_REVEAL_Y,
+  EGG_SPIN_BTN_Y,
+  EGG_SPIN_HINT_H,
+  EGG_SPIN_HINT_Y,
+  ENERGY_BAR_W,
+  ENERGY_BAR_H,
+  ENERGY_BAR_X,
+  ENERGY_BAR_Y,
+  FIGHT_BEAST_MAX_LINES,
+  FIGHT_DRAGON_IMG_OFFSET_X,
+  FIGHT_DRAGON_IMG_S,
+  FIGHT_DRAGON_IMG_Y,
+  FIGHT_LINE_GAP,
+  FIGHT_LINE_H,
+  FIGHT_LINE_PAD,
+  FIGHT_LINES_Y,
+  FIGHT_MAX_LINES,
+  FIGHT_MONSTER_IMG_S,
+  FIGHT_MONSTER_IMG_X,
+  FIGHT_MONSTER_IMG_Y,
+  FIGHT_OUTCOME_ICON_S,
+  FIGHT_OUTCOME_ICON_X,
+  FIGHT_OUTCOME_ICON_Y,
+  FIGHT_OUTCOME_TEXT_H,
+  FIGHT_OUTCOME_TEXT_Y,
+  FIGHT_STARS_Y,
+  FIGHT_VS_H,
+  FIGHT_VS_X,
+  FIGHT_VS_Y,
+  HATCH_BTN_Y,
+  HATCH_TEXT_H,
+  HATCH_TEXT_Y,
+  ICON_SIZE,
+  KEEP_BTN_X,
+  MODAL_CLOSE_OFFSET,
+  MODAL_CLOSE_S,
+  MODAL_CLOSE_Y,
+  MODAL_PAD,
+  MODAL_TITLE_H,
+  MODAL_TITLE_Y,
+  MONSTER_FIGHT_BTN_H,
+  MONSTER_FIGHT_BTN_W,
+  MONSTER_FIGHT_BTN_X,
+  MONSTER_FIGHT_BTN_Y,
+  MONSTER_GAIN_H,
+  MONSTER_GAIN_W,
+  MONSTER_GAIN_Y,
+  MONSTER_IMG_S,
+  MONSTER_IMG_X,
+  MONSTER_NAME_H,
+  MONSTER_NAME_W,
+  MONSTER_NAME_X,
+  MONSTER_ROW_BOTTOM_PAD,
+  MONSTER_ROW_H,
+  MONSTER_ROW_MAX_H,
+  MONSTER_ROW_Y,
+  MONSTER_STARS_Y_OFFSET,
+  PANEL_H,
+  PANEL_W,
+  PANEL_X,
+  PANEL_Y,
+  ROSTER_BOTTOM_PAD,
+  ROSTER_FRAME,
+  ROSTER_LEFT,
+  ROSTER_SLOTS,
+  ROSTER_THUMB,
+  SELL_BTN_W,
+  SELL_BTN_X,
+  SELL_COIN_TEXT_H,
+  SELL_COIN_TEXT_Y,
+  SELL_COIN_Y,
+  SELL_ICON_S,
+  SELL_ICON_Y,
+  SELL_LABEL_H,
+  SELL_LABEL_Y,
+  SHADOW_H,
+  SHADOW_W,
+  SHADOW_Y_OFFSET,
+  BEAST_STARS_Y,
+  STAR_GAP,
+  STAR_S,
+  TRAIN_COIN_TEXT_H,
+  TRAIN_COIN_TEXT_Y,
+  TRAIN_COIN_Y,
+  TRAIN_ENERGY_H,
+  TRAIN_ENERGY_Y,
+  TRAIN_RESULT_ENERGY_H,
+  TRAIN_RESULT_ENERGY_Y,
+  TRAIN_RESULT_GAIN_H,
+  TRAIN_RESULT_GAIN_Y,
+  TRAIN_RESULT_ICON_S,
+  TRAIN_RESULT_ICON_X,
+  TRAIN_RESULT_ICON_Y,
+  TRAIN_RESULT_LEVEL_H,
+  TRAIN_RESULT_LEVEL_Y,
+  TRAIN_WARN_H,
+  TRAIN_WARN_Y,
+  BEAST_BTN_OFFSET_X,
+  BEAST_BTN_S,
+  BEAST_BTN_Y,
+  EQUIP_BTN_S,
+  EQUIP_BTN_X,
+  EQUIP_BTN_Y,
+  EQUIP_BUY_BONUS_H,
+  EQUIP_BUY_BONUS_Y,
+  EQUIP_BUY_ICON_S,
+  EQUIP_BUY_ICON_Y,
+  EQUIP_BUY_PRICE_H,
+  EQUIP_BUY_PRICE_Y,
+  EQUIP_BUY_WALLET_H,
+  EQUIP_BUY_WALLET_Y,
+  EQUIP_COMBAT_H,
+  EQUIP_COMBAT_Y,
+  EQUIP_GRID_Y,
+  EQUIP_ROW_H,
+} from './layouts.js';
+import {
   ASSET_BEAST_72,
   ASSET_BEAST_128,
   ASSET_CLOSE_36,
@@ -36,47 +226,14 @@ import {
   BADGE_TEXT_MIN_W,
   BADGE_WIDTH_FACTOR,
   BALANCE_FONT,
-  BALANCE_ICON_S,
-  BALANCE_ICON_Y,
-  BALANCE_TEXT_H,
-  BALANCE_TEXT_Y,
-  BAR_HIGH_AT,
-  BAR_MID_AT,
-  BEAST_BAR_W,
-  BEAST_BAR_X,
-  BEAST_BAR_Y,
-  BEAST_BAR_H,
-  BEAST_FIGHT_BAR_W,
-  BEAST_FIGHT_BAR_X,
-  BEAST_FIGHT_BAR_Y,
-  BEAST_FIGHT_BAR_H,
-  BEAST_IMG_S,
-  BEAST_IMG_X,
-  BEAST_IMG_Y,
   BEAST_TEAM_FONT,
-  BEAST_TEAM_H,
-  BEAST_TEAM_Y,
   BEAST_VANISHED_FONT,
-  BEAST_VANISHED_H,
-  BEAST_VANISHED_Y,
   BEAST_WARN_FONT,
-  BEAST_WARN_H,
-  BEAST_WARN_Y,
-  BTN_BOTTOM_OFFSET,
-  BTN_CENTER_X,
   BTN_FONT,
   BTN_GREEN,
   BTN_GREEN_PRESS,
-  BTN_H,
   BTN_RADIUS,
-  BTN_W,
-  COIN_BIG_TEXT_W,
   COINS_FONT,
-  COINS_ICON_S,
-  COINS_ICON_X,
-  COINS_ICON_Y,
-  COINS_TEXT_H,
-  COINS_TEXT_Y,
   COLOR_BTN_DISABLED,
   COLOR_BTN_SELL,
   COLOR_BTN_TEXT,
@@ -85,49 +242,11 @@ import {
   COLOR_MUTED,
   COLOR_SUCCESS,
   COLOR_WHITE,
-  DRAGON_IMG_HATCHED_OFFSET,
-  DRAGON_IMG_S,
-  DRAGON_IMG_Y,
   DRAGON_NAME_FONT,
-  DRAGON_NAME_H,
-  DRAGON_NAME_Y,
-  DRAGON_STARS_Y,
   EARN_FONT,
-  EARN_ICON_S,
-  EARN_ICON_Y,
-  EARN_TEXT_H,
-  EARN_TEXT_Y,
   EGG_BLOCKED_FONT,
-  EGG_BLOCKED_TEXT_H,
-  EGG_BLOCKED_TEXT_Y,
-  EGG_BTN_S,
-  EGG_BTN_X,
-  EGG_BTN_Y,
-  EGG_DICE_S,
-  EGG_DICE_X,
-  EGG_DICE_Y,
-  EGG_CHOOSE_S,
-  EGG_CHOOSE_Y,
-  EGG_CHOOSE_BTN_Y,
-  EGG_ARROW_S,
-  EGG_ARROW_Y,
   EGG_PRICE_FONT,
-  EGG_PRICE_ICON_Y,
-  EGG_PRICE_TEXT_H,
-  EGG_PRICE_TEXT_Y,
-  EGG_REVEAL_PRICE_TEXT_Y,
-  EGG_REVEAL_PRICE_Y,
-  EGG_REVEAL_S,
-  EGG_REVEAL_Y,
-  EGG_SPIN_BTN_Y,
   EGG_SPIN_HINT_FONT,
-  EGG_SPIN_HINT_H,
-  EGG_SPIN_HINT_Y,
-  ENERGY_BAR_W,
-  ENERGY_BAR_H,
-  ENERGY_BAR_X,
-  ENERGY_BAR_Y,
-  ENERGY_SEG_COUNT,
   ENERGY_BAR_NATIVE_W,
   ENERGY_BAR_NATIVE_H,
   ENERGY_SEG_X0,
@@ -135,149 +254,39 @@ import {
   ENERGY_SEG_Y0,
   ENERGY_SEG_Y1,
   ENERGY_SEG_INSET,
-  ENERGY_SEG_COLOR_LOW,
-  ENERGY_SEG_COLOR_MID,
-  ENERGY_SEG_COLOR_HIGH,
   FALLBACK_ROSTER_ICON,
-  FIGHT_BEAST_MAX_LINES,
   FIGHT_BEAST_OUTCOME_FONT,
-  FIGHT_DRAGON_IMG_OFFSET_X,
-  FIGHT_DRAGON_IMG_S,
-  FIGHT_DRAGON_IMG_Y,
   FIGHT_LINE_FONT,
-  FIGHT_LINE_GAP,
-  FIGHT_LINE_H,
-  FIGHT_LINE_PAD,
-  FIGHT_LINES_Y,
-  FIGHT_MAX_LINES,
-  FIGHT_MONSTER_IMG_S,
-  FIGHT_MONSTER_IMG_X,
-  FIGHT_MONSTER_IMG_Y,
   FIGHT_OUTCOME_FONT,
-  FIGHT_OUTCOME_ICON_S,
-  FIGHT_OUTCOME_ICON_X,
-  FIGHT_OUTCOME_ICON_Y,
-  FIGHT_OUTCOME_TEXT_H,
-  FIGHT_OUTCOME_TEXT_Y,
-  FIGHT_STARS_Y,
   FIGHT_VS_FONT,
-  FIGHT_VS_H,
-  FIGHT_VS_X,
-  FIGHT_VS_Y,
-  HATCH_BTN_Y,
   HATCH_TEXT_FONT,
-  HATCH_TEXT_H,
-  HATCH_TEXT_Y,
-  ICON_SIZE,
   IMG_DISABLED_ALPHA,
-  KEEP_BTN_X,
-  MODAL_CLOSE_OFFSET,
-  MODAL_CLOSE_S,
-  MODAL_CLOSE_Y,
-  MODAL_PAD,
   MODAL_RADIUS,
   MODAL_TITLE_FONT,
-  MODAL_TITLE_H,
-  MODAL_TITLE_Y,
   MONSTER_FIGHT_BTN_FONT,
-  MONSTER_FIGHT_BTN_H,
-  MONSTER_FIGHT_BTN_W,
-  MONSTER_FIGHT_BTN_X,
-  MONSTER_FIGHT_BTN_Y,
   MONSTER_GAIN_FONT,
-  MONSTER_GAIN_H,
-  MONSTER_GAIN_W,
-  MONSTER_GAIN_Y,
-  MONSTER_IMG_S,
-  MONSTER_IMG_X,
   MONSTER_NAME_FONT,
-  MONSTER_NAME_H,
-  MONSTER_NAME_W,
-  MONSTER_NAME_X,
-  MONSTER_ROW_BOTTOM_PAD,
-  MONSTER_ROW_H,
-  MONSTER_ROW_MAX_H,
-  MONSTER_ROW_Y,
-  MONSTER_STARS_Y_OFFSET,
   PANEL_ALPHA,
   PANEL_COLOR,
-  PANEL_H,
-  PANEL_W,
-  PANEL_X,
-  PANEL_Y,
   RECT_DEFAULT_ALPHA,
   RECT_DEFAULT_RADIUS,
-  ROSTER_BOTTOM_PAD,
-  ROSTER_FRAME,
-  ROSTER_LEFT,
-  ROSTER_SLOTS,
-  ROSTER_THUMB,
-  SELL_BTN_W,
-  SELL_BTN_X,
   SELL_COIN_FONT,
-  SELL_COIN_TEXT_H,
-  SELL_COIN_TEXT_Y,
-  SELL_COIN_Y,
-  SELL_ICON_S,
-  SELL_ICON_Y,
   SELL_LABEL_FONT,
-  SELL_LABEL_H,
-  SELL_LABEL_Y,
-  SHADOW_H,
-  SHADOW_W,
-  SHADOW_Y_OFFSET,
-  BEAST_STARS_Y,
   SHADE_ALPHA,
   SHADE_COLOR,
   SHADE_DEFAULT_RADIUS,
-  STAR_GAP,
-  STAR_S,
   TEXT_DEFAULT_SIZE,
   TEXT_PILL_RADIUS,
   TRAIN_COIN_FONT,
-  TRAIN_COIN_TEXT_H,
-  TRAIN_COIN_TEXT_Y,
-  TRAIN_COIN_Y,
   TRAIN_ENERGY_FONT,
-  TRAIN_ENERGY_H,
-  TRAIN_ENERGY_Y,
   TRAIN_RESULT_ENERGY_FONT,
-  TRAIN_RESULT_ENERGY_H,
-  TRAIN_RESULT_ENERGY_Y,
   TRAIN_RESULT_GAIN_FONT,
-  TRAIN_RESULT_GAIN_H,
-  TRAIN_RESULT_GAIN_Y,
-  TRAIN_RESULT_ICON_S,
-  TRAIN_RESULT_ICON_X,
-  TRAIN_RESULT_ICON_Y,
   TRAIN_RESULT_LEVEL_FONT,
-  TRAIN_RESULT_LEVEL_H,
-  TRAIN_RESULT_LEVEL_Y,
   TRAIN_WARN_FONT,
-  TRAIN_WARN_H,
-  TRAIN_WARN_Y,
-  BEAST_BTN_OFFSET_X,
-  BEAST_BTN_S,
-  BEAST_BTN_Y,
-  EQUIP_BTN_S,
-  EQUIP_BTN_X,
-  EQUIP_BTN_Y,
   EQUIP_BUY_BONUS_FONT,
-  EQUIP_BUY_BONUS_H,
-  EQUIP_BUY_BONUS_Y,
-  EQUIP_BUY_ICON_S,
-  EQUIP_BUY_ICON_Y,
   EQUIP_BUY_PRICE_FONT,
-  EQUIP_BUY_PRICE_H,
-  EQUIP_BUY_PRICE_Y,
   EQUIP_BUY_WALLET_FONT,
-  EQUIP_BUY_WALLET_H,
-  EQUIP_BUY_WALLET_Y,
   EQUIP_COMBAT_FONT,
-  EQUIP_COMBAT_H,
-  EQUIP_COMBAT_Y,
-  EQUIP_GRID_Y,
-  EQUIP_ROW_H,
   EQUIP_SLOT_NAME_FONT,
   EQUIP_SLOT_SUB_FONT,
   dragonAsset240,
@@ -288,6 +297,16 @@ import {
 } from './index.style.js';
 import { CONFIG, beastDisplayStrength, breedForIndex, clamp, effectiveMonsterStrength, starsForStrength } from '../engine/config.js';
 import { createGameEngine, coerceLoadedSave } from '../engine/engine.js';
+import {
+  actionRowPositions,
+  beastFightHpAtReveal,
+  beastVanishHours,
+  energySegmentColor,
+  energySegmentsFilled,
+  formatDragonName,
+  rosterWindow,
+  wrapIndex,
+} from './viewUtils.js';
 
 /**
  * Dragon Army — thin UI layer (screens + modals, see docs/interface.md).
@@ -553,24 +572,6 @@ function addButton(x, y, w, h, text, onTap, opts) {
   );
 }
 
-// Segmented gold energy bar: ornate frame IMG with colored squares drawn
-// inside its 8 slots. Fill count rounds UP so any remaining energy shows
-// at least one segment (1% -> 1 red bar, 99% -> all 8 green bars).
-// Color reflects the overall pct (same 0.7/0.4 thresholds as the old bar):
-// few -> red, mid -> yellow, high -> green.
-function energySegmentsFilled(value, max) {
-  const pct = clamp(value / max, 0, 1);
-  if (pct <= 0) return 0;
-  return Math.min(ENERGY_SEG_COUNT, Math.ceil(pct * ENERGY_SEG_COUNT));
-}
-
-function energySegmentColor(value, max) {
-  const pct = clamp(value / max, 0, 1);
-  if (pct > BAR_HIGH_AT) return ENERGY_SEG_COLOR_HIGH;
-  if (pct > BAR_MID_AT) return ENERGY_SEG_COLOR_MID;
-  return ENERGY_SEG_COLOR_LOW;
-}
-
 function addEnergyBar(x, y, w, h, src, value, max) {
   addImg(x, y, w, h, src);
   const filled = energySegmentsFilled(value, max);
@@ -596,12 +597,6 @@ function addIconButton(x, y, size, src, onTap, dimmed) {
   // (egg blocked modal, train warning, monster empty state) instead of
   // going dead.
   return addImg(x, y, size, size, src, onTap, dimmed ? IMG_DISABLED_ALPHA : undefined);
-}
-
-// Dragon name with age: "Wooly Howl (2 days)" / "Wooly Howl (1 day)".
-function formatDragonName(breedName, ageDays) {
-  const age = Math.max(0, Math.floor(ageDays));
-  return breedName + ' (' + age + ' day' + (age === 1 ? '' : 's') + ')';
 }
 
 // Equipment slot metadata (page-side labels + art; prices/bonuses come
@@ -687,10 +682,9 @@ function stopEggSpin() {
   if (_page) _page.render();
 }
 
-function confirmEgg() {
-  const modal = _modal;
-  if (!modal || modal.kind !== 'egg-spin' || modal.blocked || modal.spinning) return;
-  const res = engine.confirmEggPurchase(modal.breedIndex);
+// Shared tail of both egg purchases: a refused buy re-blocks the modal,
+// a success closes it and jumps to the new egg's page.
+function finishEggPurchase(res) {
   if (!res.ok) {
     _modal.blocked = true;
     _modal.reason = res.reason;
@@ -701,6 +695,12 @@ function confirmEgg() {
   closeTimersForScreen();
   _screenIndex = roster().length;
   if (_page) _page.render();
+}
+
+function confirmEgg() {
+  const modal = _modal;
+  if (!modal || modal.kind !== 'egg-spin' || modal.blocked || modal.spinning) return;
+  finishEggPurchase(engine.confirmEggPurchase(modal.breedIndex));
 }
 
 // Choose-a-specific-egg mode (150 coins): entered via the ">" arrow in the
@@ -721,9 +721,8 @@ function enterEggChoose() {
 function cycleEggChoose(delta) {
   const modal = _modal;
   if (!modal || modal.kind !== 'egg-spin' || modal.mode !== 'choose') return;
-  const count = CONFIG.egg.breedCount;
   const cur = typeof modal.chooseIndex === 'number' ? modal.chooseIndex : 0;
-  modal.chooseIndex = ((cur + delta) % count + count) % count;
+  modal.chooseIndex = wrapIndex(cur, delta, CONFIG.egg.breedCount);
   if (_page) _page.render();
 }
 
@@ -731,17 +730,7 @@ function confirmChosenEgg() {
   const modal = _modal;
   if (!modal || modal.kind !== 'egg-spin' || modal.mode !== 'choose') return;
   const idx = typeof modal.chooseIndex === 'number' ? modal.chooseIndex : 0;
-  const res = engine.confirmChosenEggPurchase(idx);
-  if (!res.ok) {
-    _modal.blocked = true;
-    _modal.reason = res.reason;
-    if (_page) _page.render();
-    return;
-  }
-  _modal = null;
-  closeTimersForScreen();
-  _screenIndex = roster().length;
-  if (_page) _page.render();
+  finishEggPurchase(engine.confirmChosenEggPurchase(idx));
 }
 
 function hatchEgg(dragonId) {
@@ -910,7 +899,6 @@ function renderDragon(width, view) {
 
   if (egg) {
      // Still hatching: hide the breed so the dragon stays a surprise.
-     // addBadgeText(0, 8, width, 30, 'Egg', 24, COLOR_WHITE);
    } else {
      addBadgeText(0, DRAGON_NAME_Y, width, DRAGON_NAME_H, formatDragonName(breed.name, view.ageDays), DRAGON_NAME_FONT, COLOR_WHITE);
    }
@@ -958,34 +946,29 @@ function renderDragon(width, view) {
    // danger 72x72 -> rendered at ACTION_ICON_S), bottom-aligned.
    const sidePad = ACTION_SIDE_PAD;
    const bottom = DEVICE.height - ACTION_BOTTOM_PAD;
-    if (egg) {
-      const cells = [
-        { src: ASSET_HOME_84, size: ACTION_ICON_S, dimmed: false, tap: () => goTo(0) },
-        { src: ASSET_SELL_84, size: ACTION_ICON_S, dimmed: false, tap: () => openModal({ kind: 'sell', dragonId: view.dragon.id }) },
-      ];
-      const maxS = ACTION_ICON_S;
-      const step = (width - sidePad * 2 - maxS) / (cells.length - 1);
-      cells.forEach((cell, i) => {
-        const ix = Math.round(sidePad + i * step);
-        const iy = bottom - cell.size;
-        addIconButton(ix, iy, cell.size, cell.src, cell.tap, cell.dimmed);
-      });
-    } else {
+   const homeCell = { src: ASSET_HOME_84, size: ACTION_ICON_S, dimmed: false, tap: () => goTo(0) };
+   const sellCell = { src: ASSET_SELL_84, size: ACTION_ICON_S, dimmed: false, tap: () => openModal({ kind: 'sell', dragonId: view.dragon.id }) };
+   if (egg) {
+     renderActionRow(width, sidePad, bottom, [homeCell, sellCell]);
+   } else {
      const hasMonsters = engine.getSpawnedMonsters().length > 0;
-     const cells = [
-       { src: ASSET_HOME_84, size: ACTION_ICON_S, dimmed: false, tap: () => goTo(0) },
-       { src: ASSET_SELL_84, size: ACTION_ICON_S, dimmed: false, tap: () => openModal({ kind: 'sell', dragonId: view.dragon.id }) },
+     renderActionRow(width, sidePad, bottom, [
+       homeCell,
+       sellCell,
        { src: ASSET_DANGER_84, size: ACTION_ICON_S, dimmed: !hasMonsters || !view.canFight, tap: () => openMonsterSelect(view.dragon.id) },
        { src: ASSET_TRAINING_84, size: ACTION_ICON_S, dimmed: !view.canTrain, tap: () => openModal({ kind: 'train', dragonId: view.dragon.id }) },
-     ];
-     const maxS = ACTION_ICON_S;
-     const step = (width - sidePad * 2 - maxS) / (cells.length - 1);
-     cells.forEach((cell, i) => {
-       const ix = Math.round(sidePad + i * step);
-       const iy = bottom - cell.size;
-       addIconButton(ix, iy, cell.size, cell.src, cell.tap, cell.dimmed);
-     });
+     ]);
    }
+}
+
+// Bottom action row: evenly-spread icons pinned to the bottom edge,
+// bottom-aligned. Shared by the egg page (Home + Sell) and the hatched
+// page (Home / Sell / Danger / Training).
+function renderActionRow(width, sidePad, bottom, cells) {
+  const xs = actionRowPositions(width, sidePad, ACTION_ICON_S, cells.length);
+  cells.forEach((cell, i) => {
+    addIconButton(xs[i], bottom - cell.size, cell.size, cell.src, cell.tap, cell.dimmed);
+  });
 }
 
 function renderRosterStrip(width) {
@@ -1002,13 +985,8 @@ function renderRosterStrip(width) {
   const left = ROSTER_LEFT;
   const y = DEVICE.height - thumbS - ROSTER_BOTTOM_PAD;
   const pad = Math.round((frameS - thumbS) / 2);
-  let start = 0;
-  let visible = list;
-  if (list.length > SLOT_N) {
-    const cur = Math.max(0, _screenIndex - 1);
-    start = Math.min(Math.max(0, cur - 2), list.length - SLOT_N);
-    visible = list.slice(start, start + SLOT_N);
-  }
+  const { start, count } = rosterWindow(list.length, _screenIndex, SLOT_N);
+  const visible = list.slice(start, start + count);
   const step = (width - left * 2 - thumbS) / (SLOT_N - 1);
   for (let i = 0; i < SLOT_N; i++) {
     const x = Math.round(left + i * step);
@@ -1237,8 +1215,7 @@ function renderBeastIntro() {
   renderModalShell(CONFIG.beast.name, false);
   addImg(PANEL_X + BEAST_IMG_X, PANEL_Y + BEAST_IMG_Y, BEAST_IMG_S, BEAST_IMG_S, ASSET_BEAST_72);
   if (beast.status !== 'alive') {
-    const now = timeAdapter.getTime();
-    const hrs = Math.max(1, Math.ceil(((beast.respawnAtMs || now) - now) / CONFIG.economy.coinAccrualIntervalMs));
+    const hrs = beastVanishHours(beast.respawnAtMs, timeAdapter.getTime(), CONFIG.economy.coinAccrualIntervalMs);
     addText(PANEL_X + MODAL_PAD, PANEL_Y + BEAST_VANISHED_Y, PANEL_W - MODAL_PAD * 2, BEAST_VANISHED_H, 'Vanished - back in ~' + hrs + 'h', BEAST_VANISHED_FONT, COLOR_MUTED);
     return;
   }
@@ -1270,23 +1247,20 @@ function renderBeastFight() {
   addStrengthStars(PANEL_X + FIGHT_MONSTER_IMG_X + Math.floor(FIGHT_MONSTER_IMG_S / 2), PANEL_Y + FIGHT_STARS_Y, beastDisplayStrength());
   // Realtime HP replay: the engine already persisted the final outcome
   // (anti-cheat), but the bar must drain turn-by-turn as lines reveal.
-  // revealed counts text lines (turns + 1 final summary); each revealed turn
-  // line steps the bar to that turn's beastHpAfter.
-  let hp = beast.currentHp;
   let maxHp = beast.maxHp;
   if (modal.outcome && Array.isArray(modal.outcome.hpSteps)) {
-    const steps = modal.outcome.hpSteps;
     maxHp = modal.outcome.maxHp || maxHp;
-    if (modal.revealed <= 0) {
-      hp = modal.outcome.hpBefore;
-    } else if (modal.revealed <= steps.length) {
-      hp = steps[modal.revealed - 1];
-    } else {
-      hp = modal.outcome.hpAfter;
-    }
-  } else if (modal.outcome && modal.revealed >= modal.lines.length) {
-    hp = modal.outcome.hpAfter;
   }
+  const hp = modal.outcome
+    ? beastFightHpAtReveal({
+        revealed: modal.revealed,
+        lineCount: modal.lines.length,
+        hpSteps: modal.outcome.hpSteps,
+        hpBefore: modal.outcome.hpBefore,
+        hpAfter: modal.outcome.hpAfter,
+        currentHp: beast.currentHp,
+      })
+    : beast.currentHp;
   addEnergyBar(PANEL_X + BEAST_FIGHT_BAR_X, PANEL_Y + BEAST_FIGHT_BAR_Y, BEAST_FIGHT_BAR_W, BEAST_FIGHT_BAR_H, ASSET_ENERGY_BAR_190, hp, maxHp);
   renderFightLines(FIGHT_BEAST_MAX_LINES);
   if (!modal.locked && modal.outcome) {
@@ -1357,12 +1331,12 @@ function renderEquipment(width, view) {
   const rows = [['head', 'wings', 'tail'], ['leg-front-left', 'leg-front-right', 'leg-back-left', 'leg-back-right']];
   rows.forEach((row, r) => {
     const y = EQUIP_GRID_Y + r * EQUIP_ROW_H;
-    const step = (width - sidePad * 2 - 72) / (row.length - 1);
+    const xs = actionRowPositions(width, sidePad, 72, row.length);
     row.forEach((slotId, i) => {
       const meta = equipSlotMeta(slotId);
       const def = defById[slotId];
       if (!meta || !def) return;
-      const x = Math.round(sidePad + i * step);
+      const x = xs[i];
       const isOwned = owned[slotId] === true;
       if (isOwned) {
         addImg(x, y, 72, 72, meta.art);

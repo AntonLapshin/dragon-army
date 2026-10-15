@@ -460,21 +460,26 @@ export function createGameEngine(deps: CreateEngineDeps) {
   }
 
   /**
-   * "Yo hoo": deduct the egg price and add the egg with its hidden 1–2 day
-   * hatch timer encoded at purchase.
+   * Shared egg purchase: gate on coins + roster, deduct `price`, add the
+   * egg with its hidden 1–2 day hatch timer encoded at purchase, and jump
+   * to the new egg's page. Random-spin and choose-a-specific-egg differ
+   * only in price (`CONFIG.egg.price` vs `CONFIG.egg.choosePrice`) and in
+   * which affordability check the caller ran.
    */
-  function confirmEggPurchase(
+  function purchaseEgg(
     breedIndex: number,
+    price: number,
+    canAfford: (coins: number) => boolean,
     hatchRand01?: number,
   ): ConfirmEggResult {
     const s = requireState();
     const atMs = now();
-    if (!canAffordEgg(s.player.coins)) {
+    if (!canAfford(s.player.coins)) {
       return { ok: false, reason: "not-enough-coins" };
     }
     if (rosterFull()) return { ok: false, reason: "roster-full" };
     const breed = breedForIndex(breedIndex);
-    s.player.coins -= CONFIG.egg.price;
+    s.player.coins -= price;
     const egg = createEggDragon({
       id: generateId(rand(), atMs),
       breedId: breed.id,
@@ -490,6 +495,17 @@ export function createGameEngine(deps: CreateEngineDeps) {
   }
 
   /**
+   * "Yo hoo": deduct the egg price and add the egg with its hidden 1–2 day
+   * hatch timer encoded at purchase.
+   */
+  function confirmEggPurchase(
+    breedIndex: number,
+    hatchRand01?: number,
+  ): ConfirmEggResult {
+    return purchaseEgg(breedIndex, CONFIG.egg.price, canAffordEgg, hatchRand01);
+  }
+
+  /**
    * "Buy" a SPECIFIC egg from choose mode: same as confirmEggPurchase but
    * deducts `CONFIG.egg.choosePrice` (150) instead of the random price.
    * The breed is picked by the player via left/right arrows (chooseIndex).
@@ -498,26 +514,12 @@ export function createGameEngine(deps: CreateEngineDeps) {
     breedIndex: number,
     hatchRand01?: number,
   ): ConfirmEggResult {
-    const s = requireState();
-    const atMs = now();
-    if (!canAffordChosenEgg(s.player.coins)) {
-      return { ok: false, reason: "not-enough-coins" };
-    }
-    if (rosterFull()) return { ok: false, reason: "roster-full" };
-    const breed = breedForIndex(breedIndex);
-    s.player.coins -= CONFIG.egg.choosePrice;
-    const egg = createEggDragon({
-      id: generateId(rand(), atMs),
-      breedId: breed.id,
-      nowMs: atMs,
-      hatchDelayMs: rollHatchMs(hatchRand01 ?? rand()),
-    });
-    s.player.dragons.push(egg);
-    s.player.totalEggsBought += 1;
-    s.ui.selectedDragonId = egg.id;
-    s.ui.currentScreen = { kind: "dragon", dragonId: egg.id };
-    save();
-    return { ok: true, dragon: { ...egg } };
+    return purchaseEgg(
+      breedIndex,
+      CONFIG.egg.choosePrice,
+      canAffordChosenEgg,
+      hatchRand01,
+    );
   }
 
   // -- manual hatch: green Hatch button once the hidden timer is due --
