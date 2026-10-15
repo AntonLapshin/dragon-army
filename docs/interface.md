@@ -23,7 +23,7 @@
 - The game is composed of **tap-navigated screens**: the Main Control Screen plus one Dragon Detail Screen per owned dragon or unhatched egg. There is **no swipe/GESTURE navigation** (unreliable on the real device).
 - Main hub navigation uses the bottom roster-strip thumbnails; detail screens return via **Home**.
 - Each screen may contain **icons** that open **modals** (panels over a semi-transparent dark overlay).
-- All modals appear on top of the current screen with **no animation** and contain a **close (X)** button (top-right) to dismiss them, **except Fight modals while turns are auto-resolving, which are locked until the outcome is shown**.
+- All modals appear on top of the current screen with **no animation** and contain a **close (X)** button (top-right) to dismiss them. Fights are **not** modals — they use the dedicated full-screen Fight Screen (§3.5).
 
 ---
 
@@ -57,7 +57,7 @@
 
 ### 3. Modals (common attributes)
 - **Overlay** – semi-transparent dark overlay dimming the underlying screen, no entrance animation.
-- **Close (X) button** – top-right corner of the modal content; tapping dismisses the modal, except while fight turns auto-resolve.
+- **Close (X) button** – top-right corner of the modal content; tapping dismisses the modal.
 
 #### 3.1 Egg-Spin Purchase Modal
 - **Title** – "Get a New Egg".
@@ -86,24 +86,24 @@
   - **Hard** – rarest spawns.
 - Each row contains a monster image and a "Fight" button.
 - **Empty state** – if nothing spawned: "No monsters right now".
-- **Selection** – tapping a Fight button opens the Fight Modal (see below). Requires the dragon's energy > 0.
+- **Selection** – tapping a Fight button opens the Fight Screen (see §3.5). Requires the dragon's energy > 0.
 
-#### 3.5 Fight Modal (Monster or Bewilder Beast)
-- **Header** – shows the opponent image (monster or Bewilder Beast) with its HP bar and the participating dragon(s).
-- **Turn area** – auto-resolves and logs each turn: "Dragon [name] attacks – damage X" plus retaliation on the dragon's Energy (beast) / energy drain by damage (monsters). **Locked (no X) until the outcome is shown.**
-- **Formula:**
-  - `damage = (effectiveStrength + random(0–10)) – monsterEffectiveStrength`, where `effectiveStrength = floor(combatStrength × liveEnergy / 100)` and `monsterEffectiveStrength = monster base + its equipment bonus` (see `docs/core.md` §8). Beast counter-damage on Energy is likewise config-defined.
+#### 3.5 Fight Screen (Monster or Bewilder Beast)
+- **Not a modal** – a dedicated full-screen replay that replaces the whole screen (no nav, no X) until the player taps **Continue** after the last turn.
+- **Layout** – player dragons on the left (1 column up to 3 dragons, 2 columns beyond; up to 12 roster dragons fit, rows overlap slightly at the extreme), the enemy alone on the right. A **green HP bar** sits above every unit.
+- **Animation** – per turn: the attacker highlights, a fireball flies attacker → target, then an impact burst (hit) or **MISS** text (miss) shows and the target's HP bar steps to its post-turn HP. One turn ≈ 1.1s. One narration line per turn at the bottom ("Gronkle hits monster 1 for 23" / "Gronkle misses monster 1").
+- **Resolution** – the engine resolves the whole fight instantly and persists it (anti-cheat — leaving mid-fight keeps the result); the screen only replays the returned turns. Tapping anywhere skips to the outcome; **Continue** appears only after the last turn. Monster fights return to that dragon's page; beast fights return to Main.
+- **Formula** – every attack rolls hit/miss first (80% on even combat, ±0.4% per combat edge, clamped 55–95%); a landed hit deals `attackerCombat − floor(defenderCombat / 2) + random(0–8)`, floored at 3. At most 2 consecutive misses per combatant (pity rule — fights always terminate, no endless whiffing).
 - **Outcome (monster fight):**
-  - **Win** – coins reward (random, based on difficulty) **plus permanent strength gain** (Easy +1–2, Medium +1–2, Hard +2–4). Dragon energy drains by the rolled effort cost (usually leaves the dragon tired but standing). The win is recorded on the dragon's battle record (see 3.8): +1 in the matching difficulty bucket and the coins added to its lifetime earnings.
-  - **Lose** – strength unchanged; dragon is knocked out (energy drops to 0); modal note "Dragon is tired, will recover automatically". Train/Monster/Beast blocked until energy recovers.
+  - **Win** – coins reward (random, based on difficulty) **plus permanent strength gain** (Easy +1–2, Medium +1–2, Hard +2–4). The dragon keeps its leftover HP as energy. The win is recorded on the dragon's battle record (see 3.8): +1 in the matching difficulty bucket and the coins added to its lifetime earnings.
+  - **Lose** – strength unchanged; energy drops to 0 (knocked out). Train/Monster/Beast blocked until energy recovers.
 
 #### 3.6 Bewilder Beast Modal (from Main Control)
 - **Intro** – illustration of the Bewilder Beast + **Fight** button. Uses the full roster except 0-energy dragons (excluded) and eggs (never participate).
-- **Turn log** – each dragon attacks in roster order; modal logs "Dragon [name] deals X damage to Bewilder Beast" and retaliation; beast HP bar drains turn-by-turn as lines reveal (realtime replay — the engine resolves + persists the outcome instantly so closing mid-fight cannot reroll, but the bar only shows each turn's HP once its line appears).
-- **Dragon out** – a dragon reduced to 0 energy mid-battle is **removed from the roster**; the next dragon enters.
+- **Fight** – the Fight Screen (§3.5) replays round-based turns: every living dragon attacks in roster order, then the beast fires back at **one random living dragon**. A dragon reduced to 0 HP mid-battle **vanishes from the screen** (removed from the roster).
 - **End conditions:**
-  - **Beast defeated** – "Bewilder Beast vanishes for a day. Continue adventure." Survivors keep remaining energy and each gains permanent +2–4 strength; removed dragons stay removed. Beast respawns after a day. The dragon that landed the killing blow gets +1 beast win and the reward coins on its battle record (see 3.8); other participants get no beast credit.
-  - **All dragons removed** – "Defeat — roster empty. Buy a new egg. Return to Main Screen." Player buys a new egg, waiting/collecting hourly coins if broke (no game-over).
+  - **Beast defeated** – "Bewilder Beast vanishes for a day. Continue adventure." Survivors keep remaining energy and each dragon that attacked gains permanent +2–4 strength; removed dragons stay removed. Beast respawns after a day. The dragon that landed the killing blow gets +1 beast win and the reward coins on its battle record (see 3.8); other participants get no beast credit.
+  - **All dragons removed** – "Defeat — roster lost. Buy a new egg." Player buys a new egg, waiting/collecting hourly coins if broke (no game-over). The beast **heals back to full HP** — a loss buys no progress.
 
 #### 3.7 Coin-Earning Summary Modal (hybrid time + steps, tap-to-collect)
 - Triggered only by tapping the **Earn Coins** icon (visible only when collectible coins exist).
@@ -132,18 +132,17 @@
 #### B. Fighting a Monster
 1. Player selects a hatched dragon (energy > 0) on the **Dragon Detail Screen** and taps **Monster** (bottom-right).
 2. **Monster Selection Modal** shows only currently spawned monsters (0–3 rows) each with a Fight button, or the empty state.
-3. Player taps a Fight button; **Fight Modal** opens (locked) with dragon and monster images/HP.
-4. Turns resolve automatically using the damage formula; energy drains by damage taken; outcome is displayed.
-5. **Win** → coins plus strength gain (Easy +1–2, Medium +1–2, Hard +2–4), energy drained by the rolled effort cost.
-   **Lose** → strength unchanged, knocked out (energy to 0). Player waits for passive recovery (Train/Monster/Beast blocked at 0).
+3. Player taps a Fight button; the **Fight Screen** opens (dragons left, monster right, green HP bars, fireballs, hit/miss).
+4. Turns replay automatically (~1.1s each; tap anywhere to skip); HP bars step per turn; outcome is displayed.
+5. **Win** → coins plus strength gain (Easy +1–2, Medium +1–2, Hard +2–4), dragon keeps leftover HP as energy.
+   **Lose** → strength unchanged, energy drops to 0 (knocked out). Player waits for passive recovery (Train/Monster/Beast blocked at 0).
 
 #### C. Bewilder Beast Battle
 1. From **Main Control Screen**, taps **Bewilder Beast** (top-right). Intro modal appears.
-2. Taps **Fight** – turn-based sequence starts with all energy-positive dragons in roster order (locked modal).
-3. Each dragon deals damage; beast retaliates on Energy; modal logs damage and both HP/Energy bars.
-4. Dragons at 0 are removed; next enters.
-5. If the beast's HP reaches 0 → "Bewilder Beast vanishes for a day. Continue." Survivors gain +2–4 strength each (respawns after a day).
-6. If all dragons are removed → "Defeat — roster empty. Buy a new egg." Player returns to Main, collects hourly coins if needed, and buys a new egg.
+2. Taps **Fight** – the **Fight Screen** replays round-based turns: all living dragons attack, then the beast fires back at one random dragon.
+3. Each attack shows a fireball + hit burst / MISS; HP bars step per turn; a dragon at 0 vanishes (removed from the roster).
+4. If the beast's HP reaches 0 → "Bewilder Beast vanishes for a day. Continue." Each dragon that attacked and survived gains +2–4 strength (respawns after a day).
+5. If all dragons are removed → "Defeat — roster lost. Buy a new egg." The beast heals to full HP. Player returns to Main, collects hourly coins if needed, and buys a new egg.
 
 ---
 *All icons, buttons, and text positions are fixed as described to ensure a predictable, ambiguity-free UI experience.*

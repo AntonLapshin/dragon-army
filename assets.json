@@ -212,5 +212,11 @@
   ],
   "ui/victory.png": [
     "60x60"
+  ],
+  "ui/fireball.png": [
+    "28x28"
+  ],
+  "ui/impact.png": [
+    "48x48"
   ]
 }

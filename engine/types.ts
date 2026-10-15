@@ -109,10 +109,12 @@ export interface MonsterDef {
   rewardMin: number;
   rewardMax: number;
   spawnChance: number;
-  energyLossWinMin: number;
-  energyLossWinMax: number;
-  energyLossLoseMin: number;
-  energyLossLoseMax: number;
+  /**
+   * Fight-screen HP pool. The dragon's energy IS its HP in the fight:
+   * the fight ends when one side's HP hits 0, and the dragon's leftover
+   * HP becomes its remaining energy (a loss leaves 0).
+   */
+  hp: number;
   /** Permanent strength gained on a win (rolled in [min, max]; 0 on loss). */
   strengthGainWinMin: number;
   strengthGainWinMax: number;
@@ -131,25 +133,46 @@ export interface MonsterDef {
   equipmentSlots: EquipmentSlotId[];
 }
 
-/** Outcome of one monster fight (pure result of `resolveMonsterFight`). */
-export interface MonsterFightResult {
-  rawDamage: number;
-  won: boolean;
-  coinReward: number;
-  energyLoss: number;
-  energyAfter: number;
-  /** Permanent strength gained (0 on loss). */
-  strengthGain: number;
+/** Outcome of one attack in the turn-based fight screen (`resolveFightAttack`). */
+export interface FightAttackResult {
+  /** False = the fireball missed; no damage, defender HP unchanged. */
+  hit: boolean;
+  /** Damage dealt (0 on a miss). */
+  damage: number;
+  /** Defender HP after this attack (clamped at 0). */
+  defenderHpAfter: number;
 }
 
-/** Outcome of a single Bewilder Beast turn (`resolveBeastTurn`). */
-export interface BeastTurnResult {
-  rawDamage: number;
-  beastHpAfter: number;
-  counterDamage: number;
-  dragonEnergyAfter: number;
-  dragonRemoved: boolean;
-  beastDefeated: boolean;
+/** One replayable attack in a fight (monster 1v1 or beast round-based). */
+export interface FightTurn {
+  turnIndex: number;
+  /** Who threw the fireball: a dragon, or the enemy (monster / beast). */
+  attackerKind: "dragon" | "enemy";
+  /** Attacking dragon's roster-entry id (null for enemy attacks). */
+  attackerId: string | null;
+  /** Display name of the attacker (dragon breed or enemy name). */
+  attackerName: string;
+  /** Dragon hit by an enemy attack (null for dragon attacks — they hit the enemy). */
+  targetId: string | null;
+  /** Display name of the target. */
+  targetName: string;
+  hit: boolean;
+  damage: number;
+  /** Target HP after this attack (enemy HP for dragon attacks, dragon HP for enemy attacks). */
+  targetHpAfter: number;
+  /** One-line narration ("Gronkle hits ... for 23" / "… misses"). */
+  text: string;
+}
+
+/** Outcome of one monster fight (turn-based; see `resolveMonsterFight`). */
+export interface MonsterFightResult {
+  won: boolean;
+  /** Every attack in order, for the fight-screen replay. */
+  turns: Omit<FightTurn, "turnIndex" | "attackerId" | "attackerName" | "targetId" | "targetName" | "text">[];
+  dragonHpAfter: number;
+  monsterHpAfter: number;
+  /** Total damage the dragon dealt (for logs / tests). */
+  totalDamageDealt: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -341,15 +364,8 @@ export type ScreenRef =
   | { kind: "dragon"; dragonId: string }
   | { kind: "equipment"; dragonId: string };
 
-/** One auto-resolved fight-log line shown in locked fight modals. */
-export interface FightLogEntry {
-  turnIndex: number;
-  dragonId: string;
-  text: string;
-  damage: number;
-  beastHpAfter?: number;
-  dragonEnergyAfter?: number;
-}
+/** One auto-resolved fight-log line shown on the fight screen. */
+export interface FightLogEntry extends FightTurn {}
 
 /** Transient UI slice (not persisted across sessions, except selection). */
 export interface UiState {
@@ -359,7 +375,7 @@ export interface UiState {
   selectedDragonId: string | null;
   /** Monster picked in the selection modal (fight target). */
   selectedMonsterId: string | null;
-  /** Turn log for the open fight modal (locked until outcome). */
+  /** Turn log for the open fight screen (replay narration). */
   fightLog: FightLogEntry[];
 }
 
@@ -491,7 +507,10 @@ export type MonsterFightOutcome =
   | {
       ok: true;
       won: boolean;
-      rawDamage: number;
+      /** Every attack in order — the fight screen replays these. */
+      turns: FightTurn[];
+      /** Total damage the dragon dealt (sum of its landed hits). */
+      totalDamageDealt: number;
       coinReward: number;
       energyLoss: number;
       energyAfter: number;

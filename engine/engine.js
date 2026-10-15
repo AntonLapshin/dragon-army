@@ -29,11 +29,13 @@ import {
   levelForDragon,
   liveEnergyForDragon,
   remainingLifespanForDragon,
-  resolveBeastTurn,
+  resolveBeastFight,
   resolveMonsterFight,
   rollBaseStrength,
   rollBeastReward,
   rollBeastWinStrengthGain,
+  rollIntInclusive,
+  rollMonsterWinStrengthGain,
   rollHatchMs,
   rollSpawnedMonsters,
   rollTrainingGain,
@@ -44,13 +46,13 @@ import {
 import {
   advanceCollectAnchor,
   advanceStepAnchor,
-  beastTurnLogText,
   createDragonId,
   createEggDragon,
+  fightTurnLogText,
   freshCombatStats,
   freshEquipment,
   hatchDragonInstance,
-  monsterFightLogText,
+  monsterFightSummaryText,
   normalizeCombatStats,
   normalizeEquipment,
   screensForRoster,
@@ -623,7 +625,7 @@ function createGameEngine(deps) {
     save();
     return { ok: true, spawned };
   }
-  function fightMonster(dragonId, monsterId, rolls) {
+  function fightMonster(dragonId, monsterId) {
     const s = requireState();
     const atMs = now();
     const dragon = findDragon(dragonId);
@@ -645,61 +647,65 @@ function createGameEngine(deps) {
         combatStrengthForDragon(dragon),
         liveEnergy,
         target,
-        rolls?.bonusRand01 ?? rand(),
-        rolls?.rewardRand01 ?? rand(),
-        rolls?.energyRand01 ?? rand(),
-        rolls?.strengthRand01 ?? rand()
+        rand
       );
-      const strengthAfter = applyStrengthGain(dragon.strength, result.strengthGain);
+      const coinReward = result.won ? rollIntInclusive(target.rewardMin, target.rewardMax, rand()) : 0;
+      const strengthGain = result.won ? rollMonsterWinStrengthGain(target, rand()) : 0;
+      const strengthAfter = applyStrengthGain(dragon.strength, strengthGain);
       const stats = normalizeCombatStats(dragon.combatStats);
       if (result.won) {
         if (target.difficulty === "Easy") stats.easyWins += 1;
         else if (target.difficulty === "Medium") stats.mediumWins += 1;
         else stats.hardWins += 1;
-        stats.coinsEarned += result.coinReward;
+        stats.coinsEarned += coinReward;
       }
       replaceDragon({
         ...dragon,
         strength: strengthAfter,
-        energy: result.energyAfter,
+        energy: result.dragonHpAfter,
         lastEnergyUpdateMs: atMs,
         combatStats: stats
       });
       if (result.won) {
-        s.player.coins += result.coinReward;
-        s.player.totalCoinsEarned += result.coinReward;
+        s.player.coins += coinReward;
+        s.player.totalCoinsEarned += coinReward;
         s.player.totalMonsterWins += 1;
       } else {
         s.player.totalMonsterLosses += 1;
       }
       const breed = breedForDragon(dragon);
-      const logText = monsterFightLogText(
-        breed.name,
-        target.name,
-        result.rawDamage,
-        result.won
-      );
+      const logText = monsterFightSummaryText(result.won, coinReward, strengthGain);
+      const turns = result.turns.map((t, i) => ({
+        turnIndex: i,
+        attackerKind: t.attackerKind,
+        attackerId: t.attackerKind === "dragon" ? dragonId : null,
+        attackerName: t.attackerKind === "dragon" ? breed.name : target.name,
+        targetId: t.attackerKind === "enemy" ? dragonId : null,
+        targetName: t.attackerKind === "dragon" ? target.name : breed.name,
+        hit: t.hit,
+        damage: t.damage,
+        targetHpAfter: t.defenderHpAfter,
+        text: fightTurnLogText(
+          t.attackerKind === "dragon" ? breed.name : target.name,
+          t.attackerKind === "dragon" ? target.name : breed.name,
+          t.hit,
+          t.damage
+        )
+      }));
       s.ui.selectedDragonId = dragonId;
       s.ui.selectedMonsterId = monsterId;
       s.ui.activeModal = "monster-fight";
-      s.ui.fightLog = [
-        {
-          turnIndex: 0,
-          dragonId,
-          text: logText,
-          damage: result.rawDamage,
-          dragonEnergyAfter: result.energyAfter
-        }
-      ];
+      s.ui.fightLog = turns;
       save();
       return {
         ok: true,
         won: result.won,
-        rawDamage: result.rawDamage,
-        coinReward: result.coinReward,
-        energyLoss: result.energyLoss,
-        energyAfter: result.energyAfter,
-        strengthGain: result.strengthGain,
+        turns,
+        totalDamageDealt: result.totalDamageDealt,
+        coinReward,
+        energyLoss: liveEnergy - result.dragonHpAfter,
+        energyAfter: result.dragonHpAfter,
+        strengthGain,
         strengthAfter,
         logText
       };
@@ -736,56 +742,38 @@ function createGameEngine(deps) {
     }
     fightLocked = true;
     try {
-      let hp = s.beast.currentHp;
-      const turns = [];
-      const removedIds = /* @__PURE__ */ new Set();
-      const finalEnergies = /* @__PURE__ */ new Map();
-      let turnIndex = 0;
-      let defeated = false;
-      let killerId = null;
       s.ui.activeModal = "beast-fight";
       s.ui.fightLog = [];
-      for (const participant of lineup) {
-        let energy = liveEnergyForDragon(participant, atMs);
-        const fightStartEnergy = energy;
-        finalEnergies.set(participant.id, energy);
-        while (energy > 0 && !defeated) {
-          const turn = resolveBeastTurn(
-            combatStrengthForDragon(participant),
-            energy,
-            hp,
-            rand(),
-            rand(),
-            fightStartEnergy
-          );
-          hp = turn.beastHpAfter;
-          energy = turn.dragonEnergyAfter;
-          finalEnergies.set(participant.id, energy);
-          const breed = breedForDragon(participant);
-          turns.push({
-            turnIndex: turnIndex++,
-            dragonId: participant.id,
-            text: beastTurnLogText(
-              breed.name,
-              turn.rawDamage,
-              turn.counterDamage
-            ),
-            damage: turn.rawDamage,
-            beastHpAfter: hp,
-            dragonEnergyAfter: energy
-          });
-          if (turn.beastDefeated) {
-            defeated = true;
-            killerId = participant.id;
-            break;
-          }
-          if (turn.dragonRemoved) {
-            removedIds.add(participant.id);
-            break;
-          }
-        }
-        if (defeated) break;
-      }
+      const result = resolveBeastFight(
+        lineup.map((d) => combatStrengthForDragon(d)),
+        lineup.map((d) => liveEnergyForDragon(d, atMs)),
+        s.beast.currentHp,
+        rand
+      );
+      const defeated = result.won;
+      const killerId = result.killerIndex === null ? null : lineup[result.killerIndex].id;
+      const foughtIds = new Set(
+        result.turns.filter((t) => t.attackerKind === "dragon" && t.attackerIndex !== null).map((t) => lineup[t.attackerIndex].id)
+      );
+      const removedIds = new Set(
+        lineup.filter((_, i) => result.dragonHpsAfter[i] <= 0).map((d) => d.id)
+      );
+      const turns = result.turns.map((t, turnIndex) => {
+        const attackerName = t.attackerKind === "dragon" && t.attackerIndex !== null ? breedForDragon(lineup[t.attackerIndex]).name : CONFIG.beast.name;
+        const targetName = t.attackerKind === "dragon" ? CONFIG.beast.name : t.targetIndex !== null ? breedForDragon(lineup[t.targetIndex]).name : CONFIG.beast.name;
+        return {
+          turnIndex,
+          attackerKind: t.attackerKind,
+          attackerId: t.attackerKind === "dragon" && t.attackerIndex !== null ? lineup[t.attackerIndex].id : null,
+          attackerName,
+          targetId: t.attackerKind === "enemy" && t.targetIndex !== null ? lineup[t.targetIndex].id : null,
+          targetName,
+          hit: t.hit,
+          damage: t.damage,
+          targetHpAfter: t.defenderHpAfter,
+          text: fightTurnLogText(attackerName, targetName, t.hit, t.damage)
+        };
+      });
       let reward = 0;
       const strengthGains = {};
       if (defeated) {
@@ -798,17 +786,20 @@ function createGameEngine(deps) {
         s.beast.respawnAtMs = atMs + CONFIG.beast.respawnAfterWinMs;
         s.beast.lastDefeatedAtMs = atMs;
       } else {
-        s.beast.currentHp = hp;
+        s.beast.currentHp = CONFIG.beast.hp;
+        s.beast.maxHp = CONFIG.beast.hp;
       }
-      for (const [id, energy] of finalEnergies) {
-        if (removedIds.has(id)) continue;
-        const current = s.player.dragons.find((d) => d.id === id);
+      for (let i = 0; i < lineup.length; i++) {
+        const participant = lineup[i];
+        if (removedIds.has(participant.id)) continue;
+        const current = s.player.dragons.find((d) => d.id === participant.id);
         if (!current) continue;
-        if (defeated) {
+        const energy = result.dragonHpsAfter[i];
+        if (defeated && foughtIds.has(participant.id)) {
           const gain = rollBeastWinStrengthGain(rand());
-          strengthGains[id] = gain;
+          strengthGains[participant.id] = gain;
           const stats = normalizeCombatStats(current.combatStats);
-          if (id === killerId) {
+          if (participant.id === killerId) {
             stats.beastWins += 1;
             stats.coinsEarned += reward;
           }
@@ -830,7 +821,7 @@ function createGameEngine(deps) {
         ok: true,
         won: defeated,
         turns,
-        beastHpAfter: defeated ? 0 : hp,
+        beastHpAfter: defeated ? 0 : CONFIG.beast.hp,
         reward,
         removedDragonIds: [...removedIds],
         strengthGains

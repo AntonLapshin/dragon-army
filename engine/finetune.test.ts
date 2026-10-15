@@ -6,7 +6,7 @@
  * sections use a seeded RNG (mulberry32) so runs are reproducible.
  *
  * 1) Monster spawn: Easy ~6x/day (≈33%/h), Medium ~20%/h, Hard ~10%/h
- * 2) Fresh dragon vs Easy: mostly loses (~25% win); a win leaves 0-30 energy
+ * 2) Fresh dragon vs Easy: mostly loses (~20% win); a win costs ~half the bar
  * 3) Passive coins: a casual player (half collected, sleep/school misses)
  *    earns an egg in ~5 days
  * 4) Full energy recovery (0 -> 100) fits within a day
@@ -51,8 +51,7 @@ function winRateVs(
   const rng = mulberry32(seed);
   let wins = 0;
   for (let i = 0; i < trials; i++) {
-    if (resolveMonsterFight(strength, 100, monster, rng(), rng(), rng()).won)
-      wins++;
+    if (resolveMonsterFight(strength, 100, monster, rng).won) wins++;
   }
   return wins / trials;
 }
@@ -119,38 +118,48 @@ describe("scenario 2: fresh dragon vs Easy monster (underdog, costly wins)", () 
     expect(easy.strength).toBeGreaterThan(FRESH_MAX);
   });
 
-  it("weakest fresh hatch (8) can never beat Easy (needs bonus>=11, max bonus is 10)", () => {
-    expect(winRateVs(FRESH_WEAK, 0, 500, 51)).toBe(0);
+  it("weakest fresh hatch (8) almost never beats Easy (needs 8+ landed hits first)", () => {
+    expect(winRateVs(FRESH_WEAK, 0, 1000, 51)).toBeLessThan(0.1);
   });
 
-  it("average fresh hatch (~11) wins only ~25% of the time", () => {
+  it("average fresh hatch (~11) wins only ~20% of the time", () => {
     const rate = winRateVs(FRESH_AVG, 0, 5000, 52);
-    expect(rate).toBeGreaterThan(0.15);
-    expect(rate).toBeLessThan(0.4);
-    // analytical check: needs bonus>=8 -> 3/11 ≈ 27%
-    expect(rate).toBeCloseTo(3 / 11, 1);
+    expect(rate).toBeGreaterThan(0.1);
+    expect(rate).toBeLessThan(0.35);
   });
 
-  it("a fresh win leaves almost no energy (0-30 left)", () => {
-    expect(easy.energyLossWinMin).toBeGreaterThanOrEqual(70);
-    expect(easy.energyLossWinMax).toBeLessThanOrEqual(100);
+  it("a fresh win is costly: the monster lands several hits back first", () => {
+    // A fresh dragon that somehow wins still eats ~5 monster hits
+    // (~18 each) on the way — wins leave it badly hurt, not fresh.
     const rng = mulberry32(53);
-    for (let i = 0; i < 500; i++) {
-      const r = resolveMonsterFight(FRESH_AVG, 100, easy, rng(), rng(), rng());
+    let wins = 0;
+    let totalLeft = 0;
+    for (let i = 0; i < 2000; i++) {
+      const r = resolveMonsterFight(FRESH_AVG, 100, easy, rng);
       if (r.won) {
-        expect(r.energyAfter).toBeGreaterThanOrEqual(0);
-        expect(r.energyAfter).toBeLessThanOrEqual(30);
+        wins++;
+        totalLeft += r.dragonHpAfter;
       }
     }
+    expect(wins).toBeGreaterThan(100);
+    expect(totalLeft / wins).toBeLessThan(40);
   });
 
-  it("a fresh loss also drains almost everything (near-death)", () => {
-    expect(easy.energyLossLoseMin).toBeGreaterThanOrEqual(80);
+  it("a fresh loss knocks the dragon out cold (0 energy left)", () => {
     const rng = mulberry32(54);
-    const r = resolveMonsterFight(FRESH_AVG, 100, easy, 0, 0.5, 0.999);
-    expect(r.won).toBe(false);
-    expect(r.energyAfter).toBeLessThanOrEqual(20);
-    void rng;
+    const r = resolveMonsterFight(FRESH_AVG, 100, easy, rng);
+    expect(r.dragonHpAfter).toBeGreaterThanOrEqual(0);
+    // losses always end at exactly 0 — no sliver left to chain a fight
+    const losses = { count: 0, nonZero: 0 };
+    for (let i = 0; i < 500; i++) {
+      const f = resolveMonsterFight(FRESH_AVG, 100, easy, rng);
+      if (!f.won) {
+        losses.count++;
+        if (f.dragonHpAfter !== 0) losses.nonZero++;
+      }
+    }
+    expect(losses.count).toBeGreaterThan(300);
+    expect(losses.nonZero).toBe(0);
   });
 
   it("after 3-4 trainings the dragon turns the tables (progression intact)", () => {
@@ -214,11 +223,11 @@ describe("scenario 4: full energy recovery fits within a day", () => {
     expect(recoverEnergy(0, 24 * HOUR)).toBe(100);
   });
 
-  it("an Easy-win wound (70-100 loss) heals overnight (~7-10h)", () => {
-    const worstAfter = 100 - MONSTERS[0].energyLossWinMax; // 0
-    const bestAfter = 100 - MONSTERS[0].energyLossWinMin; // 30
-    expect(recoverEnergy(worstAfter, 10 * HOUR)).toBe(100);
-    expect(recoverEnergy(bestAfter, 7 * HOUR)).toBe(100);
+  it("an Easy-win wound (~30-45 loss) heals in a few hours; a loss heals overnight", () => {
+    // Turn-based wins cost the damage the monster lands back (~30-45),
+    // so a win heals in ~4h; a loss (0 left) still heals within a day.
+    expect(recoverEnergy(60, 4 * HOUR)).toBe(100);
+    expect(recoverEnergy(0, 10 * HOUR)).toBe(100);
     // daily loop: fight in the evening, full bar next morning
     expect(recoverEnergy(0, 8 * HOUR)).toBeGreaterThanOrEqual(80);
   });

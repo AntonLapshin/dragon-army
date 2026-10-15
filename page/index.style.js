@@ -14,6 +14,7 @@
 // Palette
 // ---------------------------------------------------------------------------
 export const COLOR_WHITE = 0xffffff;
+export const COLOR_BLACK = 0x000000; // fight-screen tap shade
 export const COLOR_COIN = 0xffee88; // earn-coins / coin-summary amounts
 export const COLOR_ERROR = 0xff8888; // blocked / warning text
 export const COLOR_SUCCESS = 0xaaffaa; // gains / ready states
@@ -158,12 +159,18 @@ export const MONSTER_GAIN_FONT = FONT_14;
 export const MONSTER_FIGHT_BTN_FONT = FONT_19;
 
 // ---------------------------------------------------------------------------
-// Fight modals (monster-fight + beast-fight) look
+// Fight screen (full-screen replay, not a modal) look
 // ---------------------------------------------------------------------------
-export const FIGHT_LINE_FONT = FONT_16;
-export const FIGHT_VS_FONT = FONT_20;
-export const FIGHT_OUTCOME_FONT = FONT_18;
-export const FIGHT_BEAST_OUTCOME_FONT = FONT_17;
+export const FIGHT_TITLE_FONT = FONT_22;
+// Log font is per-device in layouts.js (FIGHT_LOG_FONT): round needs 12px
+// so the narration fits the circle chord; Bip 6 uses 16px.
+export const FIGHT_MISS_FONT = FONT_18;
+// Green HP bar above every unit (track is dark so the fill reads on any bg).
+export const FIGHT_HP_COLOR = 0x00cc00;
+export const FIGHT_HP_TRACK_COLOR = 0x333333;
+// Attacker highlight: translucent warm pill behind the attacking unit.
+export const FIGHT_ATTACKER_COLOR = 0xffcc00;
+export const FIGHT_ATTACKER_ALPHA = 64;
 
 // ---------------------------------------------------------------------------
 // Beast-intro modal look
@@ -213,6 +220,8 @@ export const ASSET_EQUIP_LEG_72 = 'ui/leg_guard_72x72.png';
 export const ASSET_VICTORY_60 = 'ui/victory_60x60.png';
 export const ASSET_LOSS_60 = 'ui/loss_60x60.png';
 export const ASSET_CLOSE_36 = 'ui/close_36x36.png';
+export const ASSET_FIREBALL_28 = 'ui/fireball_28x28.png';
+export const ASSET_IMPACT_48 = 'ui/impact_48x48.png';
 
 /** Fallback roster thumbnail when a dragon view is unavailable. */
 export const FALLBACK_ROSTER_ICON = 'eggs/night_fury_60x60.png';

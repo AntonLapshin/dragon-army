@@ -72,19 +72,100 @@ export function beastVanishHours(respawnAtMs, nowMs, intervalMs) {
   return Math.max(1, Math.ceil(((respawnAtMs || nowMs) - nowMs) / intervalMs));
 }
 
+
+// ---------------------------------------------------------------------------
+// Fight-screen geometry (dragons left, enemy right, HP bar above each
+// unit). Pure rectangles — index.js draws them.
+//
+// Row overlap: with 11-12 dragons (max roster) 6 rows of 70px do not fit
+// a ~365px arena, so the row pitch shrinks and rows overlap slightly
+// (bars stay readable — they draw over the previous row's feet). The unit
+// box itself never shrinks: Zepp OS IMG draws 1:1, a smaller box would
+// crop the 60px dragon art.
+// ---------------------------------------------------------------------------
+
+export function fightBarFill(barW, hp, maxHp) {
+  if (maxHp <= 0) return 0;
+  const fill = Math.round(barW * Math.min(1, Math.max(0, hp / maxHp)));
+  return Math.min(barW, Math.max(0, fill));
+}
+
 /**
- * Beast-fight HP bar during the realtime replay. The engine already
- * persisted the final outcome, but the bar drains turn-by-turn as log
- * lines reveal: `revealed` counts shown lines (turns + 1 final summary).
- * With per-turn `hpSteps`, each revealed turn steps to that turn's HP;
- * without them, the bar jumps to `hpAfter` once every line is shown.
+ * Rectangles for the fight screen.
+ *
+ * @param {object} p
+ * @param {number} p.dragonCount - participating dragons (1..12)
+ * @param {'rect'|'round'} p.shape
+ * @param {number} p.arenaY - top of the arena (units live here)
+ * @param {number} p.arenaH - arena height
+ * @param {number} p.leftX - left-column x (rect, or round with <=6 dragons)
+ * @param {number} p.leftXWide - left-column x for round with 7+ dragons
+ *   (shifted toward the circle's center, where the usable vertical span is
+ *   taller — at x=52 the circle only allows y in [97,383])
+ * @param {number} p.colGap - horizontal gap between the two dragon columns
+ * @param {number} p.enemyX - enemy unit x (right side)
+ * @param {number} p.dragonS - dragon unit size (60, matches dragonAsset60)
+ * @param {number} p.enemyS - enemy unit size (72, matches monsterAsset72)
+ * @param {number} p.barH - HP bar height above each unit
+ * @param {number} p.barGap - gap between the bar and the unit
+ * @param {number} p.rowGap - gap between dragon rows
+ * @returns {{ dragons: Array<{x,y,barX,barY,barW,size}>,
+ *            enemy: {x,y,barX,barY,barW,size} }}
  */
-export function beastFightHpAtReveal({ revealed, lineCount, hpSteps, hpBefore, hpAfter, currentHp }) {
-  if (Array.isArray(hpSteps)) {
-    if (revealed <= 0) return hpBefore;
-    if (revealed <= hpSteps.length) return hpSteps[revealed - 1];
-    return hpAfter;
+export function fightUnitRects(p) {
+  const rowH = p.barH + p.barGap + p.dragonS;
+  const cols = p.dragonCount <= 3 ? 1 : 2;
+  const rows = Math.ceil(p.dragonCount / cols);
+  // Pitch shrinks only when the rows would overflow the arena; the last
+  // row must still end inside it (see the module header on overlap).
+  const pitch =
+    rows <= 1
+      ? rowH
+      : Math.min(rowH + p.rowGap, (p.arenaH - rowH) / (rows - 1));
+  const blockH = (rows - 1) * pitch + rowH;
+  const topY = p.arenaY + Math.max(0, (p.arenaH - blockH) / 2);
+  const leftX =
+    p.shape === 'round' && p.dragonCount > 6 ? p.leftXWide : p.leftX;
+
+  const dragons = [];
+  for (let i = 0; i < p.dragonCount; i++) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const rowY = topY + row * pitch;
+    const x = leftX + col * (p.dragonS + p.colGap);
+    dragons.push({
+      x,
+      y: rowY + p.barH + p.barGap,
+      barX: x,
+      barY: rowY,
+      barW: p.dragonS,
+      size: p.dragonS,
+    });
   }
-  if (revealed >= lineCount) return hpAfter;
-  return currentHp;
+
+  const enemyTotalH = p.barH + p.barGap + p.enemyS;
+  const enemyBarY = p.arenaY + Math.max(0, (p.arenaH - enemyTotalH) / 2);
+  return {
+    dragons,
+    enemy: {
+      x: p.enemyX,
+      y: enemyBarY + p.barH + p.barGap,
+      barX: p.enemyX,
+      barY: enemyBarY,
+      barW: p.enemyS,
+      size: p.enemyS,
+    },
+  };
+}
+
+/**
+ * Fireball top-left for a sprite of `size` flying from center `from` to
+ * center `to` at progress `t` (clamped to [0, 1]).
+ */
+export function fightFireballPos(from, to, t, size) {
+  const k = Math.min(1, Math.max(0, t));
+  return {
+    x: Math.round(from.x + (to.x - from.x) * k - size / 2),
+    y: Math.round(from.y + (to.y - from.y) * k - size / 2),
+  };
 }

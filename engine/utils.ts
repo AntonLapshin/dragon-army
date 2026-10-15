@@ -222,21 +222,29 @@ export function screensForRoster(dragonIds: string[]): ScreenRef[] {
 // Fight-log text (pure presentation helpers)
 // ---------------------------------------------------------------------------
 
-export function monsterFightLogText(
-  dragonName: string,
-  monsterName: string,
-  rawDamage: number,
-  won: boolean,
+/**
+ * One-line narration for a single fight-screen attack (fireball flight
+ * result). Misses show as "misses" — no damage number, so the player
+ * can tell a miss from a weak hit at a glance. Pure.
+ */
+export function fightTurnLogText(
+  attackerName: string,
+  targetName: string,
+  hit: boolean,
+  damage: number,
 ): string {
-  return won
-    ? `Dragon ${dragonName} attacks ${monsterName} – damage ${rawDamage}. Victory!`
-    : `Dragon ${dragonName} attacks ${monsterName} – damage ${rawDamage}. Dragon is tired, will recover automatically.`;
+  return hit
+    ? `${attackerName} hits ${targetName} for ${damage}`
+    : `${attackerName} misses ${targetName}`;
 }
 
-export function beastTurnLogText(
-  dragonName: string,
-  rawDamage: number,
-  counterDamage: number,
+/** Summary line appended after the last attack of a monster fight. Pure. */
+export function monsterFightSummaryText(
+  won: boolean,
+  coinReward: number,
+  strengthGain: number,
 ): string {
-  return `Dragon ${dragonName} deals ${Math.max(0, rawDamage)} damage to Bewilder Beast (retaliation ${counterDamage}).`;
+  return won
+    ? `Victory! +${coinReward} coins, +${strengthGain} strength`
+    : "Dragon is tired, will recover automatically";
 }

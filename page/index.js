@@ -29,10 +29,6 @@ import {
   BEAST_BAR_X,
   BEAST_BAR_Y,
   BEAST_BAR_H,
-  BEAST_FIGHT_BAR_W,
-  BEAST_FIGHT_BAR_X,
-  BEAST_FIGHT_BAR_Y,
-  BEAST_FIGHT_BAR_H,
   BEAST_IMG_S,
   BEAST_IMG_X,
   BEAST_IMG_Y,
@@ -89,27 +85,26 @@ import {
   ENERGY_BAR_H,
   ENERGY_BAR_X,
   ENERGY_BAR_Y,
-  FIGHT_BEAST_MAX_LINES,
-  FIGHT_DRAGON_IMG_OFFSET_X,
-  FIGHT_DRAGON_IMG_S,
-  FIGHT_DRAGON_IMG_Y,
-  FIGHT_LINE_GAP,
-  FIGHT_LINE_H,
-  FIGHT_LINE_PAD,
-  FIGHT_LINES_Y,
-  FIGHT_MAX_LINES,
-  FIGHT_MONSTER_IMG_S,
-  FIGHT_MONSTER_IMG_X,
-  FIGHT_MONSTER_IMG_Y,
-  FIGHT_OUTCOME_ICON_S,
-  FIGHT_OUTCOME_ICON_X,
-  FIGHT_OUTCOME_ICON_Y,
-  FIGHT_OUTCOME_TEXT_H,
-  FIGHT_OUTCOME_TEXT_Y,
-  FIGHT_STARS_Y,
-  FIGHT_VS_H,
-  FIGHT_VS_X,
-  FIGHT_VS_Y,
+  FIGHT_ARENA_H,
+  FIGHT_ARENA_Y,
+  FIGHT_COL_GAP,
+  FIGHT_CONTINUE_Y,
+  FIGHT_DRAGON_S,
+  FIGHT_ENEMY_S,
+  FIGHT_ENEMY_X,
+  FIGHT_FIREBALL_S,
+  FIGHT_HP_BAR_GAP,
+  FIGHT_HP_BAR_H,
+  FIGHT_IMPACT_S,
+  FIGHT_LEFT_X,
+  FIGHT_LEFT_X_WIDE,
+  FIGHT_LOG_FONT,
+  FIGHT_LOG_H,
+  FIGHT_LOG_Y,
+  FIGHT_MISS_H,
+  FIGHT_ROW_GAP,
+  FIGHT_TITLE_H,
+  FIGHT_TITLE_Y,
   HATCH_BTN_Y,
   HATCH_TEXT_H,
   HATCH_TEXT_Y,
@@ -200,6 +195,8 @@ import {
 import {
   ASSET_BEAST_72,
   ASSET_BEAST_128,
+  ASSET_FIREBALL_28,
+  ASSET_IMPACT_48,
   ASSET_CLOSE_36,
   ASSET_COIN_64,
   ASSET_EQUIPMENT_40,
@@ -234,6 +231,7 @@ import {
   BTN_GREEN_PRESS,
   BTN_RADIUS,
   COINS_FONT,
+  COLOR_BLACK,
   COLOR_BTN_DISABLED,
   COLOR_BTN_SELL,
   COLOR_BTN_TEXT,
@@ -255,10 +253,12 @@ import {
   ENERGY_SEG_Y1,
   ENERGY_SEG_INSET,
   FALLBACK_ROSTER_ICON,
-  FIGHT_BEAST_OUTCOME_FONT,
-  FIGHT_LINE_FONT,
-  FIGHT_OUTCOME_FONT,
-  FIGHT_VS_FONT,
+  FIGHT_ATTACKER_ALPHA,
+  FIGHT_ATTACKER_COLOR,
+  FIGHT_HP_COLOR,
+  FIGHT_HP_TRACK_COLOR,
+  FIGHT_MISS_FONT,
+  FIGHT_TITLE_FONT,
   HATCH_TEXT_FONT,
   IMG_DISABLED_ALPHA,
   MODAL_RADIUS,
@@ -295,11 +295,11 @@ import {
   eggAsset60,
   monsterAsset72,
 } from './index.style.js';
+import { fightBarFill, fightFireballPos, fightUnitRects } from './viewUtils.js';
 import { CONFIG, beastDisplayStrength, breedForIndex, clamp, effectiveMonsterStrength, starsForStrength } from '../engine/config.js';
 import { createGameEngine, coerceLoadedSave } from '../engine/engine.js';
 import {
   actionRowPositions,
-  beastFightHpAtReveal,
   beastVanishHours,
   energySegmentColor,
   energySegmentsFilled,
@@ -375,8 +375,12 @@ let _screenIndex = 0;
 // Equipment page overlay: dragon id while its equipment page is open, else
 // null. _screenIndex is untouched so Back returns to the same dragon page.
 let _equipmentDragonId = null;
-// Modal: null or { kind, ...payload }. Fight modals carry reveal progress.
+// Modal: null or { kind, ...payload }.
 let _modal = null;
+// Fight screen: null or the replay state for an already-resolved fight
+// (see openFightScreen). The engine decides the outcome instantly and
+// persists it; this only animates the returned turns.
+let _fight = null;
 
 // ---------------------------------------------------------------------------
 // Small view helpers over the engine state
@@ -407,6 +411,7 @@ function currentView() {
 function goTo(index) {
   _screenIndex = clamp(index, 0, roster().length);
   _equipmentDragonId = null;
+  _fight = null;
   closeTimersForScreen();
   if (_page) _page.render();
 }
@@ -770,88 +775,246 @@ function openMonsterSelect(dragonId) {
 
 function startMonsterFight(dragonId, monsterId) {
   const view = engine.getDragonView(dragonId);
-  if (!view) return;
+  const monster = engine.getSpawnedMonsters().find((m) => m.id === monsterId);
+  if (!view || !monster) return;
+  // Snapshot entry HP BEFORE resolving: the engine decides the outcome
+  // instantly and persists it (anti-cheat), so the screen replays from
+  // this snapshot turn by turn.
+  const entryEnergy = view.energy;
   const res = engine.fightMonster(dragonId, monsterId);
   if (!res.ok) return;
-  openLockedFight(
-    { kind: 'monster-fight', dragonId, monsterId },
-    [
-      'Dragon ' + view.breed.name + ' attacks - damage ' + res.rawDamage,
-      res.won
-        ? 'Victory! +' + res.coinReward + ' coins, +' + res.strengthGain + ' strength'
-        : 'Dragon is tired, will recover automatically',
+  openFightScreen({
+    kind: 'monster',
+    title: 'Fight',
+    units: [
+      { asset: dragonAsset60(view.breed.assetKey), maxHp: entryEnergy, hp: entryEnergy, size: FIGHT_DRAGON_S },
+      { asset: monsterAsset72(monster.image), maxHp: monster.hp, hp: monster.hp, size: FIGHT_ENEMY_S },
     ],
-    { won: res.won, reward: res.coinReward, energyAfter: res.energyAfter, rawDamage: res.rawDamage, strengthGain: res.strengthGain, strengthAfter: res.strengthAfter },
-  );
+    turns: res.turns.map((t) => ({
+      attacker: t.attackerKind === 'dragon' ? 0 : 1,
+      target: t.attackerKind === 'dragon' ? 1 : 0,
+      hit: t.hit,
+      hpAfter: t.targetHpAfter,
+      text: t.text,
+    })),
+    outcomeText: res.won
+      ? 'Victory! +' + res.coinReward + ' coins, +' + res.strengthGain + ' strength'
+      : 'Defeat — rest to recover',
+    returnDragonId: dragonId,
+  });
 }
 
 function startBeastFight() {
   if (!engine.canFightBeast().ok) return;
-  // Snapshot HP BEFORE resolving: engine.fightBeast() decides the outcome
-  // instantly and persists it (anti-cheat — closing mid-fight keeps the
-  // result), so the UI must replay the bar from this snapshot turn by turn.
+  const participants = engine.getBeastParticipants();
+  const views = participants
+    .map((d) => engine.getDragonView(d.id))
+    .filter((v) => v !== null);
+  if (views.length === 0) return;
+  // Snapshot entry HP BEFORE resolving (same anti-cheat rule as monsters).
   const hpBefore = engine.getState().beast.currentHp;
   const maxHp = engine.getState().beast.maxHp;
   const res = engine.fightBeast();
   if (!res.ok) return;
-  const lines = res.turns.map((t) => t.text);
-  if (res.won) {
-    const gains = Object.values(res.strengthGains || {});
-    const avg = gains.length ? Math.round(gains.reduce((a, b) => a + b, 0) / gains.length) : 0;
-    lines.push(
-      'Bewilder Beast vanishes for a day. Continue adventure. +' + res.reward + ' coins, survivors +' + avg + ' strength',
-    );
-  } else {
-    lines.push('Defeat - roster empty. Buy a new egg.');
-  }
-  openLockedFight(
-    { kind: 'beast-fight' },
-    lines,
-    {
-      won: res.won,
-      reward: res.reward,
-      hpBefore,
-      hpAfter: res.beastHpAfter,
-      // Per-turn HP trail for the realtime bar replay (last entry is the
-      // final summary line, which holds the outcome — no HP step of its own).
-      hpSteps: res.turns.map((t) => t.beastHpAfter),
-      maxHp,
-      strengthGains: res.strengthGains || {},
-    },
-    5000,
-  );
+  const enemyIndex = views.length;
+  const byId = new Map(views.map((v, i) => [v.dragon.id, i]));
+  openFightScreen({
+    kind: 'beast',
+    title: CONFIG.beast.name,
+    units: [
+      ...views.map((v) => ({
+        asset: dragonAsset60(v.breed.assetKey),
+        maxHp: v.energy,
+        hp: v.energy,
+        size: FIGHT_DRAGON_S,
+      })),
+      { asset: ASSET_BEAST_72, maxHp, hp: hpBefore, size: FIGHT_ENEMY_S },
+    ],
+    turns: res.turns.map((t) => {
+      if (t.attackerKind === 'dragon') {
+        return {
+          attacker: byId.get(t.attackerId) ?? 0,
+          target: enemyIndex,
+          hit: t.hit,
+          hpAfter: t.targetHpAfter,
+          text: t.text,
+        };
+      }
+      return {
+        attacker: enemyIndex,
+        target: byId.get(t.targetId) ?? 0,
+        hit: t.hit,
+        hpAfter: t.targetHpAfter,
+        text: t.text,
+      };
+    }),
+    outcomeText: res.won
+      ? 'Beast defeated! +' + res.reward + ' coins, +strength'
+      : 'Defeat — roster lost. Buy a new egg.',
+    returnDragonId: null,
+  });
 }
 
-// Locked fight modal: X hidden until every turn line has been revealed.
-function openLockedFight(base, lines, outcome, delayMs) {
-  _modal = Object.assign({}, base, {
-    locked: true,
-    lines,
-    revealed: 0,
-    outcome,
+// Fight screen: full-screen animated replay of an already-resolved fight.
+// Phases per turn (in fight-screen ticks): aim (attacker highlights) ->
+// fly (fireball travels attacker -> target) -> impact (HP bar steps to
+// the turn's hpAfter, hit burst / MISS shows) -> next turn. Tapping
+// anywhere during the replay skips to the outcome; Continue appears
+// only after the last turn.
+const FIGHT_PHASE_TICKS = { aim: 2, fly: 4, impact: 5 };
+
+function openFightScreen({ kind, title, units, turns, outcomeText, returnDragonId }) {
+  _modal = null;
+  _equipmentDragonId = null;
+  const rects = fightUnitRects({
+    dragonCount: units.length - 1,
+    shape: DEVICE.shape,
+    arenaY: FIGHT_ARENA_Y,
+    arenaH: FIGHT_ARENA_H,
+    leftX: FIGHT_LEFT_X,
+    leftXWide: FIGHT_LEFT_X_WIDE,
+    colGap: FIGHT_COL_GAP,
+    enemyX: FIGHT_ENEMY_X,
+    dragonS: FIGHT_DRAGON_S,
+    enemyS: FIGHT_ENEMY_S,
+    barH: FIGHT_HP_BAR_H,
+    barGap: FIGHT_HP_BAR_GAP,
+    rowGap: FIGHT_ROW_GAP,
   });
+  units.forEach((u, i) => {
+    u.rect = i < units.length - 1 ? rects.dragons[i] : rects.enemy;
+  });
+  _fight = {
+    kind,
+    title,
+    units,
+    turns,
+    outcomeText,
+    returnDragonId,
+    turnIndex: 0,
+    phase: 'aim',
+    phaseTicks: 0,
+    fireball: null,
+    impact: null,
+    miss: null,
+    log: 'Tap anywhere to skip',
+    done: false,
+  };
   if (_fightTimer) clearInterval(_fightTimer);
-  _fightTimer = setInterval(() => {
-    if (!_modal || (_modal.kind !== 'monster-fight' && _modal.kind !== 'beast-fight')) {
-      if (_fightTimer) {
-        clearInterval(_fightTimer);
-        _fightTimer = null;
-      }
-      return;
-    }
-    if (_modal.revealed < _modal.lines.length) {
-      _modal.revealed += 1;
-      if (_modal.revealed >= _modal.lines.length) {
-        _modal.locked = false;
-        if (_fightTimer) {
-          clearInterval(_fightTimer);
-          _fightTimer = null;
-        }
-      }
-      if (_page) _page.render();
-    }
-  }, delayMs || CONFIG.ui.fightTurnDelayMs);
+  _fightTimer = setInterval(stepFightScreen, CONFIG.ui.fightScreenTickMs);
   if (_page) _page.render();
+}
+
+function fightUnitCenter(unit) {
+  return {
+    x: unit.rect.x + unit.size / 2,
+    y: unit.rect.y + unit.size / 2,
+  };
+}
+
+function stepFightScreen() {
+  const f = _fight;
+  if (!f || f.done) {
+    if (_fightTimer) {
+      clearInterval(_fightTimer);
+      _fightTimer = null;
+    }
+    return;
+  }
+  const turn = f.turns[f.turnIndex];
+  if (!turn) {
+    finishFightScreen();
+    return;
+  }
+  f.phaseTicks += 1;
+  if (f.phase === 'aim') {
+    if (f.phaseTicks >= FIGHT_PHASE_TICKS.aim) {
+      f.phase = 'fly';
+      f.phaseTicks = 0;
+      f.fireball = fightFireballPos(
+        fightUnitCenter(f.units[turn.attacker]),
+        fightUnitCenter(f.units[turn.attacker]),
+        0,
+        FIGHT_FIREBALL_S,
+      );
+    }
+  } else if (f.phase === 'fly') {
+    f.fireball = fightFireballPos(
+      fightUnitCenter(f.units[turn.attacker]),
+      fightUnitCenter(f.units[turn.target]),
+      f.phaseTicks / FIGHT_PHASE_TICKS.fly,
+      FIGHT_FIREBALL_S,
+    );
+    if (f.phaseTicks >= FIGHT_PHASE_TICKS.fly) {
+      // Impact: the bar steps to the already-resolved HP; the turn text
+      // narrates hit/miss (the engine decided both up front).
+      f.units[turn.target].hp = turn.hpAfter;
+      const center = fightUnitCenter(f.units[turn.target]);
+      f.fireball = null;
+      f.impact = turn.hit ? center : null;
+      f.miss = turn.hit ? null : center;
+      f.log = turn.text;
+      f.phase = 'impact';
+      f.phaseTicks = 0;
+    }
+  } else if (f.phase === 'impact') {
+    if (f.phaseTicks >= FIGHT_PHASE_TICKS.impact) {
+      f.turnIndex += 1;
+      f.phaseTicks = 0;
+      f.impact = null;
+      f.miss = null;
+      if (f.turnIndex >= f.turns.length) {
+        finishFightScreen();
+        return;
+      }
+      f.phase = 'aim';
+    }
+  }
+  if (_page) _page.render();
+}
+
+function finishFightScreen() {
+  const f = _fight;
+  if (!f) return;
+  f.done = true;
+  f.phase = 'done';
+  f.fireball = null;
+  f.impact = null;
+  f.miss = null;
+  f.log = f.outcomeText;
+  if (_fightTimer) {
+    clearInterval(_fightTimer);
+    _fightTimer = null;
+  }
+  if (_page) _page.render();
+}
+
+// Tap anywhere during the replay: apply every remaining turn at once and
+// show the outcome. Continue still gates leaving the screen.
+function skipFightScreen() {
+  const f = _fight;
+  if (!f || f.done) return;
+  for (let i = f.turnIndex; i < f.turns.length; i++) {
+    f.units[f.turns[i].target].hp = f.turns[i].hpAfter;
+  }
+  f.turnIndex = f.turns.length;
+  finishFightScreen();
+}
+
+function closeFightScreen() {
+  if (!_fight) return;
+  const returnId = _fight.returnDragonId;
+  _fight = null;
+  if (_fightTimer) {
+    clearInterval(_fightTimer);
+    _fightTimer = null;
+  }
+  if (returnId) {
+    const idx = roster().findIndex((d) => d.id === returnId);
+    goTo(idx >= 0 ? idx + 1 : 0);
+  } else {
+    goTo(0);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1174,38 +1337,90 @@ list.forEach((m, i) => {
    });
 }
 
-function renderFightLines(maxShown) {
-  const lines = _modal.lines || [];
-  const shown = lines.slice(0, _modal.revealed);
-  const startY = PANEL_Y + FIGHT_LINES_Y;
-  shown.slice(-(maxShown || FIGHT_MAX_LINES)).forEach((line, i) => {
-    addText(PANEL_X + FIGHT_LINE_PAD, startY + i * FIGHT_LINE_GAP, PANEL_W - FIGHT_LINE_PAD * 2, FIGHT_LINE_H, line, FIGHT_LINE_FONT, COLOR_WHITE);
+function addFightHpBar(unit) {
+  const r = unit.rect;
+  addShade(r.barX, r.barY, r.barW, FIGHT_HP_BAR_H, null, {
+    color: FIGHT_HP_TRACK_COLOR,
+    alpha: 255,
+    radius: 2,
   });
+  const fill = fightBarFill(r.barW, unit.hp, unit.maxHp);
+  if (fill > 0) {
+    addShade(r.barX, r.barY, fill, FIGHT_HP_BAR_H, null, {
+      color: FIGHT_HP_COLOR,
+      alpha: 255,
+      radius: 2,
+    });
+  }
 }
 
-function renderMonsterFight() {
-  const modal = _modal;
-  const view = engine.getDragonView(modal.dragonId);
-  const monster = engine.getSpawnedMonsters().find((m) => m.id === modal.monsterId);
-  renderModalShell('Fight', modal.locked);
-  if (monster) {
-    addImg(PANEL_X + FIGHT_MONSTER_IMG_X, PANEL_Y + FIGHT_MONSTER_IMG_Y, FIGHT_MONSTER_IMG_S, FIGHT_MONSTER_IMG_S, monsterAsset72(monster.image));
-    addStrengthStars(PANEL_X + FIGHT_MONSTER_IMG_X + Math.floor(FIGHT_MONSTER_IMG_S / 2), PANEL_Y + FIGHT_STARS_Y, effectiveMonsterStrength(monster));
+function renderFightScreen(width) {
+  const f = _fight;
+  addImg(BG_X, BG_Y, BG_W, BG_H, BG_DRAGON_SRC);
+  // Dim the bright bg artwork so the units and UI stay visible.
+  addShade(0, 0, width, DEVICE.height);
+  // Tap anywhere skips the replay (drawn first so the Continue button,
+  // drawn last, keeps its own tap once the fight is over).
+  addShade(0, 0, width, DEVICE.height, skipFightScreen, {
+    alpha: 0,
+    radius: 0,
+    color: COLOR_BLACK,
+  });
+  if (!f.done) {
+    addBadgeText(0, FIGHT_TITLE_Y, width, FIGHT_TITLE_H, f.title, FIGHT_TITLE_FONT, COLOR_WHITE);
   }
-  if (view) {
-    addImg(PANEL_X + PANEL_W - FIGHT_DRAGON_IMG_OFFSET_X, PANEL_Y + FIGHT_DRAGON_IMG_Y, FIGHT_DRAGON_IMG_S, FIGHT_DRAGON_IMG_S, dragonAsset60(view.breed.assetKey));
-    addStrengthStars(PANEL_X + PANEL_W - FIGHT_DRAGON_IMG_OFFSET_X + Math.floor(FIGHT_DRAGON_IMG_S / 2), PANEL_Y + FIGHT_STARS_Y, view.combatStrength ?? view.strength);
+  const turn = f.done ? null : f.turns[f.turnIndex];
+  f.units.forEach((u, i) => {
+    const isAttacker = turn && f.phase !== 'done' && i === turn.attacker;
+    const isImpactTarget = f.phase === 'impact' && turn && i === turn.target;
+    // Dead units vanish (except the impact target, shown at 0 HP mid-burst).
+    if (u.hp <= 0 && !isImpactTarget) return;
+    if (isAttacker) {
+      addShade(u.rect.x - 4, u.rect.y - 4, u.size + 8, u.size + 8, null, {
+        color: FIGHT_ATTACKER_COLOR,
+        alpha: FIGHT_ATTACKER_ALPHA,
+        radius: 8,
+      });
+    }
+    addImg(u.rect.x, u.rect.y, u.size, u.size, u.asset);
+    addFightHpBar(u);
+  });
+  if (f.fireball) {
+    addImg(f.fireball.x, f.fireball.y, FIGHT_FIREBALL_S, FIGHT_FIREBALL_S, ASSET_FIREBALL_28);
   }
-  if (monster && view) {
-    addText(PANEL_X + FIGHT_VS_X, PANEL_Y + FIGHT_VS_Y, PANEL_W - FIGHT_VS_X * 2, FIGHT_VS_H, 'vs', FIGHT_VS_FONT, COLOR_COIN);
+  if (f.impact) {
+    addImg(
+      Math.round(f.impact.x - FIGHT_IMPACT_S / 2),
+      Math.round(f.impact.y - FIGHT_IMPACT_S / 2),
+      FIGHT_IMPACT_S,
+      FIGHT_IMPACT_S,
+      ASSET_IMPACT_48,
+    );
   }
-  renderFightLines(FIGHT_MAX_LINES);
-  if (!modal.locked && modal.outcome) {
-    addImg(PANEL_X + FIGHT_OUTCOME_ICON_X, PANEL_Y + PANEL_H - FIGHT_OUTCOME_ICON_Y, FIGHT_OUTCOME_ICON_S, FIGHT_OUTCOME_ICON_S, modal.outcome.won ? ASSET_VICTORY_60 : ASSET_LOSS_60);
+  if (f.miss) {
     addText(
-      PANEL_X + MODAL_PAD, PANEL_Y + PANEL_H - FIGHT_OUTCOME_TEXT_Y, PANEL_W - MODAL_PAD * 2, FIGHT_OUTCOME_TEXT_H,
-      modal.outcome.won ? '+' + modal.outcome.reward + ' coins, +' + (modal.outcome.strengthGain || 0) + ' str' : 'Rest to recover',
-      FIGHT_OUTCOME_FONT, modal.outcome.won ? COLOR_SUCCESS : COLOR_ERROR,
+      Math.round(f.miss.x - 40),
+      Math.round(f.miss.y - FIGHT_MISS_H / 2),
+      80,
+      FIGHT_MISS_H,
+      'MISS',
+      FIGHT_MISS_FONT,
+      COLOR_ERROR,
+    );
+  }
+  // Log line: current turn narration, then the outcome. Short "Beast"
+  // label: the full name makes the line overflow the round circle chord
+  // and the damage number (the part that matters) clips off.
+  const logText = f.log.replace('Bewilder Beast', 'Beast');
+  addBadgeText(0, FIGHT_LOG_Y, width, FIGHT_LOG_H, logText, FIGHT_LOG_FONT, COLOR_WHITE);
+  if (f.done) {
+    addButton(
+      Math.floor((width - BTN_W) / 2),
+      FIGHT_CONTINUE_Y,
+      BTN_W,
+      BTN_H,
+      'Continue',
+      closeFightScreen,
     );
   }
 }
@@ -1236,42 +1451,6 @@ function renderBeastIntro() {
     addButton(PANEL_X + BTN_CENTER_X, PANEL_Y + PANEL_H - BTN_BOTTOM_OFFSET, BTN_W, BTN_H, 'Fight', startBeastFight);
   } else {
     addButton(PANEL_X + BTN_CENTER_X, PANEL_Y + PANEL_H - BTN_BOTTOM_OFFSET, BTN_W, BTN_H, 'Fight', null, { normal: COLOR_BTN_DISABLED });
-  }
-}
-
-function renderBeastFight() {
-  const modal = _modal;
-  const beast = engine.getState().beast;
-  renderModalShell('Beast Battle', modal.locked);
-  addImg(PANEL_X + FIGHT_MONSTER_IMG_X, PANEL_Y + FIGHT_MONSTER_IMG_Y, FIGHT_MONSTER_IMG_S, FIGHT_MONSTER_IMG_S, ASSET_BEAST_72);
-  addStrengthStars(PANEL_X + FIGHT_MONSTER_IMG_X + Math.floor(FIGHT_MONSTER_IMG_S / 2), PANEL_Y + FIGHT_STARS_Y, beastDisplayStrength());
-  // Realtime HP replay: the engine already persisted the final outcome
-  // (anti-cheat), but the bar must drain turn-by-turn as lines reveal.
-  let maxHp = beast.maxHp;
-  if (modal.outcome && Array.isArray(modal.outcome.hpSteps)) {
-    maxHp = modal.outcome.maxHp || maxHp;
-  }
-  const hp = modal.outcome
-    ? beastFightHpAtReveal({
-        revealed: modal.revealed,
-        lineCount: modal.lines.length,
-        hpSteps: modal.outcome.hpSteps,
-        hpBefore: modal.outcome.hpBefore,
-        hpAfter: modal.outcome.hpAfter,
-        currentHp: beast.currentHp,
-      })
-    : beast.currentHp;
-  addEnergyBar(PANEL_X + BEAST_FIGHT_BAR_X, PANEL_Y + BEAST_FIGHT_BAR_Y, BEAST_FIGHT_BAR_W, BEAST_FIGHT_BAR_H, ASSET_ENERGY_BAR_190, hp, maxHp);
-  renderFightLines(FIGHT_BEAST_MAX_LINES);
-  if (!modal.locked && modal.outcome) {
-    addImg(PANEL_X + FIGHT_OUTCOME_ICON_X, PANEL_Y + PANEL_H - FIGHT_OUTCOME_ICON_Y, FIGHT_OUTCOME_ICON_S, FIGHT_OUTCOME_ICON_S, modal.outcome.won ? ASSET_VICTORY_60 : ASSET_LOSS_60);
-    if (modal.outcome.won) {
-      addText(
-        PANEL_X + MODAL_PAD, PANEL_Y + PANEL_H - FIGHT_OUTCOME_TEXT_Y, PANEL_W - MODAL_PAD * 2, FIGHT_OUTCOME_TEXT_H,
-        'Vanishes for a day! +' + modal.outcome.reward + ' coins, survivors +str',
-        FIGHT_BEAST_OUTCOME_FONT, COLOR_SUCCESS,
-      );
-    }
   }
 }
 
@@ -1398,9 +1577,7 @@ function renderModal() {
     case 'train-result': renderTrainResult(); break;
     case 'sell': renderSell(); break;
     case 'monster-select': renderMonsterSelect(); break;
-    case 'monster-fight': renderMonsterFight(); break;
     case 'beast-intro': renderBeastIntro(); break;
-    case 'beast-fight': renderBeastFight(); break;
     case 'coin-summary': renderCoinSummary(); break;
     case 'combat-stats': renderCombatStats(); break;
     case 'equipment-buy': renderEquipmentBuy(); break;
@@ -1463,25 +1640,31 @@ Page({
     _widgets.forEach((w) => hmUI.deleteWidget(w));
     _widgets = [];
 
-    if (_screenIndex > roster().length) _screenIndex = roster().length;
-    const view = currentView();
-    if (_equipmentDragonId) {
-      const eView = engine.getDragonView(_equipmentDragonId);
-      if (eView && eView.stage !== 'egg') {
-        renderEquipment(width, eView);
-      } else {
-        // Dragon gone / hatched-back? (expired, sold) — drop the overlay.
-        _equipmentDragonId = null;
+    if (_fight) {
+      // Fight screen replaces everything (no nav, no modals) until the
+      // replay ends and the player taps Continue.
+      renderFightScreen(width);
+    } else {
+      if (_screenIndex > roster().length) _screenIndex = roster().length;
+      const view = currentView();
+      if (_equipmentDragonId) {
+        const eView = engine.getDragonView(_equipmentDragonId);
+        if (eView && eView.stage !== 'egg') {
+          renderEquipment(width, eView);
+        } else {
+          // Dragon gone / hatched-back? (expired, sold) — drop the overlay.
+          _equipmentDragonId = null;
+        }
       }
-    }
-    if (!_equipmentDragonId) {
-      if (_screenIndex === 0 || !view) {
-        _screenIndex = 0;
-        renderMain(width);
-      } else {
-        renderDragon(width, view);
+      if (!_equipmentDragonId) {
+        if (_screenIndex === 0 || !view) {
+          _screenIndex = 0;
+          renderMain(width);
+        } else {
+          renderDragon(width, view);
+        }
       }
+      renderModal();
     }
-    renderModal();
   },
 });

@@ -24,12 +24,12 @@ import {
   beastCombatDefense,
   collectibleCoins,
   energyAt,
+  fightHitDamage,
   maxUncollectedCoins,
   recoverEnergy,
-  resolveBeastTurn,
+  resolveBeastFight,
   resolveMonsterFight,
-  rollBeastCounterDamage,
-  rollDamageBonus,
+  rollFightDamageBonus,
   rollTrainingGain,
   starsForStrength,
   trainingCost,
@@ -49,8 +49,9 @@ function mulberry32(seed: number): () => number {
 
 const HOUR = 60 * 60 * 1000;
 const AVG_TRAINING_GAIN = (CONFIG.training.strengthGainMin + CONFIG.training.strengthGainMax) / 2; // 3.5
-const AVG_BONUS = (CONFIG.battle.randomBonusMin + CONFIG.battle.randomBonusMax) / 2; // 5
-const AVG_BEAST_COUNTER = (CONFIG.beast.counterDamageMin + CONFIG.beast.counterDamageMax) / 2; // 23
+const AVG_BONUS = (CONFIG.fight.damageBonusMin + CONFIG.fight.damageBonusMax) / 2; // 4
+// Beast hit vs a combat-66 dragon: 85 - 33 + 4 = 56 (falls in 2 hits).
+const AVG_BEAST_HIT_VS_66 = 85 - Math.floor(66 / 2) + AVG_BONUS;
 
 /** Monte-Carlo win rate vs a monster at fixed strength. */
 function monsterWinRate(
@@ -63,7 +64,7 @@ function monsterWinRate(
   const rng = mulberry32(seed);
   let wins = 0;
   for (let i = 0; i < trials; i++) {
-    const r = resolveMonsterFight(strength, 100, monster, rng(), rng(), rng());
+    const r = resolveMonsterFight(strength, 100, monster, rng);
     if (r.won) wins++;
   }
   return wins / trials;
@@ -71,29 +72,21 @@ function monsterWinRate(
 
 /**
  * Simulate a full Beast run with a roster of equal-strength dragons.
- * Roster order, each dragon fights until removed, next steps in.
- * Returns true when beast HP hits 0 before the roster is wiped.
+ * Round-based: every alive dragon attacks, then the beast fires back at
+ * one random alive dragon (see `resolveBeastFight`). Returns true when
+ * beast HP hits 0 before the roster is wiped.
  */
 function simulateBeastRoster(
   strengths: number[],
   rng: () => number,
   startEnergy = 100,
 ): boolean {
-  let hp = CONFIG.beast.hp;
-  for (const strength of strengths) {
-    let energy = startEnergy;
-    // Mirror the engine loop: blows scale with entry energy, the counter
-    // drains live energy turn by turn.
-    const fightStartEnergy = startEnergy;
-    while (energy > 0 && hp > 0) {
-      const turn = resolveBeastTurn(strength, energy, hp, rng(), rng(), fightStartEnergy);
-      hp = turn.beastHpAfter;
-      energy = turn.dragonEnergyAfter;
-      if (turn.beastDefeated) return true;
-      if (turn.dragonRemoved) break;
-    }
-  }
-  return hp <= 0;
+  return resolveBeastFight(
+    strengths,
+    strengths.map(() => startEnergy),
+    CONFIG.beast.hp,
+    rng,
+  ).won;
 }
 
 function beastWinRate(
@@ -119,11 +112,22 @@ describe("orientir: energy recovery", () => {
     expect(recoverEnergy(0, 8 * HOUR)).toBeCloseTo(80);
   });
 
-  it("recovers a typical Easy-fight wound (avg ~85 win) in about a day-shift (8-10h)", () => {
-    // Easy win loss avg = (70+100)/2 = 85 -> 100-85 = 15 left
-    const afterEasyWin = 100 - 85;
-    expect(recoverEnergy(afterEasyWin, 9 * HOUR)).toBe(100);
-    expect(recoverEnergy(afterEasyWin, 8 * HOUR)).toBeGreaterThanOrEqual(90);
+  it("recovers a typical Easy-fight wound (a ~21 dragon wins with ~55+ HP left) in a few hours", () => {
+    // Turn-based Easy win costs ~30-45 energy (monster hits back ~18/round
+    // for ~2-3 rounds); a trained dragon leaves with roughly half its bar.
+    const rng = mulberry32(21);
+    let totalLeft = 0;
+    let wins = 0;
+    for (let i = 0; i < 500; i++) {
+      const r = resolveMonsterFight(21, 100, MONSTERS[0], rng);
+      if (r.won) {
+        totalLeft += r.dragonHpAfter;
+        wins++;
+      }
+    }
+    expect(wins).toBeGreaterThan(400);
+    expect(totalLeft / wins).toBeGreaterThan(50);
+    expect(recoverEnergy(55, 5 * HOUR)).toBe(100);
   });
 
   it("recovers even the heaviest wounds (95-100) within a day", () => {
@@ -239,32 +243,38 @@ describe("orientir: training progression -> Easy / Medium / Hard", () => {
     }
   });
 
-  it("fresh common hatch (~11) usually LOSES to Easy-19 (~25% win); reliable after 3-4 trainings", () => {
-    // Easy strength 19: strength 11 wins only with bonus>=8 (3/11 ≈ 27%)
+  it("fresh common hatch (~11) usually LOSES to Easy (~20% win); reliable after 3-4 trainings", () => {
+    // Turn-based race: fresh deals ~6/hit (needs 7 landed) vs Easy's
+    // ~18/hit back (needs 6 landed) — the underdog loses most races.
     const freshRate = monsterWinRate(11, 0, 3000, 1);
-    expect(freshRate).toBeGreaterThan(0.15);
-    expect(freshRate).toBeLessThan(0.4);
-    // weakest hatch (8) can never win (needs bonus>=11, max 10)
-    expect(monsterWinRate(8, 0, 500, 9)).toBe(0);
+    expect(freshRate).toBeGreaterThan(0.1);
+    expect(freshRate).toBeLessThan(0.35);
+    // weakest hatch (8) almost never wins (needs 8+ landed hits first)
+    expect(monsterWinRate(8, 0, 2000, 9)).toBeLessThan(0.1);
     // after ~3 avg trainings (11 -> 21) the dragon beats Easy reliably
     expect(monsterWinRate(21, 0, 500, 3)).toBeGreaterThan(0.9);
-    // a win costs almost all energy (70-100 loss -> 0-30 left)
+    // a win costs roughly a third of the bar (monster lands ~2 hits back)
     const rng = mulberry32(21);
+    let totalLeft = 0;
+    let wins = 0;
     for (let i = 0; i < 200; i++) {
-      const r = resolveMonsterFight(21, 100, MONSTERS[0], rng(), rng(), rng());
+      const r = resolveMonsterFight(21, 100, MONSTERS[0], rng);
       if (r.won) {
-        expect(r.energyAfter).toBeLessThanOrEqual(30);
-        expect(r.energyAfter).toBeGreaterThanOrEqual(0);
+        totalLeft += r.dragonHpAfter;
+        wins++;
       }
     }
+    expect(wins).toBeGreaterThan(150);
+    expect(totalLeft / wins).toBeGreaterThan(45);
   });
 
   it("Medium (effective 40 = 32 + 8 gear) becomes favored at combat ~38", () => {
-    // combat 38 wins with bonus>=2 (~82%); combat 30 wins only with bonus 10 (~9%)
+    // ~65% at 38 (4 landed hits each side, dragon strikes first);
+    // ~10% at 30 (needs 7 landed vs the monster's 4).
     const rate = monsterWinRate(38, 1, 3000, 4);
-    expect(rate).toBeGreaterThan(0.7);
-    expect(rate).toBeLessThan(0.95);
-    expect(monsterWinRate(30, 1, 3000, 5)).toBeLessThan(0.2);
+    expect(rate).toBeGreaterThan(0.5);
+    expect(rate).toBeLessThan(0.85);
+    expect(monsterWinRate(30, 1, 3000, 5)).toBeLessThan(0.25);
     // undertrained dragons mostly lose to Medium
     expect(monsterWinRate(15, 1, 2000, 5)).toBeLessThan(0.1);
     // reaching combat 38: base 30 (6 trainings) + head (100) + one leg (60)
@@ -273,12 +283,12 @@ describe("orientir: training progression -> Easy / Medium / Hard", () => {
   });
 
   it("Hard (effective 78 = 55 + 23 gear) needs combat ~76", () => {
-    // combat 76 wins with bonus>=2 (~82%); combat 68 wins only with bonus 10 (~9%)
-    expect(monsterWinRate(76, 2, 3000, 6)).toBeGreaterThan(0.7);
-    expect(monsterWinRate(76, 2, 3000, 6)).toBeLessThan(0.95);
-    expect(monsterWinRate(68, 2, 2000, 7)).toBeLessThan(0.2);
-    // a bare base-55 dragon can never win (needs bonus>=23, max 10)
-    expect(monsterWinRate(55, 2, 500, 8)).toBe(0);
+    // ~65% at 76 (3 landed hits each side, dragon strikes first);
+    // ~50% at 68; a bare base-55 dragon wins ~0% (needs 6+ landed hits).
+    expect(monsterWinRate(76, 2, 3000, 6)).toBeGreaterThan(0.5);
+    expect(monsterWinRate(76, 2, 3000, 6)).toBeLessThan(0.85);
+    expect(monsterWinRate(68, 2, 2000, 7)).toBeLessThan(0.65);
+    expect(monsterWinRate(55, 2, 2000, 8)).toBeLessThan(0.05);
     // practical path: base 50 (12 trainings) + full gear (+26) = combat 76
     expect(Math.ceil((50 - 11) / AVG_TRAINING_GAIN)).toBe(12);
   });
@@ -312,56 +322,53 @@ describe("orientir: Bewilder Beast (boss)", () => {
     expect(beastCombatDefense()).toBe(46);
   });
 
-  it("documents per-turn math: avg bonus 5, avg counter 23", () => {
-    expect(AVG_BONUS).toBe(5);
-    expect(AVG_BEAST_COUNTER).toBe(23);
-    expect(rollDamageBonus(0.5)).toBeGreaterThanOrEqual(0);
-    expect(rollDamageBonus(0.5)).toBeLessThanOrEqual(10);
-    expect(rollBeastCounterDamage(0.5)).toBeGreaterThanOrEqual(18);
-    expect(rollBeastCounterDamage(0.5)).toBeLessThanOrEqual(28);
+  it("documents per-attack math: avg bonus 4, beast hit vs 66 = 56", () => {
+    expect(AVG_BONUS).toBe(4);
+    expect(AVG_BEAST_HIT_VS_66).toBe(56);
+    expect(rollFightDamageBonus(0.5)).toBeGreaterThanOrEqual(0);
+    expect(rollFightDamageBonus(0.5)).toBeLessThanOrEqual(8);
+    // dragon hit: 66 - 46/2 + 4 = 47 (display 101 is stars-only;
+    // using it here would shrink every hit to ~20)
+    expect(fightHitDamage(66, beastCombatDefense(), 0.5)).toBe(47);
+    // beast hit: 85 - 66/2 + 4 = 56 — a combat-66 dragon falls in 2 hits
+    expect(fightHitDamage(CONFIG.beast.attack, 66, 0.5)).toBe(56);
   });
 
-  it("a fully equipped base-40 dragon (combat 66) deals ~25/turn, lasts ~5 turns (~125 lifetime)", () => {
-    // expected damage = 66 + 5 - 46 (combat defense) = 25
-    // (display 101 is stars-only; using it here would zero out every hit)
-    const expectedPerTurn = 66 + AVG_BONUS - beastCombatDefense();
-    expect(expectedPerTurn).toBe(25);
-    // lifetime turns = ceil(100 / 23) = 5
-    const expectedTurns = Math.ceil(100 / AVG_BEAST_COUNTER);
-    expect(expectedTurns).toBe(5);
-    expect(expectedPerTurn * expectedTurns).toBeLessThan(CONFIG.beast.hp); // 125 < 260: solo-66 can't win
+  it("a fully equipped base-40 dragon (combat 66) deals ~47/hit, falls in 2 beast hits", () => {
+    // solo-66 lifetime output ≈ 2 landed hits ≈ 94 << 580 HP: solo-66
+    // essentially never wins — the beast is a TEAM fight by design.
+    expect(beastWinRate([66], 500, 11)).toBeLessThan(0.05);
   });
 
-  it("ONE dragon can NEVER kill the 260-HP beast at combat 66, even with max rolls", () => {
-    // best case: bonus 10 every turn (30 dmg), counter 18 (6 turns) -> 180 < 260
-    const maxDmgPerTurn = 66 + 10 - beastCombatDefense();
-    const maxTurns = Math.ceil(100 / CONFIG.beast.counterDamageMin);
-    expect(maxDmgPerTurn * maxTurns).toBeLessThan(CONFIG.beast.hp);
-    expect(beastWinRate([66], 300, 11)).toBe(0);
+  it("THREE dragons at combat 66 win ~62% — strong but no longer a guarantee (design target: 3 x fully-equipped base-40)", () => {
+    // Team output/round ≈ 3 x 47 x 0.88 hit ≈ 124; beast needs ~5 rounds
+    // to fall, dealing ~5 x 56 ≈ 280 spread over the team — right at the
+    // edge, so misses and random targeting decide it.
+    const rate = beastWinRate([66, 66, 66], 1000, 12);
+    expect(rate).toBeGreaterThan(0.5);
+    expect(rate).toBeLessThan(0.75);
   });
 
-  it("THREE dragons at combat 66 ALWAYS kill the beast, even with worst rolls (design target: 3 x fully-equipped base-40)", () => {
-    // worst case: bonus 0 every turn (20 dmg), counter 18 (6 turns) -> 120 each -> 360 > 260
-    const minDmgPerTurn = 66 + 0 - beastCombatDefense();
-    const minTurnsEach = Math.ceil(100 / CONFIG.beast.counterDamageMin);
-    expect(minDmgPerTurn * minTurnsEach * 3).toBeGreaterThan(CONFIG.beast.hp);
-    expect(beastWinRate([66, 66, 66], 300, 12)).toBe(1);
+  it("TWO dragons at combat 66 almost never win — the 2-vs-3 threshold is sharp", () => {
+    expect(beastWinRate([66, 66], 500, 13)).toBeLessThan(0.1);
   });
 
-  it("TWO dragons at combat 66 are a coin flip (sometimes enough) — the 2-vs-3 threshold", () => {
-    const rate = beastWinRate([66, 66], 500, 13);
-    expect(rate).toBeGreaterThan(0.05);
-    expect(rate).toBeLessThan(0.99);
-  });
-
-  it("TWO dragons at combat 81 (base 55 + full gear) reliably win; FIVE at combat 76 always win", () => {
-    expect(beastWinRate([81, 81], 300, 14)).toBe(1);
+  it("TWO dragons at combat 81 (base 55 + full gear) win ~60%; FIVE at combat 76 always win", () => {
+    const pair = beastWinRate([81, 81], 500, 14);
+    expect(pair).toBeGreaterThan(0.45);
+    expect(pair).toBeLessThan(0.75);
     expect(beastWinRate([76, 76, 76, 76, 76], 200, 15)).toBe(1);
   });
 
-  it("a bare base-40 dragon barely scratches the geared beast (avg -1/turn)", () => {
-    // 40 + 5 - 46 = -1: gear is effectively required for the boss
-    expect(40 + AVG_BONUS - beastCombatDefense()).toBe(-1);
+  it("a bare base-40 team barely scratches the geared beast (3 x 40 win ~0%)", () => {
+    // 40 - 23 + 4 = 21/hit vs beast's 85 - 20 + 4 = 69/hit back:
+    // the team dies long before 580 HP is gone. Gear is required.
+    expect(fightHitDamage(40, beastCombatDefense(), 0.5)).toBe(21);
+    expect(beastWinRate([40, 40, 40], 500, 16)).toBeLessThan(0.05);
+  });
+
+  it("a lost beast fight heals to full (no grinding it down across attempts)", () => {
+    expect(CONFIG.beast.loseBehaviour).toBe("beast-heals-to-full-hp");
   });
 
   it("boss reward (300) refunds ~3 eggs — worth the ~10h recovery", () => {

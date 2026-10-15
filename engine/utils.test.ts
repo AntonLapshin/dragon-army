@@ -8,13 +8,13 @@ import { describe, expect, it } from "vitest";
 import {
   advanceCollectAnchor,
   advanceStepAnchor,
-  beastTurnLogText,
   createDragonId,
   createEggDragon,
+  fightTurnLogText,
   freshCombatStats,
   freshEquipment,
   hatchDragonInstance,
-  monsterFightLogText,
+  monsterFightSummaryText,
   normalizeCombatStats,
   normalizeEquipment,
   screensForRoster,
@@ -240,18 +240,22 @@ describe("screensForRoster", () => {
 });
 
 describe("fight-log text", () => {
-  it("monsterFightLogText narrates win vs loss", () => {
-    const win = monsterFightLogText("Gronkle", "monster 1", 5, true);
-    expect(win).toContain("Gronkle");
-    expect(win).toContain("5");
-    expect(win).toMatch(/victory/i);
-    const loss = monsterFightLogText("Gronkle", "monster 1", -3, false);
-    expect(loss).toContain("-3");
-    expect(loss).toMatch(/recover/);
+  it("fightTurnLogText narrates hits with damage, misses without", () => {
+    expect(fightTurnLogText("Gronkle", "monster 1", true, 23)).toBe(
+      "Gronkle hits monster 1 for 23",
+    );
+    expect(fightTurnLogText("Gronkle", "monster 1", false, 0)).toBe(
+      "Gronkle misses monster 1",
+    );
+    expect(
+      fightTurnLogText("Bewilder Beast", "Gronkle", true, 56),
+    ).toContain("Bewilder Beast");
   });
-  it("beastTurnLogText clamps negative damage at 0 in the text", () => {
-    expect(beastTurnLogText("Gronkle", 12, 20)).toContain("12");
-    expect(beastTurnLogText("Gronkle", -5, 20)).toContain("0 damage");
-    expect(beastTurnLogText("Gronkle", 12, 20)).toContain("Bewilder Beast");
+  it("monsterFightSummaryText narrates win vs loss", () => {
+    const win = monsterFightSummaryText(true, 20, 2);
+    expect(win).toMatch(/victory/i);
+    expect(win).toContain("20");
+    expect(win).toContain("2");
+    expect(monsterFightSummaryText(false, 0, 0)).toMatch(/recover/);
   });
 });

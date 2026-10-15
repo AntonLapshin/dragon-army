@@ -98,12 +98,13 @@ describe('layout tables', () => {
     const artBound = [
       'DRAGON_IMG_S', 'ACTION_ICON_S', 'ROSTER_THUMB', 'ROSTER_FRAME',
       'EGG_BTN_S', 'BEAST_BTN_S', 'ENERGY_BAR_W', 'ENERGY_BAR_H',
-      'BEAST_BAR_W', 'BEAST_BAR_H', 'BEAST_FIGHT_BAR_W', 'BEAST_FIGHT_BAR_H',
-      'MONSTER_IMG_S', 'FIGHT_MONSTER_IMG_S', 'FIGHT_DRAGON_IMG_S',
+      'BEAST_BAR_W', 'BEAST_BAR_H',
+      'MONSTER_IMG_S',
       'EARN_ICON_S', 'BALANCE_ICON_S', 'COINS_ICON_S', 'ICON_SIZE',
       'EGG_DICE_S', 'EGG_REVEAL_S', 'SELL_ICON_S', 'TRAIN_RESULT_ICON_S',
-      'FIGHT_OUTCOME_ICON_S', 'BEAST_IMG_S', 'SHADOW_W', 'SHADOW_H',
+      'BEAST_IMG_S', 'SHADOW_W', 'SHADOW_H',
       'EQUIP_BUY_ICON_S', 'EQUIP_BTN_S', 'EQUIP_ROW_H',
+      'FIGHT_DRAGON_S', 'FIGHT_ENEMY_S', 'FIGHT_FIREBALL_S', 'FIGHT_IMPACT_S',
     ];
     for (const k of artBound) {
       expect(ROUND480_LAYOUT[k], k).toBe(BIP6_LAYOUT[k]);
@@ -194,6 +195,46 @@ describe('round480 circle containment', () => {
       rows += 1;
     }
     expect(rows).toBe(3);
+  });
+
+  it('keeps the fight screen inside the circle (dragons left, enemy right)', async () => {
+    const { fightUnitRects } = await import('./viewUtils.js');
+    const params = {
+      shape: 'round',
+      arenaY: L.FIGHT_ARENA_Y,
+      arenaH: L.FIGHT_ARENA_H,
+      leftX: L.FIGHT_LEFT_X,
+      leftXWide: L.FIGHT_LEFT_X_WIDE,
+      colGap: L.FIGHT_COL_GAP,
+      enemyX: L.FIGHT_ENEMY_X,
+      dragonS: L.FIGHT_DRAGON_S,
+      enemyS: L.FIGHT_ENEMY_S,
+      barH: L.FIGHT_HP_BAR_H,
+      barGap: L.FIGHT_HP_BAR_GAP,
+      rowGap: L.FIGHT_ROW_GAP,
+    };
+    // 1, 6 and 12 dragons (max roster): every unit + its HP bar inside.
+    for (const count of [1, 6, 12]) {
+      const r = fightUnitRects({ ...params, dragonCount: count });
+      for (const d of r.dragons) {
+        expect(rectInsideCircle(d.barX, d.barY, d.barW, L.FIGHT_HP_BAR_H, 4), `dragon bar ${count}`).toBe(true);
+        expect(rectInsideCircle(d.x, d.y, d.size, d.size, 4), `dragon ${count}`).toBe(true);
+      }
+      expect(rectInsideCircle(r.enemy.barX, r.enemy.barY, r.enemy.barW, L.FIGHT_HP_BAR_H, 4), `enemy bar ${count}`).toBe(true);
+      expect(rectInsideCircle(r.enemy.x, r.enemy.y, r.enemy.size, r.enemy.size, 4), `enemy ${count}`).toBe(true);
+    }
+    // Continue button (drawn like index.js: centered, FIGHT_CONTINUE_Y).
+    const btnX = Math.floor((prof.width - L.BTN_W) / 2);
+    expect(rectInsideCircle(btnX, L.FIGHT_CONTINUE_Y, L.BTN_W, L.BTN_H, 4)).toBe(true);
+    // Log line: real Zepp OS TEXT clips instead of wrapping, so the
+    // longest narration (37 chars with the short "Beast" label, e.g.
+    // "Hideous Zippleback hits Beast for 48") must fit the circle chord
+    // at the log's vertical center. 0.6 = worst-case char-width factor
+    // (same as BADGE_WIDTH_FACTOR).
+    const logCenterY = L.FIGHT_LOG_Y + L.FIGHT_LOG_H / 2;
+    const dy = Math.abs(logCenterY - 240);
+    const chord = 2 * Math.sqrt(240 * 240 - dy * dy);
+    expect(37 * L.FIGHT_LOG_FONT * 0.6).toBeLessThanOrEqual(chord);
   });
 });
 

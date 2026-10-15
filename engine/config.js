@@ -89,9 +89,18 @@ const CONFIG = {
     perStrength: 1,
     perAgeDay: 2
   },
-  battle: {
-    randomBonusMin: 0,
-    randomBonusMax: 10
+  // Turn-based fight screen (see `resolveFightAttack`): every attack
+  // rolls hit/miss first, then damage on a hit. Accuracy grows with the
+  // attacker's combat edge so stronger combatants land more reliably.
+  fight: {
+    hitChanceBase: 0.8,
+    hitChancePerDiff: 4e-3,
+    hitChanceMin: 0.55,
+    hitChanceMax: 0.95,
+    damageBonusMin: 0,
+    damageBonusMax: 8,
+    // Even the weakest hit chips: fights never stall at 0 damage.
+    minDamage: 3
   },
   monsterSpawn: {
     maxShown: 3,
@@ -110,16 +119,26 @@ const CONFIG = {
   },
   beast: {
     name: "Bewilder Beast",
-    hp: 260,
+    // 580 HP + attack 85 (see `fight`): a 3-dragon team of combat-66
+    // dragons wins ~62% of fights (Monte Carlo, balance.test.ts) — no
+    // longer the old 100% guarantee. Two dragons at 66 almost never win;
+    // four fully geared dragons still win reliably (earned, not free).
+    hp: 580,
+    // Beast attack strength for `resolveFightAttack` (defender = the
+    // randomly picked dragon's combat strength). A hit lands for
+    // ~85 - combat/2 + bonus, so a combat-66 dragon falls in 2 hits —
+    // every beast turn threatens a kill, and a miss saves a dragon.
+    attack: 85,
     // Display strength: feeds starsForStrength() for the boss icon /
     // intro / fight header (75 = exactly 3 gold stars). This is the
     // "final boss looks mighty" number shown to the player.
     strengthConstant: 75,
-    // Combat defense: effective subtraction in resolveBeastTurn().
-    // Decoupled from the display value so the boss can LOOK like 3 gold
-    // stars while still hitting like ~20 (roster of 3-5 x 40-60 wins).
-    // Without this split, a display 75 would deal 0 damage per turn to
-    // mid-game rosters (40 + 10 - 75 < 0) and the beast would be unbeatable.
+    // Combat defense: the defender number in `resolveFightAttack()` for
+    // dragon blows (damage = combat - defense/2 + bonus). Decoupled from
+    // the display value so the boss can LOOK like 3 gold stars while a
+    // combat-66 dragon still deals ~47/hit. Without this split, a
+    // display 75 would zero out every mid-game hit and the beast would
+    // be unbeatable.
     combatDefense: 20,
     // The beast wears the FULL equipment set (all 7 slots, +26), so its
     // combat defense is 20 + 26 = 46 (see beastCombatDefense()) and its
@@ -136,13 +155,16 @@ const CONFIG = {
       "leg-back-left",
       "leg-back-right"
     ],
-    counterDamageMin: 18,
-    counterDamageMax: 28,
     counterTarget: "energy",
-    turnOrder: "roster-order",
+    // Round-based: every alive dragon attacks (roster order), then the
+    // beast fires back at ONE randomly picked alive dragon. A lost fight
+    // heals the beast back to full HP — no grinding it down across
+    // attempts with sacrificial rosters.
+    turnOrder: "round-based: all-alive-dragons, then beast-hits-random",
     participants: "all-hatched-dragons-with-energy-above-0 (eggs excluded)",
     zeroEnergyBehaviour: "removed-from-roster",
     loseCondition: "all-dragons-removed-before-hp-0",
+    loseBehaviour: "beast-heals-to-full-hp",
     winRewardMin: 300,
     winRewardMax: 300,
     // Survivors of a victorious beast battle grow stronger (rolled per dragon).
@@ -158,10 +180,11 @@ const CONFIG = {
   ui: {
     eggSpinFrameMs: 120,
     eggSpinSymbols: "167468123?!-+",
-    fightTurnDelayMs: 900,
+    // Fight-screen replay: one stepFightScreen() tick per 100ms; a turn is
+    // aim(2) + fly(4) + impact(5) = 11 ticks ≈ 1.1s.
+    fightScreenTickMs: 100,
     modalOverlayOpacity: 0.6,
-    modalAnimation: "none",
-    fightModalLockedWhileResolving: true
+    modalAnimation: "none"
   },
   limits: {
     maxRoster: 12,
@@ -171,10 +194,10 @@ const CONFIG = {
     timeToFirstHatch: "24-48h",
     hourlyIncome: 2,
     trainingsPerHourIncome: "~0.12 early (passive only; fights fund training)",
-    easyBeatableAt: "combat ~19 (fresh ~11 wins ~25%; reliable after 3-4 trainings; Easy wears no gear)",
-    mediumBeatableAt: "combat ~38-40 (base ~30 + ~8 gear, or base ~40 bare; Medium wears head + leg = +8)",
-    hardBeatableAt: "combat ~76-78 (base ~50 + full +26 gear; Hard wears all but one leg = +23)",
-    beastBeatableAt: "roster of 3-5 dragons at combat ~66 (e.g. base 40 + full +26 gear; beast wears all gear, defense 46)"
+    easyBeatableAt: "combat ~21 (fresh ~11 wins ~20%; reliable after 3-4 trainings; Easy wears no gear, 42 HP)",
+    mediumBeatableAt: "combat ~38-40 (base ~30 + ~8 gear, or base ~40 bare; Medium wears head + leg = +8, 85 HP)",
+    hardBeatableAt: "combat ~76-78 (base ~50 + full +26 gear; Hard wears all but one leg = +23, 105 HP)",
+    beastBeatableAt: "3 dragons at combat ~66 win ~62% (e.g. base 40 + full +26 gear; beast wears all gear, defense 46, 580 HP, attack 85); 2 at 66 almost never win; 4 at 66 win reliably"
   }
 };
 const DRAGONS = [
@@ -219,10 +242,10 @@ const MONSTERS = [
     rewardMin: 15,
     rewardMax: 25,
     spawnChance: 0.33,
-    energyLossWinMin: 70,
-    energyLossWinMax: 100,
-    energyLossLoseMin: 85,
-    energyLossLoseMax: 100,
+    // Fight-screen HP pool. Tuned with Monte Carlo (balance.test.ts):
+    // a fresh ~11 dragon wins ~20% (needs 7 landed hits, the monster
+    // needs 6); a trained ~21 dragon wins ~99% but takes ~45 damage.
+    hp: 42,
     // Winning a fight trains the dragon: small permanent strength gain.
     strengthGainWinMin: 1,
     strengthGainWinMax: 2,
@@ -239,10 +262,9 @@ const MONSTERS = [
     rewardMin: 35,
     rewardMax: 55,
     spawnChance: 0.2,
-    energyLossWinMin: 80,
-    energyLossWinMax: 100,
-    energyLossLoseMin: 90,
-    energyLossLoseMax: 100,
+    // 85 HP: combat ~38 wins ~65% (4 landed hits vs the monster's 4);
+    // combat ~30 wins ~10%. A win costs ~65-70 energy.
+    hp: 85,
     strengthGainWinMin: 1,
     strengthGainWinMax: 2,
     image: "monsters/deadly_nadder.png",
@@ -258,10 +280,9 @@ const MONSTERS = [
     rewardMin: 70,
     rewardMax: 110,
     spawnChance: 0.1,
-    energyLossWinMin: 90,
-    energyLossWinMax: 100,
-    energyLossLoseMin: 95,
-    energyLossLoseMax: 100,
+    // 105 HP: combat ~76 wins ~65% (3 landed hits vs the monster's 3);
+    // a bare base-55 dragon wins ~0%. A win costs ~70 energy.
+    hp: 105,
     strengthGainWinMin: 2,
     strengthGainWinMax: 4,
     image: "monsters/monstrous_nightmare.png",
@@ -440,48 +461,72 @@ function combatStrengthForDragon(dragon) {
 function effectiveMonsterStrength(monster) {
   return monster.strength + (monster.equipmentBonus ?? 0);
 }
-function rollDamageBonus(rand01) {
+function fightHitChance(attackerCombat, defenderCombat) {
+  return clamp(
+    CONFIG.fight.hitChanceBase + CONFIG.fight.hitChancePerDiff * (attackerCombat - defenderCombat),
+    CONFIG.fight.hitChanceMin,
+    CONFIG.fight.hitChanceMax
+  );
+}
+function rollFightDamageBonus(rand01) {
   return rollIntInclusive(
-    CONFIG.battle.randomBonusMin,
-    CONFIG.battle.randomBonusMax,
+    CONFIG.fight.damageBonusMin,
+    CONFIG.fight.damageBonusMax,
     rand01
   );
 }
-function battleDamage(dragonStrength, opponentStrength, bonus) {
-  return dragonStrength + bonus - opponentStrength;
-}
-function effectiveStrength(dragonStrength, dragonEnergy) {
-  const factor = clamp(dragonEnergy, CONFIG.energy.min, CONFIG.energy.max) / CONFIG.energy.max;
-  return Math.floor(dragonStrength * factor);
-}
-function isBattleWin(rawDamage) {
-  return rawDamage >= 0;
-}
-function resolveMonsterFight(dragonStrength, dragonEnergy, monster, bonusRand01, rewardRand01, energyRand01, strengthRand01 = 0.5) {
-  const rawDamage = battleDamage(
-    effectiveStrength(dragonStrength, dragonEnergy),
-    effectiveMonsterStrength(monster),
-    rollDamageBonus(bonusRand01)
+function fightHitDamage(attackerCombat, defenderCombat, bonusRand01) {
+  return Math.max(
+    CONFIG.fight.minDamage,
+    attackerCombat - Math.floor(defenderCombat / 2) + rollFightDamageBonus(bonusRand01)
   );
-  const won = isBattleWin(rawDamage);
-  const coinReward = won ? rollIntInclusive(monster.rewardMin, monster.rewardMax, rewardRand01) : 0;
-  const energyAfter = won ? applyEnergyDrain(
-    dragonEnergy,
-    rollIntInclusive(
-      monster.energyLossWinMin,
-      monster.energyLossWinMax,
-      energyRand01
-    )
-  ) : CONFIG.energy.min;
-  const energyLoss = dragonEnergy - energyAfter;
-  const strengthGain = won ? rollMonsterWinStrengthGain(monster, strengthRand01) : 0;
+}
+function resolveFightAttack(attackerCombat, defenderHp, defenderCombat, hitRand01, damageRand01) {
+  const hit = hitRand01 < fightHitChance(attackerCombat, defenderCombat);
+  const damage = hit ? fightHitDamage(attackerCombat, defenderCombat, damageRand01) : 0;
   return {
-    rawDamage,
-    won,
-    coinReward,
-    energyLoss,
-    energyAfter,
-    strengthGain
+    hit,
+    damage,
+    defenderHpAfter: Math.max(0, defenderHp - damage)
+  };
+}
+function resolveMonsterFight(dragonCombat, dragonEnergy, monster, rand01) {
+  const turns = [];
+  let dragonHp = dragonEnergy;
+  let monsterHp = monster.hp;
+  let totalDamageDealt = 0;
+  let dragonMissStreak = 0;
+  let monsterMissStreak = 0;
+  while (dragonHp > 0 && monsterHp > 0) {
+    const attack = resolveFightAttack(
+      dragonCombat,
+      monsterHp,
+      effectiveMonsterStrength(monster),
+      dragonMissStreak >= 2 ? 0 : rand01(),
+      rand01()
+    );
+    dragonMissStreak = attack.hit ? 0 : dragonMissStreak + 1;
+    turns.push({ attackerKind: "dragon", ...attack });
+    monsterHp = attack.defenderHpAfter;
+    totalDamageDealt += attack.damage;
+    if (monsterHp <= 0) break;
+    const retaliation = resolveFightAttack(
+      effectiveMonsterStrength(monster),
+      dragonHp,
+      dragonCombat,
+      monsterMissStreak >= 2 ? 0 : rand01(),
+      rand01()
+    );
+    monsterMissStreak = retaliation.hit ? 0 : monsterMissStreak + 1;
+    turns.push({ attackerKind: "enemy", ...retaliation });
+    dragonHp = retaliation.defenderHpAfter;
+  }
+  return {
+    won: monsterHp <= 0,
+    turns,
+    dragonHpAfter: dragonHp,
+    monsterHpAfter: monsterHp,
+    totalDamageDealt
   };
 }
 function shouldSpawnMonster(spawnChance, rand01) {
@@ -499,13 +544,6 @@ function beastCombatDefense() {
 function beastDisplayStrength() {
   return CONFIG.beast.strengthConstant + CONFIG.beast.equipmentBonus;
 }
-function rollBeastCounterDamage(rand01) {
-  return rollIntInclusive(
-    CONFIG.beast.counterDamageMin,
-    CONFIG.beast.counterDamageMax,
-    rand01
-  );
-}
 function rollBeastReward(rand01) {
   return rollIntInclusive(
     CONFIG.beast.winRewardMin,
@@ -513,23 +551,61 @@ function rollBeastReward(rand01) {
     rand01
   );
 }
-function resolveBeastTurn(dragonStrength, dragonEnergy, beastHp, bonusRand01, counterRand01, fightStartEnergy = dragonEnergy) {
-  const rawDamage = battleDamage(
-    effectiveStrength(dragonStrength, fightStartEnergy),
-    beastCombatDefense(),
-    rollDamageBonus(bonusRand01)
-  );
-  const beastHpAfter = Math.max(0, beastHp - Math.max(0, rawDamage));
-  const beastDefeated = beastHpAfter <= 0;
-  const counterDamage = beastDefeated ? 0 : rollBeastCounterDamage(counterRand01);
-  const dragonEnergyAfter = beastDefeated ? dragonEnergy : applyEnergyDrain(dragonEnergy, counterDamage);
+function resolveBeastFight(dragonCombats, dragonHps, beastHp, rand01) {
+  const turns = [];
+  const hps = [...dragonHps];
+  let hp = beastHp;
+  let killerIndex = null;
+  const alive = () => hps.map((h, i) => h > 0 ? i : -1).filter((i) => i >= 0);
+  const dragonMissStreaks = dragonCombats.map(() => 0);
+  let beastMissStreak = 0;
+  while (hp > 0 && alive().length > 0) {
+    for (const i of alive()) {
+      const attack = resolveFightAttack(
+        dragonCombats[i],
+        hp,
+        beastCombatDefense(),
+        dragonMissStreaks[i] >= 2 ? 0 : rand01(),
+        rand01()
+      );
+      dragonMissStreaks[i] = attack.hit ? 0 : dragonMissStreaks[i] + 1;
+      turns.push({
+        attackerKind: "dragon",
+        attackerIndex: i,
+        targetIndex: null,
+        ...attack
+      });
+      hp = attack.defenderHpAfter;
+      if (hp <= 0) {
+        killerIndex = i;
+        break;
+      }
+    }
+    if (hp <= 0) break;
+    const targets = alive();
+    const targetIndex = targets[Math.floor(rand01() * targets.length)];
+    const retaliation = resolveFightAttack(
+      CONFIG.beast.attack,
+      hps[targetIndex],
+      dragonCombats[targetIndex],
+      beastMissStreak >= 2 ? 0 : rand01(),
+      rand01()
+    );
+    beastMissStreak = retaliation.hit ? 0 : beastMissStreak + 1;
+    turns.push({
+      attackerKind: "enemy",
+      attackerIndex: null,
+      targetIndex,
+      ...retaliation
+    });
+    hps[targetIndex] = retaliation.defenderHpAfter;
+  }
   return {
-    rawDamage,
-    beastHpAfter,
-    counterDamage,
-    dragonEnergyAfter,
-    dragonRemoved: !beastDefeated && dragonEnergyAfter <= CONFIG.energy.min,
-    beastDefeated
+    won: hp <= 0,
+    killerIndex,
+    turns,
+    dragonHpsAfter: hps,
+    beastHpAfter: hp
   };
 }
 function findBreed(breedId) {
@@ -592,7 +668,6 @@ export {
   ageDaysFromMs,
   applyEnergyDrain,
   applyStrengthGain,
-  battleDamage,
   beastCombatDefense,
   beastDisplayStrength,
   breedForDragon,
@@ -612,15 +687,15 @@ export {
   dragonStage,
   drawBreedIndex,
   effectiveMonsterStrength,
-  effectiveStrength,
   energyAt,
   equipmentBonusForEquipment,
   equipmentCostForEquipment,
   equipmentDefForSlot,
   equipmentSellValue,
+  fightHitChance,
+  fightHitDamage,
   findBreed,
   hasCollectibleCoins,
-  isBattleWin,
   isBeastEligible,
   isDragonExpired,
   isDragonHatched,
@@ -633,13 +708,13 @@ export {
   recoverEnergy,
   remainingLifespanDays,
   remainingLifespanForDragon,
-  resolveBeastTurn,
+  resolveBeastFight,
+  resolveFightAttack,
   resolveMonsterFight,
   rollBaseStrength,
-  rollBeastCounterDamage,
   rollBeastReward,
   rollBeastWinStrengthGain,
-  rollDamageBonus,
+  rollFightDamageBonus,
   rollHatchMs,
   rollIntInclusive,
   rollMonsterWinStrengthGain,

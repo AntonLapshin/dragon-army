@@ -34,13 +34,17 @@ generated `engine/*.js` files are fresh — zeus bundles `.js` only, never
 3. **Train** a hatched dragon — costs coins (scales with strength) **and 15
    energy** per session, raises strength by +2–5 (clamped at 125 max).
    Strength renders as stars: 5 strength = 1 silver star, 5 silver = 1 gold.
-4. **Fight monsters** — only spawned monsters (0–3) are listed. Winning gives
-   coins **plus permanent strength** (Easy +1–2, Medium +1–2, Hard +2–4);
-   losing knocks the dragon out (energy to 0), strength unchanged.
+4. **Fight monsters** — only spawned monsters (0–3) are listed. Fights play
+   on a dedicated fight screen (dragons left, monster right, green HP bars,
+   fireballs, hit/miss). Winning gives coins **plus permanent strength**
+   (Easy +1–2, Medium +1–2, Hard +2–4); losing knocks the dragon out
+   (energy 0), strength unchanged.
 5. **Fight the Bewilder Beast** (top-right) — all hatched dragons with energy
-   > 0 attack in roster order; the beast retaliates on energy. Dragons dropped
-   to 0 are removed. Winning vanishes the beast for a day and grants every
-   survivor **+2–4 permanent strength** plus 300 coins.
+   > 0 attack in roster order each round; the beast fires back at **one
+   random dragon** per round. Dragons dropped to 0 are removed. Winning
+   vanishes the beast for a day and grants every dragon that attacked
+   **+2–4 permanent strength** plus 300 coins. Losing heals the beast back
+   to full HP — no grinding it down across attempts.
 6. **Equip a dragon** — tap the equipment icon (top-left on a hatched
    dragon's page) for its 7 slots: Dragon Helm (+5, 100c), Wing Guards
    (+5, 100c), Tail Guard (+4, 80c), and one Leg Guard per leg (+3, 60c
@@ -49,7 +53,9 @@ generated `engine/*.js` files are fresh — zeus bundles `.js` only, never
    are unchanged); selling a geared dragon refunds 50% of its gear cost.
    Monsters wear gear too — Easy none, Medium head + leg (+8), Hard all but
    one leg (+23) — and the Beast wears the full set (display 101 = 4 gold
-   stars, combat defense 46). Three fully equipped base-40 dragons always win.
+   stars, combat defense 46). A bare base-40 dragon barely scratches it;
+   three fully equipped base-40 dragons (combat 66) win ~62% of fights —
+   strong but no longer a guarantee; two at 66 almost never win.
 7. **Earn Coins** — hourly coins accrue but are credited only by tapping the
    coin icon when it appears. Energy recovers passively (10/hour).
 
@@ -81,7 +87,7 @@ generated `engine/*.js` files are fresh — zeus bundles `.js` only, never
   injected dependency. The page wires the real adapters; tests inject fakes.
 - **Balance lives in exactly one place: `engine/config.ts`.** All formulas
   are pure functions there (`sellPrice()`, `resolveMonsterFight()`,
-  `resolveBeastTurn()`, …). The page and the engine never reimplement a
+  `resolveBeastFight()`, …). The page and the engine never reimplement a
   formula or hardcode a balance number.
 - **Computed, not stored.** A `Dragon` persists only event anchors (ids,
   strength, energy-at-timestamp, hatch anchors, equipment, battle record).
@@ -89,7 +95,7 @@ generated `engine/*.js` files are fresh — zeus bundles `.js` only, never
   derived on every read via pure functions, so saves can't drift after
   offline gaps and the tick loop stays idempotent.
 - **The page holds no rules.** `page/index.js` renders widgets, tracks
-  transient animation state (egg spin, locked-fight reveal), and calls the
+  transient animation state (egg spin, fight-screen replay), and calls the
   engine. Colors/fonts/assets live in `page/index.style.js`; every pixel
   coordinate lives in `page/layouts.js` (see Devices below).
 - **TypeScript is the source of truth for the engine; `.js` is generated.**
@@ -109,7 +115,7 @@ generated `engine/*.js` files are fresh — zeus bundles `.js` only, never
 | `page/index.js` | Watch screens + modals, navigation, widget helpers, transient animation state. |
 | `page/layouts.js` | Per-device geometry tables (`bip6`, `round480`) + `refreshLayout()` live bindings. |
 | `page/index.style.js` | Theme: palette, typography, asset paths, energy-bar slot map. No coordinates. |
-| `page/viewUtils.js` | Pure view math extracted from the page (name formatting, energy-bar segments, roster windowing, action-row positions, beast HP replay). Fully unit-tested. |
+| `page/viewUtils.js` | Pure view math extracted from the page (name formatting, energy-bar segments, roster windowing, action-row positions, fight-screen geometry). Fully unit-tested. |
 | `utils/` | Watch platform adapters: `storageAdapter` (local file), `timeAdapter` (`Date.now`), `sensorAdapter` (step counter), `deviceAdapter` (`@zos/device`). |
 | `web/` | Desktop preview: React shell + `zepp-web-runner` + `WatchPageFixed` (1:1 IMG renderer matching the watch) + `DebugPanel` (device switch, +hours/+days, steps, reset). Vite `adapterMappings` swap the `utils/` adapters for web ones. |
 | `scripts/build-engine.mjs` | TS → JS codegen for the engine (esbuild). |
@@ -164,7 +170,8 @@ make clean     # remove generated assets
   `WxH` sizes it is displayed at (e.g. dragons → `60x60` + `240x240`).
   Entries with an empty list (unused art) are deleted by `scale`.
 - `raw/icon_source.png` is the un-cropped icon source; `raw/equipment/`
-  holds the equipment art. `store/` holds the app-store listing assets.
+  holds the equipment art, `raw/fight/` the fireball + impact FX.
+  `store/` holds the app-store listing assets.
 - `assets/` (including `default.{b,r,s}`) is generated but committed — the
   watch build reads it directly. `web/public/images` is a symlink to
   `assets/` so the preview serves the same files.
@@ -176,9 +183,10 @@ make clean     # remove generated assets
 | Egg | 100 coins | random of 16 breeds |
 | Chosen egg | 150 coins | specific breed |
 | Train | coins (8 + 0.8×str) + 15 energy | +2–5 strength (max 125) |
-| Monster win | 70–100 energy | coins + strength (+1–2 / +1–2 / +2–4) |
+| Monster win | ~⅓ of the HP bar (damage taken) | coins + strength (+1–2 / +1–2 / +2–4) |
 | Monster loss | energy → 0 | strength unchanged |
-| Beast win | energy per turn (18–28 counter) | 300 coins + 2–4 strength per survivor |
+| Beast win | HP lost to ~56-damage beast hits | 300 coins + 2–4 strength per attacker |
+| Beast loss | whole team removed | beast heals to full HP |
 | Equipment (full set) | 520 coins | +26 combat strength (helm 100, wings 100, tail 80, legs 60×4) |
 
 ## Testing
@@ -194,7 +202,7 @@ npm run test:watch
 | `engine/engine.test.ts` | Session flow: boot/migration, egg/train/sell, coins, monster + beast fights, tick idempotency. |
 | `engine/balance.test.ts`, `engine/finetune.test.ts` | Playability targets: fresh dragons vs Easy, gear vs Medium/Hard/Beast, economy pacing. |
 | `page/layouts.test.mjs` | Layout tables share keys, art-bound sizes never shrink, round-480 geometry stays inside the circle, `refreshLayout` covers every key. |
-| `page/viewUtils.test.mjs` | Pure view math: name formatting, energy segments, roster window, action-row positions, beast HP replay. |
+| `page/viewUtils.test.mjs` | Pure view math: name formatting, energy segments, roster window, action-row positions, fight-screen geometry. |
 
 `npm run format` formats the sources with prettier (`.prettierrc`:
 single quotes, width 100). Generated `engine/*.js` is excluded.
@@ -224,8 +232,9 @@ plus a real render of the web preview (screenshot above). Biggest visual wins:
    art; show a faint egg silhouette or "+" instead.
 6. **Numbers on bars** — energy/beast HP bars have no numeric readout; add
    small `72/100`-style text for clarity on a tiny screen.
-7. **Fight pacing** — beast log reveals one line per 5s with no skip; add
-   tap-to-reveal-all and a victory flash + haptics.
+7. **Fight pacing** — done: fights moved from the locked text modal to a
+   full-screen fight screen with fireballs, hit/miss, HP bars, ~1.1s/turn,
+   and tap-to-skip. Remaining: victory flash + haptics.
 8. **Text contrast** — white text over the bright home/ocean background is
    saved only by the dark pill; extend the pill treatment to every floating
    label (coin delta, level line).

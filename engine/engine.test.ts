@@ -674,22 +674,18 @@ describe("equipment", () => {
     expect(t.engine.getState().player.coins).toBe(50);
   });
   it("equipment helps win a Medium fight a bare dragon would lose", () => {
-    // Medium effective 40: bare 32 loses (32+10-40=2? actually wins narrowly) —
-    // use a 25-base dragon: bare 25+10-40 < 0 loss; +head (30) +wings (35) still
-    // loses; full-ish +26 = 51 wins. Use head+wings+tail = +14 -> 39+10-40=9 win.
+    // Medium effective 40, 85 HP: bare 25 deals ~9/hit (needs 10 landed)
+    // while the monster deals ~32/hit back (needs 4) — bare loses.
+    // Head + wings + tail = +14 -> combat 39 deals ~23/hit (needs 4)
+    // vs ~25/hit back (needs 4) — dragon strikes first, so geared wins.
     const saved = stateWith([hatchedDragon({ id: "d", strength: 25 })]);
     saved.monsterSpawn = { spawned: [{ ...MONSTERS[1] }], lastRefreshMs: T0 };
     const t = setup(saved);
     t.engine.init();
-    const bare = t.engine.fightMonster("d", MONSTERS[1].id, {
-      bonusRand01: 0.999,
-      rewardRand01: 0.5,
-      energyRand01: 0,
-      strengthRand01: 0,
-    });
+    const bare = t.engine.fightMonster("d", MONSTERS[1].id);
     expect(bare.ok).toBe(true);
     if (!bare.ok) return;
-    expect(bare.won).toBe(false); // 25 + 10 - 40 < 0
+    expect(bare.won).toBe(false);
     // fresh dragon, buy gear, then fight
     const saved2 = stateWith([hatchedDragon({ id: "d", strength: 25 })]);
     saved2.player.coins = 1000;
@@ -699,15 +695,10 @@ describe("equipment", () => {
     expect(t2.engine.buyEquipment("d", "head").ok).toBe(true);
     expect(t2.engine.buyEquipment("d", "wings").ok).toBe(true);
     expect(t2.engine.buyEquipment("d", "tail").ok).toBe(true);
-    const geared = t2.engine.fightMonster("d", MONSTERS[1].id, {
-      bonusRand01: 0.999,
-      rewardRand01: 0.5,
-      energyRand01: 0,
-      strengthRand01: 0,
-    });
+    const geared = t2.engine.fightMonster("d", MONSTERS[1].id);
     expect(geared.ok).toBe(true);
     if (!geared.ok) return;
-    expect(geared.won).toBe(true); // (25+14) + 10 - 40 = 9 > 0
+    expect(geared.won).toBe(true); // 39 deals 23/hit, monster 25/hit — first strike wins
   });
   it("coerceLoadedSave backfills missing equipment as empty", () => {
     const saved = stateWith([hatchedDragon()]);
@@ -778,22 +769,21 @@ describe("monsters", () => {
     const t = spawnedSetup();
     t.engine.init();
     const before = t.engine.getState().player.coins;
-    const res = t.engine.fightMonster("d", MONSTERS[0].id, {
-      bonusRand01: 0.999,
-      rewardRand01: 0,
-      energyRand01: 0,
-      strengthRand01: 0,
-    });
+    const res = t.engine.fightMonster("d", MONSTERS[0].id);
     expect(res.ok).toBe(true);
     if (!res.ok) return;
-    expect(res.won).toBe(true); // 50 + 10 - 19 > 0
-    expect(res.coinReward).toBe(MONSTERS[0].rewardMin);
-    expect(res.energyLoss).toBe(MONSTERS[0].energyLossWinMin);
-    expect(res.energyAfter).toBe(100 - MONSTERS[0].energyLossWinMin);
-    expect(res.strengthGain).toBe(MONSTERS[0].strengthGainWinMin);
-    expect(res.strengthAfter).toBe(50 + MONSTERS[0].strengthGainWinMin);
+    // 50 deals 45/hit (50 - 9 + 4) vs Easy 42 HP: one-shot, untouched.
+    expect(res.won).toBe(true);
+    expect(res.turns).toHaveLength(1);
+    expect(res.totalDamageDealt).toBe(45);
+    // constant 0.5 rand: reward = 15 + floor(0.5 * 11) = 20, gain = 2
+    expect(res.coinReward).toBe(20);
+    expect(res.energyLoss).toBe(0);
+    expect(res.energyAfter).toBe(100);
+    expect(res.strengthGain).toBe(2);
+    expect(res.strengthAfter).toBe(52);
     const s = t.engine.getState();
-    expect(s.player.coins).toBe(before + MONSTERS[0].rewardMin);
+    expect(s.player.coins).toBe(before + 20);
     expect(s.player.totalMonsterWins).toBe(1);
     expect(s.player.dragons[0].strength).toBe(res.strengthAfter);
     expect(s.ui.fightLog).toHaveLength(1);
@@ -809,12 +799,7 @@ describe("monsters", () => {
       saved.monsterSpawn = { spawned: [{ ...MONSTERS[idx] }], lastRefreshMs: T0 };
       const t = setup(saved);
       t.engine.init();
-      const res = t.engine.fightMonster("d", MONSTERS[idx].id, {
-        bonusRand01: 0.999,
-        rewardRand01: 0,
-        energyRand01: 0,
-        strengthRand01: 0,
-      });
+      const res = t.engine.fightMonster("d", MONSTERS[idx].id);
       expect(res.ok).toBe(true);
       if (!res.ok) continue;
       expect(res.won).toBe(true);
@@ -833,12 +818,7 @@ describe("monsters", () => {
     saved.monsterSpawn = { spawned: [{ ...MONSTERS[2] }], lastRefreshMs: T0 };
     const t = setup(saved);
     t.engine.init();
-    const res = t.engine.fightMonster("d", MONSTERS[2].id, {
-      bonusRand01: 0,
-      rewardRand01: 0.5,
-      energyRand01: 0,
-      strengthRand01: 0.999,
-    });
+    const res = t.engine.fightMonster("d", MONSTERS[2].id);
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.won).toBe(false);
@@ -852,15 +832,10 @@ describe("monsters", () => {
     const t = setup(saved);
     t.engine.init();
     const before = t.engine.getState().player.coins;
-    const res = t.engine.fightMonster("d", MONSTERS[2].id, {
-      bonusRand01: 0,
-      rewardRand01: 0.5,
-      energyRand01: 0,
-      strengthRand01: 0.999,
-    });
+    const res = t.engine.fightMonster("d", MONSTERS[2].id);
     expect(res.ok).toBe(true);
     if (!res.ok) return;
-    expect(res.won).toBe(false); // 1 + 0 - 55 < 0
+    expect(res.won).toBe(false); // 1 deals 3/hit vs 105 HP, monster deals 82/hit back
     expect(res.coinReward).toBe(0);
     expect(res.strengthGain).toBe(0);
     expect(res.strengthAfter).toBe(1);
@@ -873,12 +848,7 @@ describe("monsters", () => {
     saved.monsterSpawn = { spawned: [{ ...MONSTERS[0] }], lastRefreshMs: T0 };
     const t = setup(saved);
     t.engine.init();
-    const res = t.engine.fightMonster("d", MONSTERS[0].id, {
-      bonusRand01: 0, // 11 + 0 - 19 < 0 -> loss
-      rewardRand01: 0.5,
-      energyRand01: 0,
-      strengthRand01: 0.5,
-    });
+    const res = t.engine.fightMonster("d", MONSTERS[0].id); // 11 deals 6/hit, monster 18/hit back -> loss
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.won).toBe(false);
@@ -898,14 +868,10 @@ describe("monsters", () => {
     saved.monsterSpawn = { spawned: [{ ...MONSTERS[0] }], lastRefreshMs: T0 };
     const t = setup(saved);
     t.engine.init();
-    const res = t.engine.fightMonster("d", MONSTERS[0].id, {
-      bonusRand01: 0.999, // max bonus still not enough: 1 + 10 - 19 < 0
-      rewardRand01: 0.5,
-      energyRand01: 0.5,
-      strengthRand01: 0.5,
-    });
+    const res = t.engine.fightMonster("d", MONSTERS[0].id);
     expect(res.ok).toBe(true);
     if (!res.ok) return;
+    // 5 HP = one hit (19 dmg), then the monster's retaliation (11) kills.
     expect(res.won).toBe(false);
     expect(res.energyAfter).toBe(0);
   });
@@ -982,7 +948,7 @@ describe("beast", () => {
     const res = t.engine.fightBeast();
     expect(res.ok).toBe(true);
     if (!res.ok) return;
-    expect(res.won).toBe(true); // 100 + 5 - 20 >> 10: first turn kills
+    expect(res.won).toBe(true); // 100 - 23 + 4 = 81 damage >> 10 HP: first blow kills
     expect(res.turns).toHaveLength(1);
     expect(res.beastHpAfter).toBe(0);
     expect(res.reward).toBe(CONFIG.beast.winRewardMin);
@@ -1022,7 +988,7 @@ describe("beast", () => {
       freshCombatStats(),
     );
   });
-  it("losses: drained dragons removed, beast HP persists, no gains", () => {
+  it("losses: drained dragons removed, beast heals to full HP, no gains", () => {
     const saved = stateWith([hatchedDragon({ id: "weak", strength: 1, energy: 10 })]);
     const t = setup(saved, 0.5);
     t.engine.init();
@@ -1030,14 +996,16 @@ describe("beast", () => {
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.won).toBe(false);
-    expect(res.turns).toHaveLength(1);
+    // dragon chip (3 dmg), then the beast's 89-damage retaliation kills it
+    expect(res.turns).toHaveLength(2);
     expect(res.removedDragonIds).toEqual(["weak"]);
     expect(res.reward).toBe(0);
     expect(res.strengthGains).toEqual({});
     const s = t.engine.getState();
     expect(s.player.dragons).toEqual([]);
     expect(s.beast.status).toBe("alive");
-    expect(s.beast.currentHp).toBe(CONFIG.beast.hp); // 0 chip damage dealt
+    // a loss buys no progress: the beast heals back to full HP
+    expect(s.beast.currentHp).toBe(CONFIG.beast.hp);
   });
   it("openBeastIntro records the modal", () => {
     ctx.engine.init();

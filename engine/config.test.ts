@@ -16,7 +16,6 @@ import {
   ageDaysFromMs,
   applyEnergyDrain,
   applyStrengthGain,
-  battleDamage,
   beastCombatDefense,
   beastDisplayStrength,
   breedForDragon,
@@ -35,15 +34,15 @@ import {
   drawBreedIndex,
   dragonStage,
   effectiveMonsterStrength,
-  effectiveStrength,
   energyAt,
   equipmentBonusForEquipment,
   equipmentCostForEquipment,
   equipmentDefForSlot,
   equipmentSellValue,
+  fightHitChance,
+  fightHitDamage,
   findBreed,
   hasCollectibleCoins,
-  isBattleWin,
   isBeastEligible,
   isDragonExpired,
   isDragonHatched,
@@ -56,17 +55,17 @@ import {
   recoverEnergy,
   remainingLifespanDays,
   remainingLifespanForDragon,
+  resolveBeastFight,
+  resolveFightAttack,
   rollBaseStrength,
-  rollBeastCounterDamage,
   rollBeastReward,
   rollBeastWinStrengthGain,
-  rollDamageBonus,
+  rollFightDamageBonus,
   rollHatchMs,
   rollIntInclusive,
   rollMonsterWinStrengthGain,
   rollSpawnedMonsters,
   rollTrainingGain,
-  resolveBeastTurn,
   resolveMonsterFight,
   sellEnergyFactor,
   sellPrice,
@@ -618,125 +617,108 @@ describe("selling", () => {
 });
 
 describe("battle", () => {
-  describe("rollDamageBonus", () => {
-    it("returns 0 at rand 0 and 10 at rand ~1", () => {
-      expect(rollDamageBonus(0)).toBe(CONFIG.battle.randomBonusMin);
-      expect(rollDamageBonus(0.999999)).toBe(CONFIG.battle.randomBonusMax);
+  describe("fightHitChance", () => {
+    it("is 80% on even combat", () => {
+      expect(fightHitChance(40, 40)).toBeCloseTo(0.8, 10);
+    });
+    it("grows 0.4% per point of combat edge", () => {
+      expect(fightHitChance(65, 40)).toBeCloseTo(0.9, 10);
+      expect(fightHitChance(15, 40)).toBeCloseTo(0.7, 10);
+    });
+    it("clamps to [55%, 95%]", () => {
+      expect(fightHitChance(1, 200)).toBe(CONFIG.fight.hitChanceMin);
+      expect(fightHitChance(200, 1)).toBe(CONFIG.fight.hitChanceMax);
     });
   });
 
-  describe("battleDamage", () => {
-    it("computes dragon + bonus - opponent", () => {
-      expect(battleDamage(20, 15, 5)).toBe(10);
-      expect(battleDamage(10, 15, 0)).toBe(-5);
+  describe("rollFightDamageBonus / fightHitDamage", () => {
+    it("rolls a 0-8 bonus", () => {
+      expect(rollFightDamageBonus(0)).toBe(CONFIG.fight.damageBonusMin);
+      expect(rollFightDamageBonus(0.999999)).toBe(CONFIG.fight.damageBonusMax);
     });
-    it("may be negative (loss signal)", () => {
-      expect(battleDamage(5, 55, 0)).toBeLessThan(0);
-    });
-  });
-
-  describe("isBattleWin", () => {
-    it("wins on zero (chip damage counts)", () => {
-      expect(isBattleWin(0)).toBe(true);
-    });
-    it("wins on positive, loses on negative", () => {
-      expect(isBattleWin(1)).toBe(true);
-      expect(isBattleWin(-1)).toBe(false);
+    it("damage = attacker - defender/2 + bonus, floored at 3", () => {
+      // 66 vs beast defense 46, bonus 4 (rand 0.5): 66 - 23 + 4 = 47
+      expect(fightHitDamage(66, 46, 0.5)).toBe(47);
+      // weakest hit still chips: 1 vs 78 would be negative -> floor 3
+      expect(fightHitDamage(1, 78, 0)).toBe(CONFIG.fight.minDamage);
+      expect(fightHitDamage(11, 19, 0)).toBe(3);
     });
   });
 
-  describe("effectiveStrength (energy-scaled damage)", () => {
-    it("is full strength at full energy (identity)", () => {
-      expect(effectiveStrength(24, 100)).toBe(24);
-      expect(effectiveStrength(1, 100)).toBe(1);
+  describe("resolveFightAttack", () => {
+    it("a roll above the hit chance misses: 0 damage, HP unchanged", () => {
+      const res = resolveFightAttack(66, 580, 46, 0.99, 0.5);
+      expect(res.hit).toBe(false);
+      expect(res.damage).toBe(0);
+      expect(res.defenderHpAfter).toBe(580);
     });
-    it("scales linearly and floors (half bar = half strength)", () => {
-      expect(effectiveStrength(24, 50)).toBe(12);
-      expect(effectiveStrength(25, 50)).toBe(12); // floor(12.5)
+    it("a roll below the hit chance hits for full damage", () => {
+      const res = resolveFightAttack(66, 580, 46, 0.1, 0.5);
+      expect(res.hit).toBe(true);
+      expect(res.damage).toBe(47);
+      expect(res.defenderHpAfter).toBe(533);
     });
-    it("is 0 at 0 energy (exhausted dragons cannot hurt anything)", () => {
-      expect(effectiveStrength(100, 0)).toBe(0);
-      expect(effectiveStrength(28, 0)).toBe(0);
-    });
-    it("a sliver of energy means a sliver of strength", () => {
-      // Night Fury 24 at 5 energy -> floor(1.2) = 1
-      expect(effectiveStrength(24, 5)).toBe(1);
-    });
-    it("clamps out-of-range energy", () => {
-      expect(effectiveStrength(24, 1000)).toBe(24);
-      expect(effectiveStrength(24, -10)).toBe(0);
+    it("clamps defender HP at 0 on overkill", () => {
+      const res = resolveFightAttack(200, 10, 46, 0, 0.999);
+      expect(res.defenderHpAfter).toBe(0);
     });
   });
 
   describe("resolveMonsterFight", () => {
     const easy = MONSTERS[0];
 
-    it("resolves a win with reward and win-range energy loss", () => {
-      // strong dragon + max bonus always wins vs Easy(15)
-      const res = resolveMonsterFight(50, 100, easy, 0.999, 0.5, 0.5);
+    it("a strong dragon one-shots Easy untouched (50 - 9 + 4 = 45 >= 42 HP)", () => {
+      const res = resolveMonsterFight(50, 100, easy, () => 0.5);
       expect(res.won).toBe(true);
-      expect(res.rawDamage).toBeGreaterThanOrEqual(0);
-      expect(res.coinReward).toBeGreaterThanOrEqual(easy.rewardMin);
-      expect(res.coinReward).toBeLessThanOrEqual(easy.rewardMax);
-      expect(res.energyLoss).toBeGreaterThanOrEqual(easy.energyLossWinMin);
-      expect(res.energyLoss).toBeLessThanOrEqual(easy.energyLossWinMax);
-      expect(res.energyAfter).toBe(100 - res.energyLoss);
+      expect(res.turns).toHaveLength(1);
+      expect(res.turns[0].attackerKind).toBe("dragon");
+      expect(res.turns[0].hit).toBe(true);
+      expect(res.turns[0].damage).toBe(45);
+      expect(res.monsterHpAfter).toBe(0);
+      expect(res.dragonHpAfter).toBe(100);
+      expect(res.totalDamageDealt).toBe(45);
     });
 
-    it("resolves a loss with zero reward and lose-range energy loss", () => {
-      // weak dragon + zero bonus always loses vs Easy(15)
-      const res = resolveMonsterFight(1, 100, easy, 0, 0.5, 0.5);
+    it("a weak dragon loses to Hard with 0 HP left (1 - 39 -> floor 3/hit vs 82/hit back)", () => {
+      const res = resolveMonsterFight(1, 100, MONSTERS[2], () => 0.5);
       expect(res.won).toBe(false);
-      expect(res.rawDamage).toBeLessThan(0);
-      expect(res.coinReward).toBe(0);
-      expect(res.energyLoss).toBeGreaterThanOrEqual(easy.energyLossLoseMin);
-      expect(res.energyLoss).toBeLessThanOrEqual(easy.energyLossLoseMax);
-      expect(res.energyAfter).toBe(100 - res.energyLoss);
+      expect(res.dragonHpAfter).toBe(0);
+      expect(res.monsterHpAfter).toBeGreaterThan(0);
+      // turns alternate dragon/enemy, starting with the dragon
+      expect(res.turns[0].attackerKind).toBe("dragon");
+      expect(res.turns[1].attackerKind).toBe("enemy");
+      expect(res.turns[res.turns.length - 1].attackerKind).toBe("enemy");
     });
 
-    it("maps reward/energy rand01 to range edges", () => {
-      const winMin = resolveMonsterFight(50, 100, easy, 0.999, 0, 0);
-      const winMax = resolveMonsterFight(50, 100, easy, 0.999, 0.999, 0.999);
-      expect(winMin.coinReward).toBe(easy.rewardMin);
-      expect(winMax.coinReward).toBe(easy.rewardMax);
-      expect(winMin.energyLoss).toBe(easy.energyLossWinMin);
-      expect(winMax.energyLoss).toBe(easy.energyLossWinMax);
-    });
-
-    it("clamps energyAfter at 0 on heavy losses", () => {
-      const res = resolveMonsterFight(1, 5, easy, 0, 0.5, 0.999);
-      expect(res.energyAfter).toBeGreaterThanOrEqual(0);
-      expect(res.energyAfter).toBe(
-        Math.max(0, 5 - res.energyLoss),
-      );
-    });
-
-    it("respects energy in damage: same rolls hit weaker on low energy", () => {
-      const full = resolveMonsterFight(24, 100, easy, 0.5, 0.5, 0.5);
-      const low = resolveMonsterFight(24, 5, easy, 0.5, 0.5, 0.5);
-      expect(low.rawDamage).toBeLessThan(full.rawDamage);
-    });
-
-    it("a strong dragon on a sliver of energy LOSES to Easy (no cheap chain-wins)", () => {
-      // Night Fury 24 at 5 energy -> effective 1; even max bonus 10
-      // cannot beat Easy 19: 1 + 10 - 19 < 0.
-      const res = resolveMonsterFight(24, 5, easy, 0.999, 0.5, 0.5);
+    it("a loss leaves the dragon at exactly 0 (knocked out, no sliver)", () => {
+      const res = resolveMonsterFight(11, 100, easy, () => 0.5);
       expect(res.won).toBe(false);
-      expect(res.rawDamage).toBeLessThan(0);
-      // ...while the same dragon at full energy wins with those rolls.
-      expect(resolveMonsterFight(24, 100, easy, 0.999, 0.5, 0.5).won).toBe(true);
+      expect(res.dragonHpAfter).toBe(0);
     });
 
-    it("a loss knocks the dragon out cold: energyAfter is 0, never a sliver", () => {
-      const res = resolveMonsterFight(11, 100, easy, 0, 0.5, 0);
+    it("a 5-energy dragon gets one hit, then falls (HP is energy)", () => {
+      const res = resolveMonsterFight(24, 5, easy, () => 0.5);
       expect(res.won).toBe(false);
-      expect(res.energyAfter).toBe(0);
-      expect(res.energyLoss).toBe(100); // everything actually drained
-      // also at partial energy: loss still empties the bar completely
-      const partial = resolveMonsterFight(11, 40, easy, 0, 0.5, 0.5);
-      expect(partial.won).toBe(false);
-      expect(partial.energyAfter).toBe(0);
-      expect(partial.energyLoss).toBe(40);
+      expect(res.dragonHpAfter).toBe(0);
+      expect(res.turns).toHaveLength(2); // one dragon hit, one retaliation
+    });
+
+    it("pity rule: always-miss rolls still terminate (max 2 misses in a row)", () => {
+      const res = resolveMonsterFight(21, 100, easy, () => 0.999);
+      expect(res.turns.length).toBeLessThan(200);
+      expect(res.turns.length).toBeGreaterThan(0);
+      // no 3 consecutive misses by the same side
+      let dragonMisses = 0;
+      let enemyMisses = 0;
+      for (const t of res.turns) {
+        if (t.attackerKind === "dragon") {
+          dragonMisses = t.hit ? 0 : dragonMisses + 1;
+          expect(dragonMisses).toBeLessThanOrEqual(2);
+        } else {
+          enemyMisses = t.hit ? 0 : enemyMisses + 1;
+          expect(enemyMisses).toBeLessThanOrEqual(2);
+        }
+      }
     });
   });
 
@@ -781,12 +763,45 @@ describe("battle", () => {
 });
 
 describe("bewilder beast", () => {
-  describe("rollBeastCounterDamage", () => {
-    it("returns min at 0 and max at ~1", () => {
-      expect(rollBeastCounterDamage(0)).toBe(CONFIG.beast.counterDamageMin);
-      expect(rollBeastCounterDamage(0.999999)).toBe(
-        CONFIG.beast.counterDamageMax,
-      );
+  describe("resolveBeastFight (round-based)", () => {
+    it("a solo max dragon can kill a 10-HP beast in one blow", () => {
+      const res = resolveBeastFight([100], [100], 10, () => 0.5);
+      expect(res.won).toBe(true);
+      expect(res.killerIndex).toBe(0);
+      expect(res.turns).toHaveLength(1);
+      expect(res.turns[0].attackerKind).toBe("dragon");
+      expect(res.beastHpAfter).toBe(0);
+      expect(res.dragonHpsAfter).toEqual([100]);
+    });
+
+    it("the beast fires back at one random alive dragon per round", () => {
+      // 3 weak dragons vs a 580-HP beast: nobody kills it in round 1,
+      // so the beast gets exactly one retaliation per round, aimed at
+      // a single dragon — the other two take no damage that round.
+      const res = resolveBeastFight([10, 10, 10], [100, 100, 100], 580, () => 0.5);
+      expect(res.won).toBe(false);
+      const enemyTurns = res.turns.filter((t) => t.attackerKind === "enemy");
+      expect(enemyTurns.length).toBeGreaterThan(0);
+      // each enemy turn hits exactly one dragon (single targetIndex)
+      for (const t of enemyTurns) {
+        expect(t.targetIndex).not.toBeNull();
+      }
+      // all three dragons are gone at the end (loss = whole team wiped)
+      expect(res.dragonHpsAfter).toEqual([0, 0, 0]);
+      expect(res.beastHpAfter).toBeGreaterThan(0);
+    });
+
+    it("damage uses beastCombatDefense (46), not the 101 display value", () => {
+      // 66 - 23 + 4 = 47/hit; with the display value it would be
+      // 66 - 50 + 4 = 20/hit. First turn of a 3x66 team vs full HP:
+      const res = resolveBeastFight([66, 66, 66], [100, 100, 100], 580, () => 0.5);
+      expect(res.turns[0].damage).toBe(47);
+    });
+
+    it("pity rule: always-miss rolls still terminate", () => {
+      const res = resolveBeastFight([66, 66], [100, 100], 580, () => 0.999);
+      expect(res.turns.length).toBeLessThan(500);
+      expect(res.turns.length).toBeGreaterThan(0);
     });
   });
 
@@ -922,71 +937,6 @@ describe("bewilder beast", () => {
     });
   });
 
-  describe("resolveBeastTurn", () => {
-    it("damages the beast and drains dragon energy on a normal turn", () => {
-      const res = resolveBeastTurn(50, 100, 260, 0.5, 0.5);
-      expect(res.rawDamage).toBe(
-        50 + rollDamageBonus(0.5) - beastCombatDefense(),
-      );
-      expect(res.beastHpAfter).toBe(260 - Math.max(0, res.rawDamage));
-      expect(res.beastDefeated).toBe(false);
-      expect(res.counterDamage).toBeGreaterThanOrEqual(
-        CONFIG.beast.counterDamageMin,
-      );
-      expect(res.dragonEnergyAfter).toBe(100 - res.counterDamage);
-      expect(res.dragonRemoved).toBe(false);
-    });
-
-    it("deals no damage on negative rawDamage but still takes counter", () => {
-      const res = resolveBeastTurn(1, 100, 260, 0, 0.5);
-      expect(res.rawDamage).toBeLessThan(0);
-      expect(res.beastHpAfter).toBe(260);
-      expect(res.counterDamage).toBeGreaterThan(0);
-      expect(res.beastDefeated).toBe(false);
-    });
-
-    it("skips counter damage and keeps energy on the killing blow", () => {
-      // combat-100 dragon at 40 energy hits for 4 (40 eff + 10 bonus - 46 defense)
-      const res = resolveBeastTurn(100, 40, 2, 0.999, 0.999);
-      expect(res.beastHpAfter).toBe(0);
-      expect(res.beastDefeated).toBe(true);
-      expect(res.counterDamage).toBe(0);
-      expect(res.dragonEnergyAfter).toBe(40);
-      expect(res.dragonRemoved).toBe(false);
-    });
-
-    it("flags dragonRemoved when counter drains energy to 0", () => {
-      const res = resolveBeastTurn(30, 5, 260, 0.5, 0.999);
-      expect(res.beastDefeated).toBe(false);
-      expect(res.dragonEnergyAfter).toBe(0);
-      expect(res.dragonRemoved).toBe(true);
-    });
-
-    it("scales damage with live energy: tired dragons chip weakly", () => {
-      const full = resolveBeastTurn(50, 100, 260, 0.5, 0.5);
-      const tired = resolveBeastTurn(50, 10, 260, 0.5, 0.5);
-      expect(tired.rawDamage).toBeLessThan(full.rawDamage);
-      // full-energy math is unchanged: strength + bonus - combat defense
-      // (NOT the 75 display value — that would zero out every mid-game hit)
-      expect(full.rawDamage).toBe(
-        50 + rollDamageBonus(0.5) - beastCombatDefense(),
-      );
-    });
-
-    it("mid-fight exhaustion does not weaken blows: damage keys off entry energy", () => {
-      const fresh = resolveBeastTurn(50, 100, 260, 0.5, 0.5, 100);
-      const winded = resolveBeastTurn(50, 12, 260, 0.5, 0.5, 100);
-      expect(winded.rawDamage).toBe(fresh.rawDamage);
-      // ...but a dragon that steps in tired hits weakly from the first turn
-      const steppedInTired = resolveBeastTurn(50, 12, 260, 0.5, 0.5, 12);
-      expect(steppedInTired.rawDamage).toBeLessThan(fresh.rawDamage);
-    });
-
-    it("clamps beast HP at 0 on overkill", () => {
-      const res = resolveBeastTurn(200, 100, 10, 0.999, 0.5);
-      expect(res.beastHpAfter).toBe(0);
-    });
-  });
 });
 
 describe("trainingEnergyCost / win strength gains", () => {
@@ -1009,16 +959,12 @@ describe("trainingEnergyCost / win strength gains", () => {
       expect(v).toBeLessThanOrEqual(4);
     }
   });
-  it("resolveMonsterFight grants win-range strength on win, 0 on loss", () => {
-    const easy = MONSTERS[0];
-    const win = resolveMonsterFight(50, 100, easy, 0.999, 0.5, 0.5, 0);
-    expect(win.won).toBe(true);
-    expect(win.strengthGain).toBe(easy.strengthGainWinMin);
-    const winMax = resolveMonsterFight(50, 100, easy, 0.999, 0.5, 0.5, 0.999);
-    expect(winMax.strengthGain).toBe(easy.strengthGainWinMax);
-    const loss = resolveMonsterFight(1, 100, easy, 0, 0.5, 0.5, 0.999);
-    expect(loss.won).toBe(false);
-    expect(loss.strengthGain).toBe(0);
+  it("monster HP pools are positive (fight-screen pools, not one-roll thresholds)", () => {
+    for (const m of MONSTERS) {
+      expect(m.hp).toBeGreaterThan(0);
+    }
+    expect(MONSTERS[0].hp).toBeLessThan(MONSTERS[1].hp);
+    expect(MONSTERS[1].hp).toBeLessThan(MONSTERS[2].hp);
   });
 });
 
@@ -1195,8 +1141,7 @@ describe("catalogue invariants (CONFIG / DRAGONS / MONSTERS)", () => {
     ]);
     for (const m of MONSTERS) {
       expect(m.rewardMin).toBeLessThanOrEqual(m.rewardMax);
-      expect(m.energyLossWinMin).toBeLessThanOrEqual(m.energyLossWinMax);
-      expect(m.energyLossLoseMin).toBeLessThanOrEqual(m.energyLossLoseMax);
+      expect(m.hp).toBeGreaterThan(0);
       expect(m.spawnChance).toBeGreaterThan(0);
       expect(m.spawnChance).toBeLessThanOrEqual(1);
     }

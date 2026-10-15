@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
   actionRowPositions,
-  beastFightHpAtReveal,
   beastVanishHours,
   energySegmentColor,
   energySegmentsFilled,
+  fightBarFill,
+  fightFireballPos,
+  fightUnitRects,
   formatDragonName,
   rosterWindow,
   wrapIndex,
@@ -92,19 +94,124 @@ describe('beastVanishHours', () => {
   });
 });
 
-describe('beastFightHpAtReveal', () => {
-  it('steps through per-turn HP as lines reveal', () => {
-    const base = { lineCount: 4, hpSteps: [200, 120, 0], hpBefore: 260, hpAfter: 0, currentHp: 0 };
-    expect(beastFightHpAtReveal({ ...base, revealed: 0 })).toBe(260);
-    expect(beastFightHpAtReveal({ ...base, revealed: 1 })).toBe(200);
-    expect(beastFightHpAtReveal({ ...base, revealed: 3 })).toBe(0);
-    expect(beastFightHpAtReveal({ ...base, revealed: 4 })).toBe(0);
+
+
+const BIP6 = {
+  shape: 'rect',
+  arenaY: 40,
+  arenaH: 364,
+  leftX: 16,
+  leftXWide: 16,
+  colGap: 12,
+  enemyX: 302,
+  dragonS: 60,
+  enemyS: 72,
+  barH: 8,
+  barGap: 2,
+  rowGap: 4,
+};
+
+const ROUND = {
+  ...BIP6,
+  shape: 'round',
+  arenaY: 56,
+  arenaH: 384,
+  leftX: 52,
+  leftXWide: 140,
+  enemyX: 356,
+};
+
+describe('fightBarFill', () => {
+  it('fills proportionally and clamps', () => {
+    expect(fightBarFill(60, 100, 100)).toBe(60);
+    expect(fightBarFill(60, 50, 100)).toBe(30);
+    expect(fightBarFill(60, 0, 100)).toBe(0);
+    expect(fightBarFill(60, -5, 100)).toBe(0);
+    expect(fightBarFill(60, 200, 100)).toBe(60);
+    expect(fightBarFill(60, 1, 0)).toBe(0);
+  });
+});
+
+describe('fightUnitRects', () => {
+  it('centers a single dragon + enemy vertically, bar above each unit', () => {
+    const r = fightUnitRects({ ...BIP6, dragonCount: 1 });
+    expect(r.dragons).toHaveLength(1);
+    const d = r.dragons[0];
+    expect(d.x).toBe(16);
+    expect(d.barY + 8 + 2).toBe(d.y); // bar, gap, unit
+    expect(d.barW).toBe(60);
+    // block (70px) centered in a 364px arena starting at 40
+    expect(d.barY).toBe(40 + (364 - 70) / 2);
+    expect(r.enemy.x).toBe(302);
+    expect(r.enemy.barY + 8 + 2).toBe(r.enemy.y);
+    expect(r.enemy.barY).toBe(40 + (364 - 82) / 2);
   });
 
-  it('falls back to jump-at-end without per-turn steps', () => {
-    const base = { lineCount: 2, hpSteps: undefined, hpBefore: 260, hpAfter: 0, currentHp: 130 };
-    expect(beastFightHpAtReveal({ ...base, revealed: 0 })).toBe(130);
-    expect(beastFightHpAtReveal({ ...base, revealed: 1 })).toBe(130);
-    expect(beastFightHpAtReveal({ ...base, revealed: 2 })).toBe(0);
+  it('uses one column up to 3 dragons, two columns beyond', () => {
+    const three = fightUnitRects({ ...BIP6, dragonCount: 3 });
+    expect(new Set(three.dragons.map((d) => d.x)).size).toBe(1);
+    const four = fightUnitRects({ ...BIP6, dragonCount: 4 });
+    expect(new Set(four.dragons.map((d) => d.x)).size).toBe(2);
+    expect(four.dragons[1].x).toBe(16 + 60 + 12);
+    expect(four.dragons[2].x).toBe(16); // second row, first column
+    expect(four.dragons[2].barY).toBeGreaterThan(four.dragons[0].barY);
+  });
+
+  it('keeps all 12 dragons inside the rect arena (rows may overlap)', () => {
+    const r = fightUnitRects({ ...BIP6, dragonCount: 12 });
+    expect(r.dragons).toHaveLength(12);
+    for (const d of r.dragons) {
+      expect(d.x).toBeGreaterThanOrEqual(16);
+      expect(d.x + 60).toBeLessThanOrEqual(16 + 60 + 12 + 60);
+      expect(d.barY).toBeGreaterThanOrEqual(40);
+      expect(d.y + 60).toBeLessThanOrEqual(40 + 364);
+    }
+    // 6 rows in 364px: pitch shrinks below the natural 74px
+    const ys = [...new Set(r.dragons.map((d) => d.barY))].sort((a, b) => a - b);
+    expect(ys).toHaveLength(6);
+    expect(ys[1] - ys[0]).toBeLessThan(74);
+  });
+
+  it('shifts the round columns toward the center for 7+ dragons', () => {
+    const six = fightUnitRects({ ...ROUND, dragonCount: 6 });
+    expect(six.dragons[0].x).toBe(52);
+    const seven = fightUnitRects({ ...ROUND, dragonCount: 7 });
+    expect(seven.dragons[0].x).toBe(140);
+    const twelve = fightUnitRects({ ...ROUND, dragonCount: 12 });
+    expect(twelve.dragons).toHaveLength(12);
+    for (const d of twelve.dragons) {
+      expect(d.barY).toBeGreaterThanOrEqual(56);
+      expect(d.y + 60).toBeLessThanOrEqual(56 + 384);
+    }
+  });
+
+  it('enemy stays on the right on both profiles', () => {
+    for (const p of [BIP6, ROUND]) {
+      const r = fightUnitRects({ ...p, dragonCount: 5 });
+      expect(r.enemy.x).toBe(p.enemyX);
+      expect(r.enemy.x).toBeGreaterThan(
+        Math.max(...r.dragons.map((d) => d.x + d.size)),
+      );
+    }
+  });
+});
+
+describe('fightFireballPos', () => {
+  it('starts at the attacker center, ends at the target center', () => {
+    const from = { x: 50, y: 100 };
+    const to = { x: 250, y: 100 };
+    expect(fightFireballPos(from, to, 0, 28)).toEqual({ x: 36, y: 86 });
+    expect(fightFireballPos(from, to, 1, 28)).toEqual({ x: 236, y: 86 });
+    expect(fightFireballPos(from, to, 0.5, 28)).toEqual({ x: 136, y: 86 });
+  });
+  it('clamps t to [0, 1]', () => {
+    const from = { x: 0, y: 0 };
+    const to = { x: 100, y: 0 };
+    expect(fightFireballPos(from, to, -1, 28)).toEqual(
+      fightFireballPos(from, to, 0, 28),
+    );
+    expect(fightFireballPos(from, to, 2, 28)).toEqual(
+      fightFireballPos(from, to, 1, 28),
+    );
   });
 });

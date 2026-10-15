@@ -108,22 +108,22 @@ function screensForRoster(dragonIds) {
     ...dragonIds.map((dragonId) => ({ kind: "dragon", dragonId }))
   ];
 }
-function monsterFightLogText(dragonName, monsterName, rawDamage, won) {
-  return won ? `Dragon ${dragonName} attacks ${monsterName} \u2013 damage ${rawDamage}. Victory!` : `Dragon ${dragonName} attacks ${monsterName} \u2013 damage ${rawDamage}. Dragon is tired, will recover automatically.`;
+function fightTurnLogText(attackerName, targetName, hit, damage) {
+  return hit ? `${attackerName} hits ${targetName} for ${damage}` : `${attackerName} misses ${targetName}`;
 }
-function beastTurnLogText(dragonName, rawDamage, counterDamage) {
-  return `Dragon ${dragonName} deals ${Math.max(0, rawDamage)} damage to Bewilder Beast (retaliation ${counterDamage}).`;
+function monsterFightSummaryText(won, coinReward, strengthGain) {
+  return won ? `Victory! +${coinReward} coins, +${strengthGain} strength` : "Dragon is tired, will recover automatically";
 }
 export {
   advanceCollectAnchor,
   advanceStepAnchor,
-  beastTurnLogText,
   createDragonId,
   createEggDragon,
+  fightTurnLogText,
   freshCombatStats,
   freshEquipment,
   hatchDragonInstance,
-  monsterFightLogText,
+  monsterFightSummaryText,
   normalizeCombatStats,
   normalizeEquipment,
   screensForRoster,
