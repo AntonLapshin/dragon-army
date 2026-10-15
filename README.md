@@ -23,7 +23,17 @@ Hatch dragon eggs, train them, fight spawn-based monsters, and take down the
    > 0 attack in roster order; the beast retaliates on energy. Dragons dropped
    to 0 are removed. Winning vanishes the beast for a day and grants every
    survivor **+2–4 permanent strength** plus 300 coins.
-6. **Earn Coins** — hourly coins accrue but are credited only by tapping the
+6. **Equip a dragon** — tap the equipment icon (top-left on a hatched
+   dragon's page) for its 7 slots: Dragon Helm (+5, 100c), Wing Guards
+   (+5, 100c), Tail Guard (+4, 80c), and one Leg Guard per leg (+3, 60c
+   each). Full set: **+26 combat strength for 520 coins**. Equipment adds
+   to combat strength only (base strength, training costs, and the 125 cap
+   are unchanged); selling a geared dragon refunds 50% of its gear cost.
+   Monsters wear gear too — Easy none, Medium head + leg (+8), Hard all but
+   one leg (+23) — and the Beast wears the full set (display 101 = 4 gold
+   stars, combat defense 46). A bare base-40 dragon barely scratches it;
+   three fully equipped base-40 dragons always win.
+7. **Earn Coins** — hourly coins accrue but are credited only by tapping the
    coin icon when it appears. Energy recovers passively (10/hour).
 
 ## Run it
@@ -59,6 +69,7 @@ Project layout: `engine/` (pure rules: `config.ts`, `engine.ts`, `utils.ts`,
 | Train | coins (8 + 0.8×str) + 15 energy | +2–5 strength (max 125) |
 | Monster win | 70–100 energy | coins + strength (+1–2 / +1–2 / +2–4) |
 | Beast win | energy per turn (18–28 counter) | 300 coins + 2–4 strength per survivor |
+| Equipment (full set) | 520 coins | +26 combat strength (helm 100, wings 100, tail 80, legs 60×4) |
 
 ## What could look better (from a playtest pass)
 

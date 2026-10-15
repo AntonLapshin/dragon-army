@@ -53,6 +53,53 @@ export interface LevelThreshold {
   minStrength: number;
 }
 
+// ---------------------------------------------------------------------------
+// Equipment (one purchasable piece per body slot, see EQUIPMENT_SLOTS)
+// ---------------------------------------------------------------------------
+
+/**
+ * Equipment body slots: head, wings, tail + one slot per leg (4 legs).
+ * 7 slots total. Each slot holds at most one piece (the single catalogue
+ * entry for that slot) — buying it flips the slot from empty to owned.
+ */
+export type EquipmentSlotId =
+  | "head"
+  | "wings"
+  | "tail"
+  | "leg-front-left"
+  | "leg-front-right"
+  | "leg-back-left"
+  | "leg-back-right";
+
+/** Static equipment catalogue entry (see EQUIPMENT_SLOTS in config.ts). */
+export interface EquipmentDef {
+  /** Slot this piece fills (also its stable id — one option per slot). */
+  id: EquipmentSlotId;
+  /** Body slot (same as id; kept for readability at call sites). */
+  slot: EquipmentSlotId;
+  /** Display name, e.g. "Dragon Helm". */
+  name: string;
+  /** Short slot label for the equipment grid, e.g. "Head". */
+  slotLabel: string;
+  /** Combat-strength bonus while owned (added to base strength). */
+  bonus: number;
+  /** Purchase price in coins. */
+  price: number;
+  /**
+   * Image path relative to `assets/` (e.g. `equipment/helm.png`).
+   * Presentation-only; never enters formulas. Rendered via
+   * `equipmentAsset72(image)` (72x72, like monster rows).
+   */
+  image: string;
+}
+
+/**
+ * Per-dragon equipment: which slots are owned. Plain booleans, JSON-safe.
+ * New dragons start with every slot false (`freshEquipment()`); old saves
+ * backfill to all-false via `normalizeEquipment()`.
+ */
+export type DragonEquipment = Record<EquipmentSlotId, boolean>;
+
 /** Static monster catalogue entry (see MONSTERS in config.ts). */
 export interface MonsterDef {
   id: string;
@@ -74,6 +121,14 @@ export interface MonsterDef {
    * Presentation-only; never enters formulas.
    */
   image: string;
+  /**
+   * Equipment bonus added to `strength` for combat:
+   * `effectiveMonsterStrength = strength + equipmentBonus`.
+   * Easy 0 (no gear), Medium +8 (some), Hard +23 (almost all).
+   */
+  equipmentBonus: number;
+  /** Which equipment slots this monster wears (informational; sums to equipmentBonus). */
+  equipmentSlots: EquipmentSlotId[];
 }
 
 /** Outcome of one monster fight (pure result of `resolveMonsterFight`). */
@@ -108,17 +163,21 @@ export type DragonStage = "egg" | "hatched";
  * One owned dragon OR unhatched egg.
  *
  * STORED vs COMPUTED contract (do not add stored derived fields):
- * - Stored anchors (persist these 9): `id`, `breedId`, `strength`,
+ * - Stored anchors (persist these 10): `id`, `breedId`, `strength`,
  *   `energy` (= value AT `lastEnergyUpdateMs`, not "current"),
  *   `purchasedAtMs`, `hatchAtMs`, `hatchedAtMs`, `lastEnergyUpdateMs`,
- *   `combatStats` (lifetime battle record, backfilled as zeros on old saves).
+ *   `combatStats` (lifetime battle record, backfilled as zeros on old saves),
+ *   `equipment` (owned slots, backfilled all-false on old saves).
  * - Always computed via `config.ts` pure functions, never stored:
  *   - `stage` = `dragonStage(hatchedAtMs)` ("egg" while null, else "hatched");
  *     hatch is due when `isHatchDue(hatchAtMs, nowMs)`.
  *   - `ageDays` = `ageDaysForDragon(hatchedAtMs, nowMs)` (0 for eggs).
  *   - current energy = `energyAt(energy, lastEnergyUpdateMs, nowMs)`.
- *   - `level` = `levelForStrength(strength)` (display-only).
- *   - sell price = `sellPrice(strength, ageDays(now), energy(now), breed)`.
+ *   - `level` = `levelForStrength(strength)` (display-only, base strength).
+ *   - `equipmentBonus` = `equipmentBonusForEquipment(equipment)` (sum of
+ *     owned pieces); `combatStrength` = `strength + equipmentBonus`.
+ *   - sell price = `sellPriceForDragon(dragon, nowMs)` (base formula +
+ *     50% equipment refund).
  *   - lifespan = `breed.lifespanDays`; remaining/expired via
  *     `remainingLifespanDays(...)` / `isDragonExpired(...)`.
  *
@@ -159,6 +218,11 @@ export interface Dragon {
    * Incremented only on wins; losses change nothing.
    */
   combatStats: DragonCombatStats;
+  /**
+   * Owned equipment by slot. Eggs start empty; buying a piece flips its
+   * slot to true (one option per slot — no tiers, no swapping).
+   */
+  equipment: DragonEquipment;
 }
 
 /**
@@ -275,12 +339,14 @@ export type ModalKind =
   | "beast-intro"
   | "beast-fight"
   | "coin-summary"
+  | "equipment-buy"
   | null;
 
-/** Screens: main hub + one detail screen per dragon/egg. */
+/** Screens: main hub + one detail / equipment screen per dragon/egg. */
 export type ScreenRef =
   | { kind: "main" }
-  | { kind: "dragon"; dragonId: string };
+  | { kind: "dragon"; dragonId: string }
+  | { kind: "equipment"; dragonId: string };
 
 /** One auto-resolved fight-log line shown in locked fight modals. */
 export interface FightLogEntry {
@@ -396,6 +462,31 @@ export type SellResult =
   | { ok: true; price: number }
   | { ok: false; reason: "unknown-dragon" };
 
+export type EquipmentPreview =
+  | { canBuy: true; price: number; bonus: number; reason: null }
+  | {
+      canBuy: false;
+      price: number;
+      bonus: number;
+      reason:
+        | "unknown-dragon"
+        | "egg"
+        | "already-owned"
+        | "unknown-slot"
+        | "not-enough-coins";
+    };
+
+export type EquipmentBuyResult =
+  | {
+      ok: true;
+      slot: EquipmentSlotId;
+      price: number;
+      bonus: number;
+      equipmentBonusAfter: number;
+      combatStrengthAfter: number;
+    }
+  | { ok: false; reason: NonNullable<EquipmentPreview["reason"]> };
+
 export type HatchResult =
   | { ok: true; dragon: Dragon; strength: number }
   | {
@@ -449,7 +540,12 @@ export interface DragonView {
   ageDays: number;
   /** Live energy at view time (recovery derived, never stored). */
   energy: number;
+  /** Base strength (training / monster-win gains, capped at 125). */
   strength: number;
+  /** Sum of owned equipment bonuses (0 when nothing owned). */
+  equipmentBonus: number;
+  /** Combat strength actually used in fights: base + equipment bonus. */
+  combatStrength: number;
   sellPrice: number;
   remainingLifespanDays: number;
   expired: boolean;
@@ -513,6 +609,8 @@ export interface LegacyDragonEntry {
   hatchAt?: unknown;
   hatchedAt?: unknown;
   energyTs?: unknown;
+  equipment?: unknown;
+  combatStats?: unknown;
 }
 
 /** Pre-engine persisted shape (migrated on load, never written). */

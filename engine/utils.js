@@ -8,6 +8,7 @@ import {
   collectibleCoins,
   collectibleStepCoins
 } from "./config.js";
+import { EQUIPMENT_SLOTS } from "./config.js";
 function createDragonId(rand01, nowMs) {
   const randPart = Math.floor(rand01 * 36 ** 6).toString(36);
   return `dragon-${nowMs.toString(36)}-${randPart}`;
@@ -26,6 +27,25 @@ function normalizeCombatStats(raw) {
     coinsEarned: num(r.coinsEarned)
   };
 }
+function freshEquipment() {
+  const equipment = {};
+  for (const def of EQUIPMENT_SLOTS) equipment[def.id] = false;
+  return equipment;
+}
+function normalizeEquipment(raw) {
+  const r = typeof raw === "object" && raw !== null ? raw : {};
+  const equipment = {};
+  for (const def of EQUIPMENT_SLOTS) {
+    equipment[def.id] = r[def.id] === true;
+  }
+  return equipment;
+}
+function withEquipment(dragon, slot) {
+  return {
+    ...dragon,
+    equipment: { ...normalizeEquipment(dragon.equipment), [slot]: true }
+  };
+}
 function createEggDragon(params) {
   return {
     id: params.id,
@@ -36,7 +56,8 @@ function createEggDragon(params) {
     hatchAtMs: params.nowMs + params.hatchDelayMs,
     hatchedAtMs: null,
     lastEnergyUpdateMs: params.nowMs,
-    combatStats: freshCombatStats()
+    combatStats: freshCombatStats(),
+    equipment: freshEquipment()
   };
 }
 function hatchDragonInstance(dragon, nowMs, baseStrength) {
@@ -104,10 +125,13 @@ export {
   createDragonId,
   createEggDragon,
   freshCombatStats,
+  freshEquipment,
   hatchDragonInstance,
   monsterFightLogText,
   normalizeCombatStats,
+  normalizeEquipment,
   screensForRoster,
   withEnergyAnchor,
+  withEquipment,
   withTrainingGain
 };

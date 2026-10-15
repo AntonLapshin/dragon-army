@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   CONFIG,
   DRAGONS,
+  EQUIPMENT_SLOTS,
   MONSTERS,
   ageDaysForDragon,
   ageDaysForDragonInstance,
@@ -17,6 +18,7 @@ import {
   applyStrengthGain,
   battleDamage,
   beastCombatDefense,
+  beastDisplayStrength,
   breedForDragon,
   breedForIndex,
   canAffordEgg,
@@ -29,10 +31,16 @@ import {
   collectibleCoins,
   collectibleStepCoins,
   collectibleTotalCoins,
+  combatStrengthForDragon,
   drawBreedIndex,
   dragonStage,
+  effectiveMonsterStrength,
   effectiveStrength,
   energyAt,
+  equipmentBonusForEquipment,
+  equipmentCostForEquipment,
+  equipmentDefForSlot,
+  equipmentSellValue,
   findBreed,
   hasCollectibleCoins,
   isBattleWin,
@@ -87,6 +95,16 @@ const stubBreed = (over: Partial<DragonBreed> = {}): DragonBreed => ({
   ...over,
 });
 
+const emptyEquipment = () => ({
+  head: false,
+  wings: false,
+  tail: false,
+  "leg-front-left": false,
+  "leg-front-right": false,
+  "leg-back-left": false,
+  "leg-back-right": false,
+});
+
 const stubDragon = (over: Partial<Dragon> = {}): Dragon => ({
   id: "dragon-test",
   breedId: DRAGONS[0].id,
@@ -97,6 +115,7 @@ const stubDragon = (over: Partial<Dragon> = {}): Dragon => ({
   hatchedAtMs: 0,
   lastEnergyUpdateMs: 0,
   combatStats: { easyWins: 0, mediumWins: 0, hardWins: 0, beastWins: 0, coinsEarned: 0 },
+  equipment: emptyEquipment(),
   ...over,
 });
 
@@ -782,15 +801,124 @@ describe("bewilder beast", () => {
     });
   });
 
-  describe("bewilder beast display vs combat (3 gold stars, reasonable defense)", () => {
-    it("shows 3 gold stars while combat defense stays reasonable", () => {
+  describe("bewilder beast display vs combat (full gear: 101 display, 46 defense)", () => {
+    it("shows 3 gold stars base, 4 gold with full gear; defense = 20 + 26 gear", () => {
       expect(CONFIG.beast.strengthConstant).toBe(75);
       expect(starsForStrength(CONFIG.beast.strengthConstant)).toEqual({
         gold: 3,
         silver: 0,
       });
-      expect(beastCombatDefense()).toBe(CONFIG.beast.combatDefense);
-      expect(beastCombatDefense()).toBe(20);
+      expect(CONFIG.beast.equipmentBonus).toBe(26);
+      expect(beastDisplayStrength()).toBe(101);
+      expect(starsForStrength(beastDisplayStrength())).toEqual({
+        gold: 4,
+        silver: 0,
+      });
+      expect(beastCombatDefense()).toBe(
+        CONFIG.beast.combatDefense + CONFIG.beast.equipmentBonus,
+      );
+      expect(beastCombatDefense()).toBe(46);
+    });
+  });
+
+  describe("equipment catalogue + bonuses", () => {
+    it("has 7 slots (head, wings, tail + 4 legs), 1 option per slot", () => {
+      expect(EQUIPMENT_SLOTS).toHaveLength(7);
+      expect(EQUIPMENT_SLOTS.map((e) => e.id)).toEqual([
+        "head",
+        "wings",
+        "tail",
+        "leg-front-left",
+        "leg-front-right",
+        "leg-back-left",
+        "leg-back-right",
+      ]);
+      expect(new Set(EQUIPMENT_SLOTS.map((e) => e.id)).size).toBe(7);
+    });
+    it("prices are bonus x 20 coins (legs 60, tail 80, head/wings 100; full set 520)", () => {
+      for (const def of EQUIPMENT_SLOTS) {
+        expect(def.price).toBe(def.bonus * CONFIG.equipment.coinsPerBonus);
+      }
+      expect(EQUIPMENT_SLOTS.reduce((a, e) => a + e.bonus, 0)).toBe(26);
+      expect(EQUIPMENT_SLOTS.reduce((a, e) => a + e.price, 0)).toBe(520);
+      expect(equipmentDefForSlot("head")?.bonus).toBe(5);
+      expect(equipmentDefForSlot("tail")?.price).toBe(80);
+      expect(equipmentDefForSlot("leg-front-left")?.bonus).toBe(3);
+      expect(equipmentDefForSlot("nope")).toBeUndefined();
+    });
+    it("equipmentBonusForEquipment sums owned pieces, tolerates partial/old saves", () => {
+      expect(equipmentBonusForEquipment(emptyEquipment())).toBe(0);
+      expect(equipmentBonusForEquipment(undefined)).toBe(0);
+      expect(equipmentBonusForEquipment(null)).toBe(0);
+      expect(
+        equipmentBonusForEquipment({ ...emptyEquipment(), head: true, tail: true }),
+      ).toBe(9);
+      expect(
+        equipmentBonusForEquipment({
+          head: true,
+          wings: true,
+          tail: true,
+          "leg-front-left": true,
+          "leg-front-right": true,
+          "leg-back-left": true,
+          "leg-back-right": true,
+        }),
+      ).toBe(26);
+    });
+    it("equipmentCost / sell value: full set costs 520, sells back 260 (50%)", () => {
+      const full = {
+        head: true,
+        wings: true,
+        tail: true,
+        "leg-front-left": true,
+        "leg-front-right": true,
+        "leg-back-left": true,
+        "leg-back-right": true,
+      };
+      expect(equipmentCostForEquipment(full)).toBe(520);
+      expect(equipmentSellValue(full)).toBe(260);
+      expect(equipmentSellValue(emptyEquipment())).toBe(0);
+      expect(equipmentSellValue({ ...emptyEquipment(), head: true })).toBe(50);
+    });
+    it("combatStrengthForDragon = base + gear; monster effective = base + gear", () => {
+      expect(combatStrengthForDragon(stubDragon({ strength: 40 }))).toBe(40);
+      expect(
+        combatStrengthForDragon(
+          stubDragon({
+            strength: 40,
+            equipment: { ...emptyEquipment(), head: true },
+          }),
+        ),
+      ).toBe(45);
+      expect(effectiveMonsterStrength(MONSTERS[0])).toBe(19);
+      expect(effectiveMonsterStrength(MONSTERS[1])).toBe(40);
+      expect(effectiveMonsterStrength(MONSTERS[2])).toBe(78);
+    });
+    it("monster equipment slots sum to their bonus", () => {
+      for (const m of MONSTERS) {
+        const sum = m.equipmentSlots.reduce(
+          (a, slot) => a + (equipmentDefForSlot(slot)?.bonus ?? 0),
+          0,
+        );
+        expect(sum).toBe(m.equipmentBonus);
+      }
+      expect(MONSTERS[0].equipmentBonus).toBe(0);
+      expect(MONSTERS[1].equipmentBonus).toBe(8);
+      expect(MONSTERS[2].equipmentBonus).toBe(23);
+    });
+    it("sellPriceForDragon adds the 50% gear refund", () => {
+      const bare = stubDragon({ strength: 10, energy: 100, hatchedAtMs: 0, lastEnergyUpdateMs: 0 });
+      const geared = stubDragon({
+        strength: 10,
+        energy: 100,
+        hatchedAtMs: 0,
+        lastEnergyUpdateMs: 0,
+        equipment: { ...emptyEquipment(), head: true, wings: true },
+      });
+      // head + wings cost 200 -> refund 100
+      expect(sellPriceForDragon(geared, DAY * 2)).toBe(
+        sellPriceForDragon(bare, DAY * 2) + 100,
+      );
     });
   });
 
@@ -818,7 +946,8 @@ describe("bewilder beast", () => {
     });
 
     it("skips counter damage and keeps energy on the killing blow", () => {
-      const res = resolveBeastTurn(100, 40, 5, 0.999, 0.999);
+      // combat-100 dragon at 40 energy hits for 4 (40 eff + 10 bonus - 46 defense)
+      const res = resolveBeastTurn(100, 40, 2, 0.999, 0.999);
       expect(res.beastHpAfter).toBe(0);
       expect(res.beastDefeated).toBe(true);
       expect(res.counterDamage).toBe(0);

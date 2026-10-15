@@ -74,8 +74,21 @@ export const BIP6_LAYOUT = {
   DRAGON_STARS_Y: 124,
   // "?": battle-record button right of the energy bar (bar ends at 320).
   STATS_BTN_S: 40, STATS_BTN_X: 328, STATS_BTN_Y: 76,
+  // Equipment button: mirror of "?" on the left (right margin 22 = left
+  // margin 22). 40x40 art (ui/equipment_40x40.png), clears the bar (70..).
+  EQUIP_BTN_S: 40, EQUIP_BTN_X: 22, EQUIP_BTN_Y: 76,
   // Battle-record modal: 5 rows under the title, shared by both devices.
   STATS_ROW_Y: 64, STATS_ROW_GAP: 40, STATS_ROW_H: 30,
+  // Equipment page: title (DRAGON_NAME_Y/H) + combat line, then two slot
+  // rows (3 pieces / 4 legs). Row = 72 icon + 18 name + 18 bonus/price.
+  EQUIP_COMBAT_Y: 44, EQUIP_COMBAT_H: 24,
+  EQUIP_GRID_Y: 88, EQUIP_ROW_H: 108,
+  // Equipment buy modal (panel-relative): 72px piece icon, bonus / price /
+  // wallet lines; Buy/Cancel reuse SELL_BTN_X / KEEP_BTN_X.
+  EQUIP_BUY_ICON_S: 72, EQUIP_BUY_ICON_Y: 60,
+  EQUIP_BUY_BONUS_Y: 140, EQUIP_BUY_BONUS_H: 28,
+  EQUIP_BUY_PRICE_Y: 172, EQUIP_BUY_PRICE_H: 28,
+  EQUIP_BUY_WALLET_Y: 204, EQUIP_BUY_WALLET_H: 28,
   BEAST_STARS_Y: 130,
   MONSTER_STARS_Y_OFFSET: 74,
   FIGHT_STARS_Y: 130,
@@ -172,8 +185,19 @@ export const ROUND480_LAYOUT = {
   // round: "?": right of the energy bar (bar ends at 365); worst corner
   // (415,96) is d~=227 from center — inside the 480 circle with margin.
   STATS_BTN_S: 40, STATS_BTN_X: 375, STATS_BTN_Y: 96,
+  // round: equipment button mirrors "?" (right margin 65 = left margin 65);
+  // worst corner (65,96) is d~=227 — inside with margin. Bar starts 115.
+  EQUIP_BTN_S: 40, EQUIP_BTN_X: 65, EQUIP_BTN_Y: 96,
   // Battle-record modal: 5 rows under the title, shared by both devices.
   STATS_ROW_Y: 64, STATS_ROW_GAP: 40, STATS_ROW_H: 30,
+  // round: title 44..74, combat line 80..104, grid 104..320 (nav top 326).
+  EQUIP_COMBAT_Y: 80, EQUIP_COMBAT_H: 24,
+  EQUIP_GRID_Y: 104, EQUIP_ROW_H: 108,
+  // Equipment buy modal (panel-relative, same as Bip 6).
+  EQUIP_BUY_ICON_S: 72, EQUIP_BUY_ICON_Y: 60,
+  EQUIP_BUY_BONUS_Y: 140, EQUIP_BUY_BONUS_H: 28,
+  EQUIP_BUY_PRICE_Y: 172, EQUIP_BUY_PRICE_H: 28,
+  EQUIP_BUY_WALLET_Y: 204, EQUIP_BUY_WALLET_H: 28,
   BEAST_STARS_Y: 130,
   MONSTER_STARS_Y_OFFSET: 74,
   FIGHT_STARS_Y: 130,
@@ -333,6 +357,21 @@ export let DRAGON_STARS_Y = BIP6_LAYOUT.DRAGON_STARS_Y;
 export let STATS_BTN_S = BIP6_LAYOUT.STATS_BTN_S;
 export let STATS_BTN_X = BIP6_LAYOUT.STATS_BTN_X;
 export let STATS_BTN_Y = BIP6_LAYOUT.STATS_BTN_Y;
+export let EQUIP_BTN_S = BIP6_LAYOUT.EQUIP_BTN_S;
+export let EQUIP_BTN_X = BIP6_LAYOUT.EQUIP_BTN_X;
+export let EQUIP_BTN_Y = BIP6_LAYOUT.EQUIP_BTN_Y;
+export let EQUIP_COMBAT_Y = BIP6_LAYOUT.EQUIP_COMBAT_Y;
+export let EQUIP_COMBAT_H = BIP6_LAYOUT.EQUIP_COMBAT_H;
+export let EQUIP_GRID_Y = BIP6_LAYOUT.EQUIP_GRID_Y;
+export let EQUIP_ROW_H = BIP6_LAYOUT.EQUIP_ROW_H;
+export let EQUIP_BUY_ICON_S = BIP6_LAYOUT.EQUIP_BUY_ICON_S;
+export let EQUIP_BUY_ICON_Y = BIP6_LAYOUT.EQUIP_BUY_ICON_Y;
+export let EQUIP_BUY_BONUS_Y = BIP6_LAYOUT.EQUIP_BUY_BONUS_Y;
+export let EQUIP_BUY_BONUS_H = BIP6_LAYOUT.EQUIP_BUY_BONUS_H;
+export let EQUIP_BUY_PRICE_Y = BIP6_LAYOUT.EQUIP_BUY_PRICE_Y;
+export let EQUIP_BUY_PRICE_H = BIP6_LAYOUT.EQUIP_BUY_PRICE_H;
+export let EQUIP_BUY_WALLET_Y = BIP6_LAYOUT.EQUIP_BUY_WALLET_Y;
+export let EQUIP_BUY_WALLET_H = BIP6_LAYOUT.EQUIP_BUY_WALLET_H;
 export let STATS_ROW_Y = BIP6_LAYOUT.STATS_ROW_Y;
 export let STATS_ROW_GAP = BIP6_LAYOUT.STATS_ROW_GAP;
 export let STATS_ROW_H = BIP6_LAYOUT.STATS_ROW_H;
@@ -518,6 +557,21 @@ export function refreshLayout(info) {
   STATS_BTN_S = L.STATS_BTN_S;
   STATS_BTN_X = L.STATS_BTN_X;
   STATS_BTN_Y = L.STATS_BTN_Y;
+  EQUIP_BTN_S = L.EQUIP_BTN_S;
+  EQUIP_BTN_X = L.EQUIP_BTN_X;
+  EQUIP_BTN_Y = L.EQUIP_BTN_Y;
+  EQUIP_COMBAT_Y = L.EQUIP_COMBAT_Y;
+  EQUIP_COMBAT_H = L.EQUIP_COMBAT_H;
+  EQUIP_GRID_Y = L.EQUIP_GRID_Y;
+  EQUIP_ROW_H = L.EQUIP_ROW_H;
+  EQUIP_BUY_ICON_S = L.EQUIP_BUY_ICON_S;
+  EQUIP_BUY_ICON_Y = L.EQUIP_BUY_ICON_Y;
+  EQUIP_BUY_BONUS_Y = L.EQUIP_BUY_BONUS_Y;
+  EQUIP_BUY_BONUS_H = L.EQUIP_BUY_BONUS_H;
+  EQUIP_BUY_PRICE_Y = L.EQUIP_BUY_PRICE_Y;
+  EQUIP_BUY_PRICE_H = L.EQUIP_BUY_PRICE_H;
+  EQUIP_BUY_WALLET_Y = L.EQUIP_BUY_WALLET_Y;
+  EQUIP_BUY_WALLET_H = L.EQUIP_BUY_WALLET_H;
   STATS_ROW_Y = L.STATS_ROW_Y;
   STATS_ROW_GAP = L.STATS_ROW_GAP;
   STATS_ROW_H = L.STATS_ROW_H;

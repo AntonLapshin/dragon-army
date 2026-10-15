@@ -12,6 +12,11 @@ import {
   ASSET_BEAST_128,
   ASSET_CLOSE_36,
   ASSET_COIN_64,
+  ASSET_EQUIPMENT_40,
+  ASSET_EQUIP_HELM_72,
+  ASSET_EQUIP_WING_72,
+  ASSET_EQUIP_TAIL_72,
+  ASSET_EQUIP_LEG_72,
   ASSET_DANGER_84,
   ASSET_DICE_80,
   ASSET_EGG_128,
@@ -254,13 +259,34 @@ import {
   BEAST_BTN_OFFSET_X,
   BEAST_BTN_S,
   BEAST_BTN_Y,
+  EQUIP_BTN_S,
+  EQUIP_BTN_X,
+  EQUIP_BTN_Y,
+  EQUIP_BUY_BONUS_FONT,
+  EQUIP_BUY_BONUS_H,
+  EQUIP_BUY_BONUS_Y,
+  EQUIP_BUY_ICON_S,
+  EQUIP_BUY_ICON_Y,
+  EQUIP_BUY_PRICE_FONT,
+  EQUIP_BUY_PRICE_H,
+  EQUIP_BUY_PRICE_Y,
+  EQUIP_BUY_WALLET_FONT,
+  EQUIP_BUY_WALLET_H,
+  EQUIP_BUY_WALLET_Y,
+  EQUIP_COMBAT_FONT,
+  EQUIP_COMBAT_H,
+  EQUIP_COMBAT_Y,
+  EQUIP_GRID_Y,
+  EQUIP_ROW_H,
+  EQUIP_SLOT_NAME_FONT,
+  EQUIP_SLOT_SUB_FONT,
   dragonAsset240,
   dragonAsset60,
   eggAsset240,
   eggAsset60,
   monsterAsset72,
 } from './index.style.js';
-import { CONFIG, breedForIndex, clamp, starsForStrength } from '../engine/config.js';
+import { CONFIG, beastDisplayStrength, breedForIndex, clamp, effectiveMonsterStrength, starsForStrength } from '../engine/config.js';
 import { createGameEngine, coerceLoadedSave } from '../engine/engine.js';
 
 /**
@@ -327,6 +353,9 @@ let _fightTimer = null;
 
 // Screen: 0 = main, 1..N = dragon detail (roster order).
 let _screenIndex = 0;
+// Equipment page overlay: dragon id while its equipment page is open, else
+// null. _screenIndex is untouched so Back returns to the same dragon page.
+let _equipmentDragonId = null;
 // Modal: null or { kind, ...payload }. Fight modals carry reveal progress.
 let _modal = null;
 
@@ -358,7 +387,19 @@ function currentView() {
 
 function goTo(index) {
   _screenIndex = clamp(index, 0, roster().length);
+  _equipmentDragonId = null;
   closeTimersForScreen();
+  if (_page) _page.render();
+}
+
+function openEquipment(dragonId) {
+  _equipmentDragonId = dragonId;
+  _modal = null;
+  if (_page) _page.render();
+}
+
+function closeEquipment() {
+  _equipmentDragonId = null;
   if (_page) _page.render();
 }
 
@@ -563,9 +604,27 @@ function formatDragonName(breedName, ageDays) {
   return breedName + ' (' + age + ' day' + (age === 1 ? '' : 's') + ')';
 }
 
+// Equipment slot metadata (page-side labels + art; prices/bonuses come
+// from engine.getEquipmentCatalogue() — the single source of truth).
+// One piece per slot: head / wings / tail + one guard per leg.
+const EQUIP_SLOTS = [
+  { id: 'head', label: 'Head', art: ASSET_EQUIP_HELM_72 },
+  { id: 'wings', label: 'Wings', art: ASSET_EQUIP_WING_72 },
+  { id: 'tail', label: 'Tail', art: ASSET_EQUIP_TAIL_72 },
+  { id: 'leg-front-left', label: 'Leg FL', art: ASSET_EQUIP_LEG_72 },
+  { id: 'leg-front-right', label: 'Leg FR', art: ASSET_EQUIP_LEG_72 },
+  { id: 'leg-back-left', label: 'Leg BL', art: ASSET_EQUIP_LEG_72 },
+  { id: 'leg-back-right', label: 'Leg BR', art: ASSET_EQUIP_LEG_72 },
+];
+
+function equipSlotMeta(slotId) {
+  return EQUIP_SLOTS.find((s) => s.id === slotId) || null;
+}
+
 // Strength visual: 5 strength = 1 silver star, 5 silver = 1 gold star
-// (25 strength = 1 gold; 30 = 1 gold + 1 silver; max 125 = 5 gold).
-// 16px stars with a tiny 2px gap, centered on cx.
+// (25 strength = 1 gold; 30 = 1 gold + 1 silver; base max 125 = 5 gold,
+// combat max 151 with full gear = 6 gold). 16px stars with a tiny 2px
+// gap, centered on cx.
 function addStrengthStars(cx, y, strength) {
   const stars = starsForStrength(strength);
   const total = stars.gold + stars.silver;
@@ -873,7 +932,11 @@ function renderDragon(width, view) {
    // (drawn after the dragon so they sit above).
    if (!egg) {
       addEnergyBar(ENERGY_BAR_X, ENERGY_BAR_Y, ENERGY_BAR_W, ENERGY_BAR_H, ASSET_ENERGY_BAR_250, view.energy, CONFIG.energy.max);
-     addStrengthStars(Math.floor(width / 2), DRAGON_STARS_Y, view.strength);
+     // Stars show COMBAT strength (base + gear) — that is what fights use.
+     addStrengthStars(Math.floor(width / 2), DRAGON_STARS_Y, view.combatStrength ?? view.strength);
+     // Equipment: icon button left of the energy bar (mirror of "?")
+     // opens this dragon's equipment page (7 slots, buy per empty slot).
+     addIconButton(EQUIP_BTN_X, EQUIP_BTN_Y, EQUIP_BTN_S, ASSET_EQUIPMENT_40, () => openEquipment(view.dragon.id), false);
      // Battle record: small "?" button right of the energy bar opens the
      // per-dragon combat-stats modal (wins by difficulty + coins earned).
      addButton(STATS_BTN_X, STATS_BTN_Y, STATS_BTN_S, STATS_BTN_S, '?', () => openModal({ kind: 'combat-stats', dragonId: view.dragon.id }));
@@ -1128,7 +1191,7 @@ list.forEach((m, i) => {
      addImg(PANEL_X + MONSTER_IMG_X, rowY, MONSTER_IMG_S, MONSTER_IMG_S, monsterAsset72(m.image));
      addText(PANEL_X + MONSTER_NAME_X, rowY, MONSTER_NAME_W, MONSTER_NAME_H, m.difficulty, MONSTER_NAME_FONT, COLOR_WHITE, hmUI.align.LEFT);
      addText(PANEL_X + MONSTER_NAME_X, rowY + MONSTER_GAIN_Y, MONSTER_GAIN_W, MONSTER_GAIN_H, 'win: +' + m.strengthGainWinMin + '-' + m.strengthGainWinMax + ' str', MONSTER_GAIN_FONT, COLOR_SUCCESS, hmUI.align.LEFT);
-     addStrengthStars(PANEL_X + MONSTER_IMG_X + Math.floor(MONSTER_IMG_S / 2), rowY + MONSTER_STARS_Y_OFFSET, m.strength);
+     addStrengthStars(PANEL_X + MONSTER_IMG_X + Math.floor(MONSTER_IMG_S / 2), rowY + MONSTER_STARS_Y_OFFSET, effectiveMonsterStrength(m));
      addButton(PANEL_X + MONSTER_FIGHT_BTN_X, rowY + MONSTER_FIGHT_BTN_Y, MONSTER_FIGHT_BTN_W, MONSTER_FIGHT_BTN_H, 'Fight', () => startMonsterFight(view.dragon.id, m.id), { size: MONSTER_FIGHT_BTN_FONT });
    });
 }
@@ -1149,11 +1212,11 @@ function renderMonsterFight() {
   renderModalShell('Fight', modal.locked);
   if (monster) {
     addImg(PANEL_X + FIGHT_MONSTER_IMG_X, PANEL_Y + FIGHT_MONSTER_IMG_Y, FIGHT_MONSTER_IMG_S, FIGHT_MONSTER_IMG_S, monsterAsset72(monster.image));
-    addStrengthStars(PANEL_X + FIGHT_MONSTER_IMG_X + Math.floor(FIGHT_MONSTER_IMG_S / 2), PANEL_Y + FIGHT_STARS_Y, monster.strength);
+    addStrengthStars(PANEL_X + FIGHT_MONSTER_IMG_X + Math.floor(FIGHT_MONSTER_IMG_S / 2), PANEL_Y + FIGHT_STARS_Y, effectiveMonsterStrength(monster));
   }
   if (view) {
     addImg(PANEL_X + PANEL_W - FIGHT_DRAGON_IMG_OFFSET_X, PANEL_Y + FIGHT_DRAGON_IMG_Y, FIGHT_DRAGON_IMG_S, FIGHT_DRAGON_IMG_S, dragonAsset60(view.breed.assetKey));
-    addStrengthStars(PANEL_X + PANEL_W - FIGHT_DRAGON_IMG_OFFSET_X + Math.floor(FIGHT_DRAGON_IMG_S / 2), PANEL_Y + FIGHT_STARS_Y, view.strength);
+    addStrengthStars(PANEL_X + PANEL_W - FIGHT_DRAGON_IMG_OFFSET_X + Math.floor(FIGHT_DRAGON_IMG_S / 2), PANEL_Y + FIGHT_STARS_Y, view.combatStrength ?? view.strength);
   }
   if (monster && view) {
     addText(PANEL_X + FIGHT_VS_X, PANEL_Y + FIGHT_VS_Y, PANEL_W - FIGHT_VS_X * 2, FIGHT_VS_H, 'vs', FIGHT_VS_FONT, COLOR_COIN);
@@ -1179,7 +1242,7 @@ function renderBeastIntro() {
     addText(PANEL_X + MODAL_PAD, PANEL_Y + BEAST_VANISHED_Y, PANEL_W - MODAL_PAD * 2, BEAST_VANISHED_H, 'Vanished - back in ~' + hrs + 'h', BEAST_VANISHED_FONT, COLOR_MUTED);
     return;
   }
-  addStrengthStars(PANEL_X + BEAST_IMG_X + Math.floor(BEAST_IMG_S / 2), PANEL_Y + BEAST_STARS_Y, CONFIG.beast.strengthConstant);
+  addStrengthStars(PANEL_X + BEAST_IMG_X + Math.floor(BEAST_IMG_S / 2), PANEL_Y + BEAST_STARS_Y, beastDisplayStrength());
   addEnergyBar(PANEL_X + BEAST_BAR_X, PANEL_Y + BEAST_BAR_Y, BEAST_BAR_W, BEAST_BAR_H, ASSET_ENERGY_BAR_250, beast.currentHp, beast.maxHp);
   const team = engine.getBeastParticipants();
   addText(
@@ -1204,7 +1267,7 @@ function renderBeastFight() {
   const beast = engine.getState().beast;
   renderModalShell('Beast Battle', modal.locked);
   addImg(PANEL_X + FIGHT_MONSTER_IMG_X, PANEL_Y + FIGHT_MONSTER_IMG_Y, FIGHT_MONSTER_IMG_S, FIGHT_MONSTER_IMG_S, ASSET_BEAST_72);
-  addStrengthStars(PANEL_X + FIGHT_MONSTER_IMG_X + Math.floor(FIGHT_MONSTER_IMG_S / 2), PANEL_Y + FIGHT_STARS_Y, CONFIG.beast.strengthConstant);
+  addStrengthStars(PANEL_X + FIGHT_MONSTER_IMG_X + Math.floor(FIGHT_MONSTER_IMG_S / 2), PANEL_Y + FIGHT_STARS_Y, beastDisplayStrength());
   // Realtime HP replay: the engine already persisted the final outcome
   // (anti-cheat), but the bar must drain turn-by-turn as lines reveal.
   // revealed counts text lines (turns + 1 final summary); each revealed turn
@@ -1278,6 +1341,81 @@ function renderCombatStats() {
   addButton(PANEL_X + BTN_CENTER_X, PANEL_Y + PANEL_H - BTN_BOTTOM_OFFSET, BTN_W, BTN_H, 'OK', closeModal);
 }
 
+function renderEquipment(width, view) {
+  addImg(BG_X, BG_Y, BG_W, BG_H, BG_DRAGON_SRC);
+  addShade(0, 0, width, DEVICE.height);
+  addBadgeText(0, DRAGON_NAME_Y, width, DRAGON_NAME_H, view.breed.name + ' Equipment', DRAGON_NAME_FONT, COLOR_WHITE);
+  const combat = view.combatStrength ?? view.strength;
+  const bonus = view.equipmentBonus ?? 0;
+  addBadgeText(0, EQUIP_COMBAT_Y, width, EQUIP_COMBAT_H, 'Combat ' + combat + '  (base ' + view.strength + ' + gear ' + bonus + ')', EQUIP_COMBAT_FONT, COLOR_WHITE);
+  const owned = view.dragon.equipment || {};
+  const catalogue = engine.getEquipmentCatalogue();
+  const defById = {};
+  catalogue.forEach((d) => { defById[d.id] = d; });
+  // Two rows: 3 upper pieces (head / wings / tail), then the 4 leg guards.
+  const sidePad = ACTION_SIDE_PAD;
+  const rows = [['head', 'wings', 'tail'], ['leg-front-left', 'leg-front-right', 'leg-back-left', 'leg-back-right']];
+  rows.forEach((row, r) => {
+    const y = EQUIP_GRID_Y + r * EQUIP_ROW_H;
+    const step = (width - sidePad * 2 - 72) / (row.length - 1);
+    row.forEach((slotId, i) => {
+      const meta = equipSlotMeta(slotId);
+      const def = defById[slotId];
+      if (!meta || !def) return;
+      const x = Math.round(sidePad + i * step);
+      const isOwned = owned[slotId] === true;
+      if (isOwned) {
+        addImg(x, y, 72, 72, meta.art);
+      } else {
+        // Empty slot: frame + price; tap opens the buy modal with the
+        // piece icon. Owned slots have no buy action (one piece per slot).
+        addImg(x, y, 72, 72, ASSET_FRAME_72, () => openModal({ kind: 'equipment-buy', dragonId: view.dragon.id, slot: slotId }));
+      }
+      addText(x - 8, y + 72, 72 + 16, 18, meta.label, EQUIP_SLOT_NAME_FONT, COLOR_WHITE);
+      addText(x - 8, y + 90, 72 + 16, 18, isOwned ? '+' + def.bonus : def.price + 'c', EQUIP_SLOT_SUB_FONT, isOwned ? COLOR_SUCCESS : COLOR_COIN);
+    });
+  });
+  // Bottom nav: Back (to this dragon's page) + Home.
+  const navY = DEVICE.height - ACTION_BOTTOM_PAD - BTN_H;
+  addButton(ACTION_SIDE_PAD, navY, BTN_W, BTN_H, 'Back', closeEquipment);
+  addButton(width - ACTION_SIDE_PAD - BTN_W, navY, BTN_W, BTN_H, 'Home', () => goTo(0));
+}
+
+function renderEquipmentBuy() {
+  const modal = _modal;
+  const view = engine.getDragonView(modal.dragonId);
+  const def = engine.getEquipmentCatalogue().find((d) => d.id === modal.slot);
+  const meta = equipSlotMeta(modal.slot);
+  if (!view || view.stage === 'egg' || !def || !meta) {
+    closeModal();
+    return;
+  }
+  // Owned slots never open this modal (their tap is a no-op); if the slot
+  // became owned meanwhile (double tap), just close.
+  if ((view.dragon.equipment || {})[modal.slot] === true) {
+    closeModal();
+    return;
+  }
+  const preview = engine.equipmentPreview(modal.dragonId, modal.slot);
+  renderModalShell(def.name, false);
+  const iconX = PANEL_X + Math.floor((PANEL_W - EQUIP_BUY_ICON_S) / 2);
+  addImg(iconX, PANEL_Y + EQUIP_BUY_ICON_Y, EQUIP_BUY_ICON_S, EQUIP_BUY_ICON_S, meta.art);
+  addText(PANEL_X + MODAL_PAD, PANEL_Y + EQUIP_BUY_BONUS_Y, PANEL_W - MODAL_PAD * 2, EQUIP_BUY_BONUS_H, '+' + def.bonus + ' combat strength', EQUIP_BUY_BONUS_FONT, COLOR_SUCCESS);
+  addText(PANEL_X + MODAL_PAD, PANEL_Y + EQUIP_BUY_PRICE_Y, PANEL_W - MODAL_PAD * 2, EQUIP_BUY_PRICE_H, 'Price: ' + def.price + ' coins', EQUIP_BUY_PRICE_FONT, COLOR_COIN);
+  const coins = engine.getState().player.coins;
+  const affordable = preview.reason !== 'not-enough-coins';
+  addText(
+    PANEL_X + MODAL_PAD, PANEL_Y + EQUIP_BUY_WALLET_Y, PANEL_W - MODAL_PAD * 2, EQUIP_BUY_WALLET_H,
+    affordable ? 'You have ' + coins + ' coins' : 'Not enough coins (have ' + coins + ')',
+    EQUIP_BUY_WALLET_FONT, affordable ? COLOR_MUTED : COLOR_ERROR,
+  );
+  addButton(PANEL_X + SELL_BTN_X, PANEL_Y + PANEL_H - BTN_BOTTOM_OFFSET, SELL_BTN_W, BTN_H, 'Buy', () => {
+    // Engine re-checks every gate; a refused buy leaves the modal open.
+    if (engine.buyEquipment(modal.dragonId, modal.slot).ok) closeModal();
+  });
+  addButton(PANEL_X + KEEP_BTN_X, PANEL_Y + PANEL_H - BTN_BOTTOM_OFFSET, SELL_BTN_W, BTN_H, 'Cancel', closeModal);
+}
+
 function renderModal() {
   if (!_modal) return;
   switch (_modal.kind) {
@@ -1291,6 +1429,7 @@ function renderModal() {
     case 'beast-fight': renderBeastFight(); break;
     case 'coin-summary': renderCoinSummary(); break;
     case 'combat-stats': renderCombatStats(); break;
+    case 'equipment-buy': renderEquipmentBuy(); break;
     default: break;
   }
 }
@@ -1352,11 +1491,22 @@ Page({
 
     if (_screenIndex > roster().length) _screenIndex = roster().length;
     const view = currentView();
-    if (_screenIndex === 0 || !view) {
-      _screenIndex = 0;
-      renderMain(width);
-    } else {
-      renderDragon(width, view);
+    if (_equipmentDragonId) {
+      const eView = engine.getDragonView(_equipmentDragonId);
+      if (eView && eView.stage !== 'egg') {
+        renderEquipment(width, eView);
+      } else {
+        // Dragon gone / hatched-back? (expired, sold) — drop the overlay.
+        _equipmentDragonId = null;
+      }
+    }
+    if (!_equipmentDragonId) {
+      if (_screenIndex === 0 || !view) {
+        _screenIndex = 0;
+        renderMain(width);
+      } else {
+        renderDragon(width, view);
+      }
     }
     renderModal();
   },

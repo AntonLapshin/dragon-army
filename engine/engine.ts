@@ -32,6 +32,7 @@
 
 import {
   CONFIG,
+  EQUIPMENT_SLOTS,
   MONSTERS,
   ageDaysForDragonInstance,
   applyEnergyDrain,
@@ -45,8 +46,11 @@ import {
   collectibleCoins,
   collectibleStepCoins,
   collectibleTotalCoins,
+  combatStrengthForDragon,
   drawBreedIndex,
   dragonStage,
+  equipmentBonusForEquipment,
+  equipmentDefForSlot,
   isBeastEligible,
   isDragonHatched,
   isDragonInstanceExpired,
@@ -77,6 +81,9 @@ import type {
   DragonView,
   EconomyView,
   EggSpinPreview,
+  EquipmentBuyResult,
+  EquipmentPreview,
+  EquipmentSlotId,
   GameState,
   HatchResult,
   LegacySave,
@@ -97,11 +104,14 @@ import {
   createDragonId,
   createEggDragon,
   freshCombatStats,
+  freshEquipment,
   hatchDragonInstance,
   monsterFightLogText,
   normalizeCombatStats,
+  normalizeEquipment,
   screensForRoster,
   withEnergyAnchor,
+  withEquipment,
   withTrainingGain,
 } from "./utils";
 
@@ -197,6 +207,7 @@ export function migrateLegacySave(raw: LegacySave, nowMs: number): GameState {
       hatchedAtMs: asFiniteNumber(d.hatchedAt),
       lastEnergyUpdateMs: asFiniteNumber(d.energyTs) ?? nowMs,
       combatStats: freshCombatStats(),
+      equipment: freshEquipment(),
     }));
   state.beast.currentHp = asFiniteNumber(raw.beastHp) ?? CONFIG.beast.hp;
   state.beast.status = raw.beastStatus === "vanished" ? "vanished" : "alive";
@@ -221,6 +232,10 @@ export function coerceLoadedSave(raw: unknown, nowMs: number): GameState | null 
       if (typeof d.strength === "number") d.strength = clampStrength(d.strength);
       // Backfill the battle record for saves written before it existed.
       d.combatStats = normalizeCombatStats(d.combatStats);
+      // Backfill equipment for saves written before it existed.
+      d.equipment = normalizeEquipment(
+        (d as { equipment?: unknown }).equipment,
+      );
     }
     // Backfill the step anchor for saves written before step coins existed.
     if (asFiniteNumber(state.player.lastCollectedSteps) === null) {
@@ -619,6 +634,9 @@ export function createGameEngine(deps: CreateEngineDeps) {
     const s = requireState();
     const breed = breedForDragon(dragon);
     const energy = liveEnergyForDragon(dragon, atMs);
+    const equipmentBonus = equipmentBonusForEquipment(
+      normalizeEquipment(dragon.equipment),
+    );
     return {
       dragon: { ...dragon },
       breed,
@@ -627,6 +645,8 @@ export function createGameEngine(deps: CreateEngineDeps) {
       ageDays: ageDaysForDragonInstance(dragon, atMs),
       energy,
       strength: dragon.strength,
+      equipmentBonus,
+      combatStrength: dragon.strength + equipmentBonus,
       sellPrice: sellPriceForDragon(dragon, atMs),
       remainingLifespanDays: remainingLifespanForDragon(dragon, atMs),
       expired: isDragonInstanceExpired(dragon, atMs),
@@ -735,6 +755,70 @@ export function createGameEngine(deps: CreateEngineDeps) {
     return { ok: true, price };
   }
 
+  // -- equipment (§3.9): one piece per slot, bought with coins --
+
+  function equipmentPreview(
+    dragonId: string,
+    slot: EquipmentSlotId,
+  ): EquipmentPreview {
+    const s = requireState();
+    const dragon = findDragon(dragonId);
+    if (!dragon) {
+      return { canBuy: false, price: 0, bonus: 0, reason: "unknown-dragon" };
+    }
+    const def = equipmentDefForSlot(slot);
+    if (!def) {
+      return { canBuy: false, price: 0, bonus: 0, reason: "unknown-slot" };
+    }
+    if (!isDragonHatched(dragon)) {
+      return { canBuy: false, price: def.price, bonus: def.bonus, reason: "egg" };
+    }
+    const owned = normalizeEquipment(dragon.equipment)[slot] === true;
+    if (owned) {
+      return { canBuy: false, price: def.price, bonus: def.bonus, reason: "already-owned" };
+    }
+    if (s.player.coins < def.price) {
+      return { canBuy: false, price: def.price, bonus: def.bonus, reason: "not-enough-coins" };
+    }
+    return { canBuy: true, price: def.price, bonus: def.bonus, reason: null };
+  }
+
+  /**
+   * Buy one equipment piece for a hatched dragon: deduct the price, flip
+   * the slot to owned. No tiers, no swapping — one option per slot.
+   * Equipment is per-dragon (not shared) and is lost when the dragon is
+   * sold / removed / expires (sell refunds 50% of its cost).
+   */
+  function buyEquipment(
+    dragonId: string,
+    slot: EquipmentSlotId,
+  ): EquipmentBuyResult {
+    const s = requireState();
+    const preview = equipmentPreview(dragonId, slot);
+    if (!preview.canBuy) return { ok: false, reason: preview.reason };
+    const dragon = findDragon(dragonId);
+    if (!dragon) return { ok: false, reason: "unknown-dragon" };
+    s.player.coins -= preview.price;
+    replaceDragon(withEquipment(dragon, slot));
+    const after = findDragon(dragonId);
+    const equipmentBonusAfter = equipmentBonusForEquipment(
+      normalizeEquipment(after?.equipment),
+    );
+    save();
+    return {
+      ok: true,
+      slot,
+      price: preview.price,
+      bonus: preview.bonus,
+      equipmentBonusAfter,
+      combatStrengthAfter: (after?.strength ?? dragon.strength) + equipmentBonusAfter,
+    };
+  }
+
+  function getEquipmentCatalogue() {
+    return EQUIPMENT_SLOTS.map((d) => ({ ...d }));
+  }
+
   // -- monsters (§3.4 / §3.5) --
 
   /** Force-refresh the spawn table (modal-open refresh uses this). */
@@ -781,8 +865,9 @@ export function createGameEngine(deps: CreateEngineDeps) {
   }
 
   /**
-   * Single monster fight: `damage = (effectiveStrength + bonus) - monsterStrength`
-   * where effectiveStrength scales with live energy (tired dragons hit
+   * Single monster fight: `damage = (effectiveStrength + bonus) -
+   * effectiveMonsterStrength` where effectiveStrength scales combat
+   * strength (base + equipment) with live energy (tired dragons hit
    * weaker). Win = coins + permanent strength, energy drained by effort;
    * lose = knocked out to 0 energy, strength unchanged. Both outcomes
    * persist the drained anchor; 0 energy blocks the next fight until
@@ -811,7 +896,7 @@ export function createGameEngine(deps: CreateEngineDeps) {
     fightLocked = true;
     try {
       const result = resolveMonsterFight(
-        dragon.strength,
+        combatStrengthForDragon(dragon),
         liveEnergy,
         target,
         rolls?.bonusRand01 ?? rand(),
@@ -946,7 +1031,7 @@ export function createGameEngine(deps: CreateEngineDeps) {
         finalEnergies.set(participant.id, energy);
         while (energy > 0 && !defeated) {
           const turn = resolveBeastTurn(
-            participant.strength,
+            combatStrengthForDragon(participant),
             energy,
             hp,
             rand(),
@@ -1062,7 +1147,9 @@ export function createGameEngine(deps: CreateEngineDeps) {
   function setScreen(screen: ScreenRef): void {
     const s = requireState();
     s.ui.currentScreen = screen;
-    if (screen.kind === "dragon") s.ui.selectedDragonId = screen.dragonId;
+    if (screen.kind === "dragon" || screen.kind === "equipment") {
+      s.ui.selectedDragonId = screen.dragonId;
+    }
     save();
   }
 
@@ -1110,6 +1197,10 @@ export function createGameEngine(deps: CreateEngineDeps) {
     trainDragon,
     sellPreview,
     sellDragon,
+    // equipment
+    equipmentPreview,
+    buyEquipment,
+    getEquipmentCatalogue,
     // monsters
     refreshMonsterSpawn,
     getSpawnedMonsters,

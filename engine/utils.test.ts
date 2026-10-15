@@ -13,11 +13,14 @@ import {
   createDragonId,
   createEggDragon,
   freshCombatStats,
+  freshEquipment,
   hatchDragonInstance,
   monsterFightLogText,
   normalizeCombatStats,
+  normalizeEquipment,
   screensForRoster,
   withEnergyAnchor,
+  withEquipment,
   withTrainingGain,
 } from "./utils";
 import { CONFIG } from "./config";
@@ -35,6 +38,7 @@ const stubDragon = (over: Partial<Dragon> = {}): Dragon => ({
   hatchedAtMs: null,
   lastEnergyUpdateMs: 0,
   combatStats: freshCombatStats(),
+  equipment: freshEquipment(),
   ...over,
 });
 
@@ -69,7 +73,37 @@ describe("createEggDragon", () => {
       hatchedAtMs: null,
       lastEnergyUpdateMs: 5000,
       combatStats: freshCombatStats(),
+      equipment: freshEquipment(),
     });
+  });
+});
+
+describe("equipment helpers", () => {
+  it("freshEquipment returns all-false slots", () => {
+    expect(freshEquipment()).toEqual({
+      head: false,
+      wings: false,
+      tail: false,
+      "leg-front-left": false,
+      "leg-front-right": false,
+      "leg-back-left": false,
+      "leg-back-right": false,
+    });
+  });
+  it("normalizeEquipment backfills missing slots as false, keeps owned true", () => {
+    expect(normalizeEquipment(undefined)).toEqual(freshEquipment());
+    expect(normalizeEquipment({ head: true })).toEqual({
+      ...freshEquipment(),
+      head: true,
+    });
+    expect(normalizeEquipment({ head: "yes", tail: 1 })).toEqual(freshEquipment());
+  });
+  it("withEquipment flips one slot without mutating", () => {
+    const d = stubDragon();
+    const after = withEquipment(d, "head");
+    expect(after.equipment.head).toBe(true);
+    expect(d.equipment.head).toBe(false);
+    expect(after.equipment.wings).toBe(false);
   });
 });
 

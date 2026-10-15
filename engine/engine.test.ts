@@ -14,7 +14,7 @@ import {
   migrateLegacySave,
 } from "./engine";
 import type { Dragon, GameState } from "./types";
-import { freshCombatStats } from "./utils";
+import { freshCombatStats, freshEquipment } from "./utils";
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -35,6 +35,7 @@ function hatchedDragon(over: Partial<Dragon> = {}): Dragon {
     hatchedAtMs: T0,
     lastEnergyUpdateMs: T0,
     combatStats: freshCombatStats(),
+    equipment: freshEquipment(),
     ...over,
   };
 }
@@ -50,6 +51,7 @@ function eggDragon(over: Partial<Dragon> = {}): Dragon {
     hatchedAtMs: null,
     lastEnergyUpdateMs: T0,
     combatStats: freshCombatStats(),
+    equipment: freshEquipment(),
     ...over,
   };
 }
@@ -599,6 +601,143 @@ describe("selling", () => {
     const t = setup(stateWith([eggDragon({ id: "egg" })]));
     t.engine.init();
     expect(t.engine.sellDragon("nope")).toEqual({ ok: false, reason: "unknown-dragon" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Equipment
+// ---------------------------------------------------------------------------
+
+describe("equipment", () => {
+  it("equipmentPreview gates: unknown dragon / egg / already-owned", () => {
+    const saved = stateWith([hatchedDragon({ id: "d" }), eggDragon({ id: "egg" })]);
+    saved.player.coins = 1000;
+    const t = setup(saved);
+    t.engine.init();
+    expect(t.engine.equipmentPreview("nope", "head").reason).toBe("unknown-dragon");
+    expect(t.engine.equipmentPreview("egg", "head").reason).toBe("egg");
+    expect(t.engine.equipmentPreview("d", "head")).toEqual({
+      canBuy: true,
+      price: 100,
+      bonus: 5,
+      reason: null,
+    });
+    // buy the full set, then every slot reports already-owned
+    for (const slot of ["head", "wings", "tail", "leg-front-left", "leg-front-right", "leg-back-left", "leg-back-right"] as const) {
+      expect(t.engine.buyEquipment("d", slot).ok).toBe(true);
+    }
+    expect(t.engine.equipmentPreview("d", "head").reason).toBe("already-owned");
+    expect(t.engine.equipmentPreview("d", "wings").reason).toBe("already-owned");
+    expect(t.engine.equipmentPreview("d", "tail").reason).toBe("already-owned");
+  });
+  it("buyEquipment deducts coins, flips the slot, updates combat strength", () => {
+    const t = setup(stateWith([hatchedDragon({ id: "d", strength: 40 })]));
+    t.engine.init();
+    const before = t.engine.getState().player.coins;
+    const res = t.engine.buyEquipment("d", "head");
+    expect(res).toEqual({
+      ok: true,
+      slot: "head",
+      price: 100,
+      bonus: 5,
+      equipmentBonusAfter: 5,
+      combatStrengthAfter: 45,
+    });
+    expect(t.engine.getState().player.coins).toBe(before - 100);
+    expect(t.engine.getState().player.dragons[0].equipment.head).toBe(true);
+    const view = t.engine.getDragonView("d");
+    expect(view?.equipmentBonus).toBe(5);
+    expect(view?.combatStrength).toBe(45);
+    expect(view?.strength).toBe(40); // base unchanged
+    // second purchase of the same slot is refused
+    expect(t.engine.buyEquipment("d", "head")).toEqual({
+      ok: false,
+      reason: "already-owned",
+    });
+    expect(t.engine.getState().player.coins).toBe(before - 100);
+  });
+  it("buyEquipment rejects eggs and unknown dragons/slots", () => {
+    const t = setup(stateWith([eggDragon({ id: "egg" })]));
+    t.engine.init();
+    expect(t.engine.buyEquipment("egg", "head")).toEqual({ ok: false, reason: "egg" });
+    expect(t.engine.buyEquipment("nope", "head")).toEqual({ ok: false, reason: "unknown-dragon" });
+  });
+  it("not-enough-coins is refused and coins are untouched", () => {
+    const saved = stateWith([hatchedDragon({ id: "d" })]);
+    saved.player.coins = 50;
+    const t = setup(saved);
+    t.engine.init();
+    expect(t.engine.buyEquipment("d", "head")).toEqual({
+      ok: false,
+      reason: "not-enough-coins",
+    });
+    expect(t.engine.getState().player.coins).toBe(50);
+  });
+  it("equipment helps win a Medium fight a bare dragon would lose", () => {
+    // Medium effective 40: bare 32 loses (32+10-40=2? actually wins narrowly) —
+    // use a 25-base dragon: bare 25+10-40 < 0 loss; +head (30) +wings (35) still
+    // loses; full-ish +26 = 51 wins. Use head+wings+tail = +14 -> 39+10-40=9 win.
+    const saved = stateWith([hatchedDragon({ id: "d", strength: 25 })]);
+    saved.monsterSpawn = { spawned: [{ ...MONSTERS[1] }], lastRefreshMs: T0 };
+    const t = setup(saved);
+    t.engine.init();
+    const bare = t.engine.fightMonster("d", MONSTERS[1].id, {
+      bonusRand01: 0.999,
+      rewardRand01: 0.5,
+      energyRand01: 0,
+      strengthRand01: 0,
+    });
+    expect(bare.ok).toBe(true);
+    if (!bare.ok) return;
+    expect(bare.won).toBe(false); // 25 + 10 - 40 < 0
+    // fresh dragon, buy gear, then fight
+    const saved2 = stateWith([hatchedDragon({ id: "d", strength: 25 })]);
+    saved2.player.coins = 1000;
+    saved2.monsterSpawn = { spawned: [{ ...MONSTERS[1] }], lastRefreshMs: T0 };
+    const t2 = setup(saved2);
+    t2.engine.init();
+    expect(t2.engine.buyEquipment("d", "head").ok).toBe(true);
+    expect(t2.engine.buyEquipment("d", "wings").ok).toBe(true);
+    expect(t2.engine.buyEquipment("d", "tail").ok).toBe(true);
+    const geared = t2.engine.fightMonster("d", MONSTERS[1].id, {
+      bonusRand01: 0.999,
+      rewardRand01: 0.5,
+      energyRand01: 0,
+      strengthRand01: 0,
+    });
+    expect(geared.ok).toBe(true);
+    if (!geared.ok) return;
+    expect(geared.won).toBe(true); // (25+14) + 10 - 40 = 9 > 0
+  });
+  it("coerceLoadedSave backfills missing equipment as empty", () => {
+    const saved = stateWith([hatchedDragon()]);
+    const raw = JSON.parse(JSON.stringify(saved)) as GameState;
+    delete (raw.player.dragons[0] as Partial<Dragon>).equipment;
+    const s = coerceLoadedSave(raw, T0);
+    expect(s?.player.dragons[0].equipment).toEqual(freshEquipment());
+  });
+  it("migrateLegacySave starts dragons with empty equipment", () => {
+    const s = migrateLegacySave({ coins: 5, dragons: [{ id: "d" }] }, T0);
+    expect(s.player.dragons[0].equipment).toEqual(freshEquipment());
+  });
+  it("selling a geared dragon refunds 50% of gear cost", () => {
+    const t = setup(stateWith([hatchedDragon({ id: "d", strength: 20 })]));
+    t.engine.init();
+    const barePrice = t.engine.sellPreview("d");
+    expect(t.engine.buyEquipment("d", "head").ok).toBe(true); // 100 spent
+    const gearedPrice = t.engine.sellPreview("d");
+    expect(gearedPrice).toBe((barePrice ?? 0) + 50);
+    const res = t.engine.sellDragon("d");
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.price).toBe(gearedPrice);
+  });
+  it("getEquipmentCatalogue returns the 7-slot catalogue", () => {
+    const t = setup(stateWith([hatchedDragon()]));
+    t.engine.init();
+    const cat = t.engine.getEquipmentCatalogue();
+    expect(cat).toHaveLength(7);
+    expect(cat[0]).toMatchObject({ id: "head", bonus: 5, price: 100 });
   });
 });
 

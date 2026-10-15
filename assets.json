@@ -170,6 +170,21 @@
   "ui/egg.png": [
     "128x128"
   ],
+  "ui/equipment.png": [
+    "40x40"
+  ],
+  "ui/helm.png": [
+    "72x72"
+  ],
+  "ui/leg_guard.png": [
+    "72x72"
+  ],
+  "ui/tail_guard.png": [
+    "72x72"
+  ],
+  "ui/wing_guards.png": [
+    "72x72"
+  ],
   "ui/energy_bar.png": [
     "250x42",
     "190x32"

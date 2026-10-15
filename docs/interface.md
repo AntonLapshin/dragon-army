@@ -43,13 +43,15 @@
   - **Breed + age** in the name line, e.g. "Wooly Howl (2 days)" / "(1 day)"
   - **Energy** (segmented bar)
   - **Strength** as stars centered below the energy bar (5 strength = 1 silver,
-    5 silver = 1 gold, max 125 = 5 gold). No "Lv N · Age Nd" line.
+    5 silver = 1 gold, max 125 base = 5 gold, 151 combat with full gear).
+    Stars show **combat strength** (base + owned equipment). No "Lv N · Age Nd" line.
 - **Bottom row** three icons (equally spaced, spanning the width; **hatched dragons only** — hidden on egg screens):
   - **Train** (left) – opens Train modal. Disabled at 0 energy.
   - **Sell** (center) – opens Sell modal.
   - **Monster** (right) – opens Monster Selection modal. Disabled at 0 energy (dragon must recover first).
 - **Home** icon (bottom row) returns to the Main Control Screen.
 - **"?" button** (small, right of the energy bar; **hatched dragons only**) – opens the Battle Record modal for this dragon.
+- **Equipment button** (small icon, left of the energy bar, mirroring "?"; **hatched dragons only**) – opens this dragon's Equipment page: 7 slots (Head / Wings / Tail / one guard per leg), each showing its name and price (owned slots show the piece icon and "+bonus"). Tapping an empty slot opens the Equipment Buy modal with the piece icon, bonus, price, and wallet balance; tapping Buy deducts the price and marks the slot owned (one piece per slot, no second purchase). Back returns to the dragon page, Home to the Main Control Screen.
 
 ---
 

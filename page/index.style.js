@@ -225,6 +225,16 @@ export const BEAST_WARN_FONT = FONT_16;
 export const COINS_FONT = FONT_20;
 
 // ---------------------------------------------------------------------------
+// Equipment page + buy modal look
+// ---------------------------------------------------------------------------
+export const EQUIP_COMBAT_FONT = FONT_18;
+export const EQUIP_SLOT_NAME_FONT = FONT_16;
+export const EQUIP_SLOT_SUB_FONT = FONT_16;
+export const EQUIP_BUY_BONUS_FONT = FONT_20;
+export const EQUIP_BUY_PRICE_FONT = FONT_20;
+export const EQUIP_BUY_WALLET_FONT = FONT_18;
+
+// ---------------------------------------------------------------------------
 // Assets (every image path used by the page, except the per-device
 // backgrounds — BG_HOME_SRC / BG_DRAGON_SRC live in ./layouts.js and are
 // picked via refreshLayout(): 390x450 art for Bip 6, 480x480 art for round).
@@ -247,6 +257,11 @@ export const ASSET_SELL_84 = 'ui/sell_84x84.png';
 export const ASSET_DANGER_84 = 'ui/danger_84x84.png';
 export const ASSET_TRAINING_84 = 'ui/training_84x84.png';
 export const ASSET_DICE_80 = 'ui/dice_80x80.png';
+export const ASSET_EQUIPMENT_40 = 'ui/equipment_40x40.png';
+export const ASSET_EQUIP_HELM_72 = 'ui/helm_72x72.png';
+export const ASSET_EQUIP_WING_72 = 'ui/wing_guards_72x72.png';
+export const ASSET_EQUIP_TAIL_72 = 'ui/tail_guard_72x72.png';
+export const ASSET_EQUIP_LEG_72 = 'ui/leg_guard_72x72.png';
 export const ASSET_VICTORY_60 = 'ui/victory_60x60.png';
 export const ASSET_LOSS_60 = 'ui/loss_60x60.png';
 export const ASSET_CLOSE_36 = 'ui/close_36x36.png';
@@ -298,6 +313,12 @@ export {
   ENERGY_BAR_W, ENERGY_BAR_H, ENERGY_BAR_X, ENERGY_BAR_Y, ENERGY_SEG_COUNT,
   STAR_S, STAR_GAP,
   DRAGON_STARS_Y, BEAST_STARS_Y, MONSTER_STARS_Y_OFFSET, FIGHT_STARS_Y,
+  EQUIP_BTN_S, EQUIP_BTN_X, EQUIP_BTN_Y,
+  EQUIP_COMBAT_Y, EQUIP_COMBAT_H, EQUIP_GRID_Y, EQUIP_ROW_H,
+  EQUIP_BUY_ICON_S, EQUIP_BUY_ICON_Y,
+  EQUIP_BUY_BONUS_Y, EQUIP_BUY_BONUS_H,
+  EQUIP_BUY_PRICE_Y, EQUIP_BUY_PRICE_H,
+  EQUIP_BUY_WALLET_Y, EQUIP_BUY_WALLET_H,
   ACTION_SIDE_PAD, ACTION_BOTTOM_PAD, ACTION_ICON_S,
   HATCH_TEXT_Y, HATCH_TEXT_H, HATCH_BTN_Y,
   ROSTER_SLOTS, ROSTER_THUMB, ROSTER_FRAME, ROSTER_LEFT, ROSTER_BOTTOM_PAD,

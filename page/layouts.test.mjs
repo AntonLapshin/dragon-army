@@ -103,6 +103,7 @@ describe('layout tables', () => {
       'EARN_ICON_S', 'BALANCE_ICON_S', 'COINS_ICON_S', 'ICON_SIZE',
       'EGG_DICE_S', 'EGG_REVEAL_S', 'SELL_ICON_S', 'TRAIN_RESULT_ICON_S',
       'FIGHT_OUTCOME_ICON_S', 'BEAST_IMG_S', 'SHADOW_W', 'SHADOW_H',
+      'EQUIP_BUY_ICON_S', 'EQUIP_BTN_S', 'EQUIP_ROW_H',
     ];
     for (const k of artBound) {
       expect(ROUND480_LAYOUT[k], k).toBe(BIP6_LAYOUT[k]);
@@ -163,6 +164,26 @@ describe('round480 circle containment', () => {
         `slot ${i}`,
       ).toBe(true);
     }
+  });
+
+  it('keeps the equipment button + grid inside the circle', () => {
+    expect(rectInsideCircle(L.EQUIP_BTN_X, L.EQUIP_BTN_Y, L.EQUIP_BTN_S, L.EQUIP_BTN_S, 4)).toBe(true);
+    // equipment page: 3-piece row then 4-leg row, both 72px icons
+    const sidePad = L.ACTION_SIDE_PAD;
+    const gridY = L.EQUIP_GRID_Y;
+    for (let i = 0; i < 3; i += 1) {
+      const step = (prof.width - sidePad * 2 - 72) / 2;
+      const x = Math.round(sidePad + i * step);
+      expect(rectInsideCircle(x, gridY, 72, 72, 4), `piece ${i}`).toBe(true);
+    }
+    const legStep = (prof.width - sidePad * 2 - 72) / 3;
+    for (let i = 0; i < 4; i += 1) {
+      const x = Math.round(sidePad + i * legStep);
+      expect(rectInsideCircle(x, gridY + L.EQUIP_ROW_H, 72, 72, 4), `leg ${i}`).toBe(true);
+    }
+    // grid bottom clears the bottom action row
+    const navTop = prof.height - L.ACTION_BOTTOM_PAD - L.ACTION_ICON_S;
+    expect(gridY + 2 * L.EQUIP_ROW_H).toBeLessThanOrEqual(navTop);
   });
 
   it('fits three monster rows in the round panel (page fit condition)', () => {

@@ -100,6 +100,14 @@ const CONFIG = {
     refreshIntervalMs: 60 * 60 * 1e3,
     emptyStateText: "No monsters right now"
   },
+  equipment: {
+    // Price rule: 20 coins per +1 strength (legs 3 -> 60, tail 4 -> 80,
+    // head/wings 5 -> 100). Full set: +26 for 520 coins.
+    coinsPerBonus: 20,
+    // Selling a dragon refunds half its owned-equipment cost (see
+    // equipmentSellValue()); the other half is the cost of gearing up.
+    sellRefundRate: 0.5
+  },
   beast: {
     name: "Bewilder Beast",
     hp: 260,
@@ -113,6 +121,21 @@ const CONFIG = {
     // Without this split, a display 75 would deal 0 damage per turn to
     // mid-game rosters (40 + 10 - 75 < 0) and the beast would be unbeatable.
     combatDefense: 20,
+    // The beast wears the FULL equipment set (all 7 slots, +26), so its
+    // combat defense is 20 + 26 = 46 (see beastCombatDefense()) and its
+    // display strength is 75 + 26 = 101 (see beastDisplayStrength()).
+    // A fully equipped 40-strength dragon (combat 66) hits it exactly as
+    // a bare 40-strength dragon hit the old 20-defense beast.
+    equipmentBonus: 26,
+    equipmentSlots: [
+      "head",
+      "wings",
+      "tail",
+      "leg-front-left",
+      "leg-front-right",
+      "leg-back-left",
+      "leg-back-right"
+    ],
     counterDamageMin: 18,
     counterDamageMax: 28,
     counterTarget: "energy",
@@ -148,10 +171,10 @@ const CONFIG = {
     timeToFirstHatch: "24-48h",
     hourlyIncome: 2,
     trainingsPerHourIncome: "~0.12 early (passive only; fights fund training)",
-    easyBeatableAt: "strength ~19 (fresh ~11 wins ~25%; reliable after 3-4 trainings)",
-    mediumBeatableAt: "strength ~30 (about 4-7 trainings)",
-    hardBeatableAt: "strength ~55 (about 9-15 trainings or epic breed)",
-    beastBeatableAt: "roster of 3-5 dragons at strength 40-60"
+    easyBeatableAt: "combat ~19 (fresh ~11 wins ~25%; reliable after 3-4 trainings; Easy wears no gear)",
+    mediumBeatableAt: "combat ~38-40 (base ~30 + ~8 gear, or base ~40 bare; Medium wears head + leg = +8)",
+    hardBeatableAt: "combat ~76-78 (base ~50 + full +26 gear; Hard wears all but one leg = +23)",
+    beastBeatableAt: "roster of 3-5 dragons at combat ~66 (e.g. base 40 + full +26 gear; beast wears all gear, defense 46)"
   }
 };
 const DRAGONS = [
@@ -175,6 +198,18 @@ const DRAGONS = [
   { id: "dragon-15", name: "Light Fury", rarity: "epic", baseStrengthMin: 18, baseStrengthMax: 24, sellMultiplier: 1.55, lifespanDays: 31, assetKey: "light_fury" },
   { id: "dragon-16", name: "Night Fury", rarity: "epic", baseStrengthMin: 20, baseStrengthMax: 28, sellMultiplier: 1.7, lifespanDays: 30, assetKey: "night_fury" }
 ];
+const EQUIPMENT_SLOTS = [
+  { id: "head", slot: "head", name: "Dragon Helm", slotLabel: "Head", bonus: 5, price: 100, image: "equipment/helm.png" },
+  { id: "wings", slot: "wings", name: "Wing Guards", slotLabel: "Wings", bonus: 5, price: 100, image: "equipment/wing-guards.png" },
+  { id: "tail", slot: "tail", name: "Tail Guard", slotLabel: "Tail", bonus: 4, price: 80, image: "equipment/tail-guard.png" },
+  { id: "leg-front-left", slot: "leg-front-left", name: "Leg Guard", slotLabel: "Front left leg", bonus: 3, price: 60, image: "equipment/leg-guard.png" },
+  { id: "leg-front-right", slot: "leg-front-right", name: "Leg Guard", slotLabel: "Front right leg", bonus: 3, price: 60, image: "equipment/leg-guard.png" },
+  { id: "leg-back-left", slot: "leg-back-left", name: "Leg Guard", slotLabel: "Back left leg", bonus: 3, price: 60, image: "equipment/leg-guard.png" },
+  { id: "leg-back-right", slot: "leg-back-right", name: "Leg Guard", slotLabel: "Back right leg", bonus: 3, price: 60, image: "equipment/leg-guard.png" }
+];
+function equipmentDefForSlot(slotId) {
+  return EQUIPMENT_SLOTS.find((e) => e.id === slotId);
+}
 const MONSTERS = [
   {
     id: "monster-1",
@@ -191,7 +226,10 @@ const MONSTERS = [
     // Winning a fight trains the dragon: small permanent strength gain.
     strengthGainWinMin: 1,
     strengthGainWinMax: 2,
-    image: "monsters/gronkle.png"
+    image: "monsters/gronkle.png",
+    // Easy wears no equipment: effective strength stays 19.
+    equipmentBonus: 0,
+    equipmentSlots: []
   },
   {
     id: "monster-2",
@@ -207,7 +245,10 @@ const MONSTERS = [
     energyLossLoseMax: 100,
     strengthGainWinMin: 1,
     strengthGainWinMax: 2,
-    image: "monsters/deadly_nadder.png"
+    image: "monsters/deadly_nadder.png",
+    // Medium wears some gear: helm (+5) + one leg (+3) = +8 -> effective 40.
+    equipmentBonus: 8,
+    equipmentSlots: ["head", "leg-front-left"]
   },
   {
     id: "monster-3",
@@ -223,7 +264,11 @@ const MONSTERS = [
     energyLossLoseMax: 100,
     strengthGainWinMin: 2,
     strengthGainWinMax: 4,
-    image: "monsters/monstrous_nightmare.png"
+    image: "monsters/monstrous_nightmare.png",
+    // Hard wears almost all gear: everything except one back leg = +23
+    // (26 - 3) -> effective 78.
+    equipmentBonus: 23,
+    equipmentSlots: ["head", "wings", "tail", "leg-front-left", "leg-front-right", "leg-back-left"]
   }
 ];
 function clamp(value, min, max) {
@@ -368,6 +413,33 @@ function sellPrice(strength, ageDays, energy, breedSellMultiplier) {
     (CONFIG.selling.basePrice + (strength * CONFIG.selling.perStrength + ageDays * CONFIG.selling.perAgeDay) * breedSellMultiplier) * sellEnergyFactor(energy)
   );
 }
+function equipmentBonusForEquipment(equipment) {
+  if (!equipment || typeof equipment !== "object") return 0;
+  let total = 0;
+  for (const def of EQUIPMENT_SLOTS) {
+    if (equipment[def.id] === true) total += def.bonus;
+  }
+  return total;
+}
+function equipmentCostForEquipment(equipment) {
+  if (!equipment || typeof equipment !== "object") return 0;
+  let total = 0;
+  for (const def of EQUIPMENT_SLOTS) {
+    if (equipment[def.id] === true) total += def.price;
+  }
+  return total;
+}
+function equipmentSellValue(equipment) {
+  return Math.floor(
+    equipmentCostForEquipment(equipment) * CONFIG.equipment.sellRefundRate
+  );
+}
+function combatStrengthForDragon(dragon) {
+  return dragon.strength + equipmentBonusForEquipment(dragon.equipment);
+}
+function effectiveMonsterStrength(monster) {
+  return monster.strength + (monster.equipmentBonus ?? 0);
+}
 function rollDamageBonus(rand01) {
   return rollIntInclusive(
     CONFIG.battle.randomBonusMin,
@@ -388,7 +460,7 @@ function isBattleWin(rawDamage) {
 function resolveMonsterFight(dragonStrength, dragonEnergy, monster, bonusRand01, rewardRand01, energyRand01, strengthRand01 = 0.5) {
   const rawDamage = battleDamage(
     effectiveStrength(dragonStrength, dragonEnergy),
-    monster.strength,
+    effectiveMonsterStrength(monster),
     rollDamageBonus(bonusRand01)
   );
   const won = isBattleWin(rawDamage);
@@ -422,7 +494,10 @@ function rollSpawnedMonsters(rand01) {
   );
 }
 function beastCombatDefense() {
-  return CONFIG.beast.combatDefense;
+  return CONFIG.beast.combatDefense + CONFIG.beast.equipmentBonus;
+}
+function beastDisplayStrength() {
+  return CONFIG.beast.strengthConstant + CONFIG.beast.equipmentBonus;
 }
 function rollBeastCounterDamage(rand01) {
   return rollIntInclusive(
@@ -495,7 +570,7 @@ function sellPriceForDragon(dragon, nowMs) {
     ageDaysForDragonInstance(dragon, nowMs),
     liveEnergyForDragon(dragon, nowMs),
     breed.sellMultiplier
-  );
+  ) + equipmentSellValue(dragon.equipment);
 }
 function canFightDragon(dragon, nowMs) {
   return isDragonHatched(dragon) && canDragonFight(liveEnergyForDragon(dragon, nowMs));
@@ -510,6 +585,7 @@ function isBeastEligible(dragon, nowMs) {
 export {
   CONFIG,
   DRAGONS,
+  EQUIPMENT_SLOTS,
   MONSTERS,
   ageDaysForDragon,
   ageDaysForDragonInstance,
@@ -518,6 +594,7 @@ export {
   applyStrengthGain,
   battleDamage,
   beastCombatDefense,
+  beastDisplayStrength,
   breedForDragon,
   breedForIndex,
   canAffordChosenEgg,
@@ -531,10 +608,16 @@ export {
   collectibleCoins,
   collectibleStepCoins,
   collectibleTotalCoins,
+  combatStrengthForDragon,
   dragonStage,
   drawBreedIndex,
+  effectiveMonsterStrength,
   effectiveStrength,
   energyAt,
+  equipmentBonusForEquipment,
+  equipmentCostForEquipment,
+  equipmentDefForSlot,
+  equipmentSellValue,
   findBreed,
   hasCollectibleCoins,
   isBattleWin,

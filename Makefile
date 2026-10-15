@@ -1,7 +1,7 @@
 .PHONY: data bg misc sprites scale optimize zepp clean help
 
 # Full data pipeline: raw/ -> assets/ -> assets/default.{b,r,s}
-data: frame icon bg misc sprites coin energy_bar stars scale optimize zepp
+data: frame icon bg misc sprites coin energy_bar stars equipment scale optimize zepp
 
 # frame
 frame:
@@ -41,6 +41,14 @@ energy_bar:
 stars:
 	cp raw/silver_star.png assets/ui/silver_star.png
 	cp raw/gold_star.png assets/ui/gold_star.png
+
+# 3b) Equipment: raw/equipment/ -> assets/ui/ (scaled by `scale` per assets.json)
+equipment:
+	cp raw/equipment/helm.png assets/ui/helm.png
+	cp raw/equipment/wing-guards.png assets/ui/wing_guards.png
+	cp raw/equipment/tail-guard.png assets/ui/tail_guard.png
+	cp raw/equipment/leg-guard.png assets/ui/leg_guard.png
+	cp raw/equipment/button.png assets/ui/equipment.png
 
 # 4) Scale all PNGs to their exact widget sizes per assets.json
 # (e.g. dragons/songwing.png -> songwing_60x60.png + songwing_240x240.png),

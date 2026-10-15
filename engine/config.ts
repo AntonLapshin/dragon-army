@@ -30,7 +30,10 @@ import type {
   BeastTurnResult,
   Dragon,
   DragonBreed,
+  DragonEquipment,
   DragonStage,
+  EquipmentDef,
+  EquipmentSlotId,
   LevelThreshold,
   MonsterDef,
   MonsterFightResult,
@@ -137,6 +140,14 @@ export const CONFIG = {
     refreshIntervalMs: 60 * 60 * 1000,
     emptyStateText: "No monsters right now",
   },
+  equipment: {
+    // Price rule: 20 coins per +1 strength (legs 3 -> 60, tail 4 -> 80,
+    // head/wings 5 -> 100). Full set: +26 for 520 coins.
+    coinsPerBonus: 20,
+    // Selling a dragon refunds half its owned-equipment cost (see
+    // equipmentSellValue()); the other half is the cost of gearing up.
+    sellRefundRate: 0.5,
+  },
   beast: {
     name: "Bewilder Beast",
     hp: 260,
@@ -150,6 +161,21 @@ export const CONFIG = {
     // Without this split, a display 75 would deal 0 damage per turn to
     // mid-game rosters (40 + 10 - 75 < 0) and the beast would be unbeatable.
     combatDefense: 20,
+    // The beast wears the FULL equipment set (all 7 slots, +26), so its
+    // combat defense is 20 + 26 = 46 (see beastCombatDefense()) and its
+    // display strength is 75 + 26 = 101 (see beastDisplayStrength()).
+    // A fully equipped 40-strength dragon (combat 66) hits it exactly as
+    // a bare 40-strength dragon hit the old 20-defense beast.
+    equipmentBonus: 26,
+    equipmentSlots: [
+      "head",
+      "wings",
+      "tail",
+      "leg-front-left",
+      "leg-front-right",
+      "leg-back-left",
+      "leg-back-right",
+    ] as EquipmentSlotId[],
     counterDamageMin: 18,
     counterDamageMax: 28,
     counterTarget: "energy" as const,
@@ -185,10 +211,10 @@ export const CONFIG = {
     timeToFirstHatch: "24-48h",
     hourlyIncome: 2,
     trainingsPerHourIncome: "~0.12 early (passive only; fights fund training)",
-    easyBeatableAt: "strength ~19 (fresh ~11 wins ~25%; reliable after 3-4 trainings)",
-    mediumBeatableAt: "strength ~30 (about 4-7 trainings)",
-    hardBeatableAt: "strength ~55 (about 9-15 trainings or epic breed)",
-    beastBeatableAt: "roster of 3-5 dragons at strength 40-60",
+    easyBeatableAt: "combat ~19 (fresh ~11 wins ~25%; reliable after 3-4 trainings; Easy wears no gear)",
+    mediumBeatableAt: "combat ~38-40 (base ~30 + ~8 gear, or base ~40 bare; Medium wears head + leg = +8)",
+    hardBeatableAt: "combat ~76-78 (base ~50 + full +26 gear; Hard wears all but one leg = +23)",
+    beastBeatableAt: "roster of 3-5 dragons at combat ~66 (e.g. base 40 + full +26 gear; beast wears all gear, defense 46)",
   },
 } as const;
 
@@ -214,6 +240,28 @@ export const DRAGONS: DragonBreed[] = [
   { id: "dragon-16", name: "Night Fury", rarity: "epic", baseStrengthMin: 20, baseStrengthMax: 28, sellMultiplier: 1.7, lifespanDays: 30, assetKey: "night_fury" },
 ];
 
+/**
+ * Equipment catalogue — one purchasable piece per body slot (7 slots).
+ * Price = bonus x 20 coins (CONFIG.equipment.coinsPerBonus): legs +3/60,
+ * tail +4/80, head/wings +5/100. Full set: +26 strength for 520 coins.
+ * Leg pieces share one leg-guard image; the four leg slots are distinct
+ * purchases (each leg is armored separately).
+ */
+export const EQUIPMENT_SLOTS: EquipmentDef[] = [
+  { id: "head", slot: "head", name: "Dragon Helm", slotLabel: "Head", bonus: 5, price: 100, image: "equipment/helm.png" },
+  { id: "wings", slot: "wings", name: "Wing Guards", slotLabel: "Wings", bonus: 5, price: 100, image: "equipment/wing-guards.png" },
+  { id: "tail", slot: "tail", name: "Tail Guard", slotLabel: "Tail", bonus: 4, price: 80, image: "equipment/tail-guard.png" },
+  { id: "leg-front-left", slot: "leg-front-left", name: "Leg Guard", slotLabel: "Front left leg", bonus: 3, price: 60, image: "equipment/leg-guard.png" },
+  { id: "leg-front-right", slot: "leg-front-right", name: "Leg Guard", slotLabel: "Front right leg", bonus: 3, price: 60, image: "equipment/leg-guard.png" },
+  { id: "leg-back-left", slot: "leg-back-left", name: "Leg Guard", slotLabel: "Back left leg", bonus: 3, price: 60, image: "equipment/leg-guard.png" },
+  { id: "leg-back-right", slot: "leg-back-right", name: "Leg Guard", slotLabel: "Back right leg", bonus: 3, price: 60, image: "equipment/leg-guard.png" },
+];
+
+/** Catalogue lookup by slot id (undefined for unknown ids). Pure. */
+export function equipmentDefForSlot(slotId: string): EquipmentDef | undefined {
+  return EQUIPMENT_SLOTS.find((e) => e.id === slotId);
+}
+
 export const MONSTERS: MonsterDef[] = [
   {
     id: "monster-1",
@@ -231,6 +279,9 @@ export const MONSTERS: MonsterDef[] = [
     strengthGainWinMin: 1,
     strengthGainWinMax: 2,
     image: "monsters/gronkle.png",
+    // Easy wears no equipment: effective strength stays 19.
+    equipmentBonus: 0,
+    equipmentSlots: [],
   },
   {
     id: "monster-2",
@@ -247,6 +298,9 @@ export const MONSTERS: MonsterDef[] = [
     strengthGainWinMin: 1,
     strengthGainWinMax: 2,
     image: "monsters/deadly_nadder.png",
+    // Medium wears some gear: helm (+5) + one leg (+3) = +8 -> effective 40.
+    equipmentBonus: 8,
+    equipmentSlots: ["head", "leg-front-left"],
   },
   {
     id: "monster-3",
@@ -263,6 +317,10 @@ export const MONSTERS: MonsterDef[] = [
     strengthGainWinMin: 2,
     strengthGainWinMax: 4,
     image: "monsters/monstrous_nightmare.png",
+    // Hard wears almost all gear: everything except one back leg = +23
+    // (26 - 3) -> effective 78.
+    equipmentBonus: 23,
+    equipmentSlots: ["head", "wings", "tail", "leg-front-left", "leg-front-right", "leg-back-left"],
   },
 ];
 
@@ -569,6 +627,61 @@ export function sellPrice(
   );
 }
 
+// ---------- Equipment (pure) ----------
+
+/**
+ * Sum of owned equipment bonuses. `equipment` may be partial / absent on
+ * old saves — unknown slots count as empty. Pure.
+ */
+export function equipmentBonusForEquipment(
+  equipment: DragonEquipment | undefined | null,
+): number {
+  if (!equipment || typeof equipment !== "object") return 0;
+  let total = 0;
+  for (const def of EQUIPMENT_SLOTS) {
+    if ((equipment as Record<string, unknown>)[def.id] === true) total += def.bonus;
+  }
+  return total;
+}
+
+/** Total coins spent on the owned pieces (sum of catalogue prices). Pure. */
+export function equipmentCostForEquipment(
+  equipment: DragonEquipment | undefined | null,
+): number {
+  if (!equipment || typeof equipment !== "object") return 0;
+  let total = 0;
+  for (const def of EQUIPMENT_SLOTS) {
+    if ((equipment as Record<string, unknown>)[def.id] === true) total += def.price;
+  }
+  return total;
+}
+
+/**
+ * Sell refund for owned gear: half the spent cost, floored
+ * (`CONFIG.equipment.sellRefundRate`). Full set (520) refunds 260. Pure.
+ */
+export function equipmentSellValue(
+  equipment: DragonEquipment | undefined | null,
+): number {
+  return Math.floor(
+    equipmentCostForEquipment(equipment) * CONFIG.equipment.sellRefundRate,
+  );
+}
+
+/**
+ * Combat strength actually used in fights: base + owned-equipment bonus.
+ * Base stays capped at 125 (training / wins); combat can reach 151
+ * (125 + 26 full set). Pure.
+ */
+export function combatStrengthForDragon(dragon: Dragon): number {
+  return dragon.strength + equipmentBonusForEquipment(dragon.equipment);
+}
+
+/** Combat strength for a monster: base + its equipment bonus. Pure. */
+export function effectiveMonsterStrength(monster: MonsterDef): number {
+  return monster.strength + (monster.equipmentBonus ?? 0);
+}
+
 // ---------- Battle (pure) ----------
 
 export function rollDamageBonus(rand01: number): number {
@@ -609,7 +722,12 @@ export function isBattleWin(rawDamage: number): boolean {
   return rawDamage >= 0;
 }
 
-/** Full monster fight resolution. Pure — caller supplies rand01 values. */
+/**
+ * Full monster fight resolution. Pure — caller supplies rand01 values.
+ * `dragonStrength` is COMBAT strength (base + equipment — the engine
+ * passes `combatStrengthForDragon()`); the monster side uses
+ * `effectiveMonsterStrength()` (base + its equipment bonus).
+ */
 export function resolveMonsterFight(
   dragonStrength: number,
   dragonEnergy: number,
@@ -623,7 +741,7 @@ export function resolveMonsterFight(
   // the monster, so winning on a sliver of energy is (almost) impossible.
   const rawDamage = battleDamage(
     effectiveStrength(dragonStrength, dragonEnergy),
-    monster.strength,
+    effectiveMonsterStrength(monster),
     rollDamageBonus(bonusRand01),
   );
   const won = isBattleWin(rawDamage);
@@ -674,13 +792,22 @@ export function rollSpawnedMonsters(rand01: Random01): MonsterDef[] {
 // ---------- Bewilder Beast (pure) ----------
 
 /**
- * Effective beast defense used in damage math.
- * Decoupled from the display `strengthConstant` (75 = 3 gold stars) so the
- * boss looks like an end-game threat while staying beatable by the
- * documented roster (3-5 dragons at 40-60). Pure.
+ * Effective beast defense used in damage math: base 20 + full-equipment
+ * bonus 26 = 46. The beast wears all gear, so a fully equipped dragon
+ * (combat = base + 26) hits it exactly as a bare dragon hit the old
+ * 20-defense beast; a bare mid-game roster barely scratches it. Pure.
  */
 export function beastCombatDefense(): number {
-  return CONFIG.beast.combatDefense;
+  return CONFIG.beast.combatDefense + CONFIG.beast.equipmentBonus;
+}
+
+/**
+ * Display strength for the beast icon / intro / fight header:
+ * 75 (3 gold stars) + full-equipment bonus 26 = 101 (4 gold stars).
+ * Pure.
+ */
+export function beastDisplayStrength(): number {
+  return CONFIG.beast.strengthConstant + CONFIG.beast.equipmentBonus;
 }
 
 export function rollBeastCounterDamage(rand01: number): number {
@@ -705,9 +832,11 @@ export function rollBeastReward(rand01: number): number {
  * while mid-fight exhaustion only shortens how many turns they last),
  * beast retaliates on Energy. Pure.
  *
- * Damage subtracts `beastCombatDefense()` (20), NOT the display
- * `strengthConstant` (75 = 3 gold stars) — the display value would
- * otherwise zero out every mid-game hit (40 + 10 - 75 < 0).
+ * Damage subtracts `beastCombatDefense()` (46 = 20 base + 26 full gear),
+ * NOT the display `beastDisplayStrength()` (101 = 75 + 26) — the display
+ * value would otherwise zero out every mid-game hit (66 + 10 - 101 < 0).
+ * `dragonStrength` is COMBAT strength (base + equipment — the engine
+ * passes `combatStrengthForDragon()`).
  *
  * `fightStartEnergy` is the dragon's energy at fight entry (the engine
  * snapshots it per participant); it defaults to `dragonEnergy` for
@@ -805,15 +934,18 @@ export function trainingCostForDragon(dragon: Dragon): number {
 
 /**
  * Sale price for the instance. Derives age + live energy internally so
- * callers cannot accidentally pass stored values. Pure.
+ * callers cannot accidentally pass stored values. Base formula PLUS a
+ * 50% refund on owned-equipment cost (full set refunds 260). Pure.
  */
 export function sellPriceForDragon(dragon: Dragon, nowMs: number): number {
   const breed = breedForDragon(dragon);
-  return sellPrice(
-    dragon.strength,
-    ageDaysForDragonInstance(dragon, nowMs),
-    liveEnergyForDragon(dragon, nowMs),
-    breed.sellMultiplier,
+  return (
+    sellPrice(
+      dragon.strength,
+      ageDaysForDragonInstance(dragon, nowMs),
+      liveEnergyForDragon(dragon, nowMs),
+      breed.sellMultiplier,
+    ) + equipmentSellValue(dragon.equipment)
   );
 }
 

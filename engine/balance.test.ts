@@ -259,30 +259,28 @@ describe("orientir: training progression -> Easy / Medium / Hard", () => {
     }
   });
 
-  it("Medium (~32) becomes favored at strength ~30 after ~4-7 trainings", () => {
-    // 11 -> 30 needs +19 ≈ 6 avg trainings; win needs bonus>=2 (~82%)
-    const trainingsNeeded = Math.ceil((30 - 11) / AVG_TRAINING_GAIN);
-    expect(trainingsNeeded).toBeGreaterThanOrEqual(4);
-    expect(trainingsNeeded).toBeLessThanOrEqual(7);
-    const rate = monsterWinRate(30, 1, 3000, 4);
+  it("Medium (effective 40 = 32 + 8 gear) becomes favored at combat ~38", () => {
+    // combat 38 wins with bonus>=2 (~82%); combat 30 wins only with bonus 10 (~9%)
+    const rate = monsterWinRate(38, 1, 3000, 4);
     expect(rate).toBeGreaterThan(0.7);
     expect(rate).toBeLessThan(0.95);
+    expect(monsterWinRate(30, 1, 3000, 5)).toBeLessThan(0.2);
     // undertrained dragons mostly lose to Medium
     expect(monsterWinRate(15, 1, 2000, 5)).toBeLessThan(0.1);
+    // reaching combat 38: base 30 (6 trainings) + head (100) + one leg (60)
+    // = +8 gear, or 8 pure trainings 11 -> 38
+    expect(Math.ceil((38 - 11) / AVG_TRAINING_GAIN)).toBe(8);
   });
 
-  it("Hard (~55) needs ~9-15 trainings or an epic hatch", () => {
-    // common 11 -> 55 needs +44 ≈ 13 avg trainings
-    const fromCommon = Math.ceil((55 - 11) / AVG_TRAINING_GAIN);
-    expect(fromCommon).toBeGreaterThanOrEqual(9);
-    expect(fromCommon).toBeLessThanOrEqual(15);
-    // epic hatch 18-25 shortens the grind
-    const fromEpic = Math.ceil((55 - 22) / AVG_TRAINING_GAIN);
-    expect(fromEpic).toBeLessThan(fromCommon);
-    // at 55 every bonus wins; at 40 nothing wins (needs bonus>=15, max 10)
-    expect(monsterWinRate(55, 2, 500, 6)).toBe(1);
-    expect(monsterWinRate(40, 2, 500, 7)).toBe(0);
-    expect(monsterWinRate(50, 2, 500, 8)).toBeGreaterThan(0.4);
+  it("Hard (effective 78 = 55 + 23 gear) needs combat ~76", () => {
+    // combat 76 wins with bonus>=2 (~82%); combat 68 wins only with bonus 10 (~9%)
+    expect(monsterWinRate(76, 2, 3000, 6)).toBeGreaterThan(0.7);
+    expect(monsterWinRate(76, 2, 3000, 6)).toBeLessThan(0.95);
+    expect(monsterWinRate(68, 2, 2000, 7)).toBeLessThan(0.2);
+    // a bare base-55 dragon can never win (needs bonus>=23, max 10)
+    expect(monsterWinRate(55, 2, 500, 8)).toBe(0);
+    // practical path: base 50 (12 trainings) + full gear (+26) = combat 76
+    expect(Math.ceil((50 - 11) / AVG_TRAINING_GAIN)).toBe(12);
   });
 
   it("monster rewards accelerate training (Easy ~20, Medium ~45, Hard ~90 avg)", () => {
@@ -301,15 +299,17 @@ describe("orientir: training progression -> Easy / Medium / Hard", () => {
 });
 
 describe("orientir: Bewilder Beast (boss)", () => {
-  it("displays 3 gold stars while combat defense stays at ~20 (reasonable)", () => {
-    // Display value feeds the star UI: 75 = exactly 3 gold stars.
+  it("displays 101 (4 gold stars) with full gear; combat defense 46 = 20 + 26 gear", () => {
+    // Display value feeds the star UI: 75 base = 3 gold; +26 gear = 101 = 4 gold.
     expect(CONFIG.beast.strengthConstant).toBe(75);
     expect(starsForStrength(CONFIG.beast.strengthConstant)).toEqual({
       gold: 3,
       silver: 0,
     });
-    // Combat math uses the decoupled defense so mid-game rosters still chip it.
-    expect(beastCombatDefense()).toBe(20);
+    expect(CONFIG.beast.equipmentBonus).toBe(26);
+    // Combat math uses the decoupled defense: a fully equipped dragon
+    // (combat = base + 26) hits exactly as a bare dragon hit the old 20.
+    expect(beastCombatDefense()).toBe(46);
   });
 
   it("documents per-turn math: avg bonus 5, avg counter 23", () => {
@@ -321,42 +321,47 @@ describe("orientir: Bewilder Beast (boss)", () => {
     expect(rollBeastCounterDamage(0.5)).toBeLessThanOrEqual(28);
   });
 
-  it("a strength-40 dragon deals ~25/turn and lasts ~5 turns (~125 lifetime damage)", () => {
-    // expected damage = 40 + 5 - 20 (combat defense) = 25
-    // (display 75 is stars-only; using it here would zero out every hit)
-    const expectedPerTurn = 40 + AVG_BONUS - beastCombatDefense();
+  it("a fully equipped base-40 dragon (combat 66) deals ~25/turn, lasts ~5 turns (~125 lifetime)", () => {
+    // expected damage = 66 + 5 - 46 (combat defense) = 25
+    // (display 101 is stars-only; using it here would zero out every hit)
+    const expectedPerTurn = 66 + AVG_BONUS - beastCombatDefense();
     expect(expectedPerTurn).toBe(25);
     // lifetime turns = ceil(100 / 23) = 5
     const expectedTurns = Math.ceil(100 / AVG_BEAST_COUNTER);
     expect(expectedTurns).toBe(5);
-    expect(expectedPerTurn * expectedTurns).toBeLessThan(CONFIG.beast.hp); // 125 < 260: solo-40 can't win
+    expect(expectedPerTurn * expectedTurns).toBeLessThan(CONFIG.beast.hp); // 125 < 260: solo-66 can't win
   });
 
-  it("ONE dragon can NEVER kill the 260-HP beast at strength 40, even with max rolls", () => {
+  it("ONE dragon can NEVER kill the 260-HP beast at combat 66, even with max rolls", () => {
     // best case: bonus 10 every turn (30 dmg), counter 18 (6 turns) -> 180 < 260
-    const maxDmgPerTurn = 40 + 10 - beastCombatDefense();
+    const maxDmgPerTurn = 66 + 10 - beastCombatDefense();
     const maxTurns = Math.ceil(100 / CONFIG.beast.counterDamageMin);
     expect(maxDmgPerTurn * maxTurns).toBeLessThan(CONFIG.beast.hp);
-    expect(beastWinRate([40], 300, 11)).toBe(0);
+    expect(beastWinRate([66], 300, 11)).toBe(0);
   });
 
-  it("THREE dragons at 40 ALWAYS kill the beast, even with worst rolls (design target: 3-5 x 40-60)", () => {
+  it("THREE dragons at combat 66 ALWAYS kill the beast, even with worst rolls (design target: 3 x fully-equipped base-40)", () => {
     // worst case: bonus 0 every turn (20 dmg), counter 18 (6 turns) -> 120 each -> 360 > 260
-    const minDmgPerTurn = 40 + 0 - beastCombatDefense();
+    const minDmgPerTurn = 66 + 0 - beastCombatDefense();
     const minTurnsEach = Math.ceil(100 / CONFIG.beast.counterDamageMin);
     expect(minDmgPerTurn * minTurnsEach * 3).toBeGreaterThan(CONFIG.beast.hp);
-    expect(beastWinRate([40, 40, 40], 300, 12)).toBe(1);
+    expect(beastWinRate([66, 66, 66], 300, 12)).toBe(1);
   });
 
-  it("TWO dragons at 40 are a coin flip (sometimes enough) — the 2-vs-3 threshold", () => {
-    const rate = beastWinRate([40, 40], 500, 13);
+  it("TWO dragons at combat 66 are a coin flip (sometimes enough) — the 2-vs-3 threshold", () => {
+    const rate = beastWinRate([66, 66], 500, 13);
     expect(rate).toBeGreaterThan(0.05);
     expect(rate).toBeLessThan(0.99);
   });
 
-  it("TWO dragons at 55+ reliably win; FIVE at 50 always win", () => {
-    expect(beastWinRate([55, 55], 300, 14)).toBe(1);
-    expect(beastWinRate([50, 50, 50, 50, 50], 200, 15)).toBe(1);
+  it("TWO dragons at combat 81 (base 55 + full gear) reliably win; FIVE at combat 76 always win", () => {
+    expect(beastWinRate([81, 81], 300, 14)).toBe(1);
+    expect(beastWinRate([76, 76, 76, 76, 76], 200, 15)).toBe(1);
+  });
+
+  it("a bare base-40 dragon barely scratches the geared beast (avg -1/turn)", () => {
+    // 40 + 5 - 46 = -1: gear is effectively required for the boss
+    expect(40 + AVG_BONUS - beastCombatDefense()).toBe(-1);
   });
 
   it("boss reward (300) refunds ~3 eggs — worth the ~10h recovery", () => {
@@ -368,8 +373,8 @@ describe("orientir: Bewilder Beast (boss)", () => {
 });
 
 describe("orientir: ideal-playthrough cost model (egg -> beast-ready)", () => {
-  it("reaching Medium-ready (~30 str) costs < 200 coins (~6 trainings from hatch)", () => {
-    // ~3.5 avg per training: 11 -> ~32 in 6 sessions
+  it("reaching Medium-ready (combat ~38) costs < 400 coins (6 trainings + head + 1 leg)", () => {
+    // ~3.5 avg per training: 11 -> ~32 in 6 sessions; + head (100) + leg (60) = +8 gear
     let strength = 11;
     let total = 0;
     for (let i = 0; i < 6; i++) {
@@ -378,22 +383,25 @@ describe("orientir: ideal-playthrough cost model (egg -> beast-ready)", () => {
     }
     expect(strength).toBeGreaterThanOrEqual(30);
     expect(total).toBeLessThan(200);
-    // at 2/h passive this is ~70h of idle income — active Easy wins (~20
+    const gearCost = 100 + 60;
+    expect(total + gearCost).toBeLessThan(400);
+    expect(strength + 8).toBeGreaterThanOrEqual(38);
+    // at 2/h passive this is ~170h of idle income — active Easy wins (~20
     // each, minus a ~10h recovery) are the intended accelerator
-    expect(total / CONFIG.economy.hourlyCoins).toBeLessThan(100);
+    expect((total + gearCost) / CONFIG.economy.hourlyCoins).toBeLessThan(200);
   });
 
-  it("reaching Hard-ready (~55 str) costs < 550 coins (~13 trainings)", () => {
+  it("reaching Hard-ready (combat ~76) costs < 950 coins (12 trainings + full gear)", () => {
+    // base 50 in ~12 trainings, then full gear (+26) -> combat 76
     let strength = 11;
     let total = 0;
-    for (let i = 0; i < 13; i++) {
+    for (let i = 0; i < 12; i++) {
       total += trainingCost(strength);
       strength += AVG_TRAINING_GAIN;
     }
-    expect(strength).toBeGreaterThanOrEqual(55);
-    expect(total).toBeLessThan(550);
-    // ~4 Medium wins (≈180) + ~150h passive trickle (300) covers it
-    expect(total).toBeLessThan(4 * 55 + 150 * CONFIG.economy.hourlyCoins);
+    expect(strength).toBeGreaterThanOrEqual(50);
+    expect(total + 520).toBeLessThan(950); // 381 training + 520 gear = 901
+    expect(strength + 26).toBeGreaterThanOrEqual(76);
   });
 
   it("a 3-dragon beast roster fits comfortably inside the 30-45d lifespan", () => {

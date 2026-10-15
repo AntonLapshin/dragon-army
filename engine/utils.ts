@@ -19,10 +19,13 @@ import type {
   CollectAdvance,
   Dragon,
   DragonCombatStats,
+  DragonEquipment,
+  EquipmentSlotId,
   FightLogEntry,
   NewEggParams,
   ScreenRef,
 } from "./types";
+import { EQUIPMENT_SLOTS } from "./config";
 
 export type { CollectAdvance, NewEggParams } from "./types";
 
@@ -65,6 +68,41 @@ export function normalizeCombatStats(raw: unknown): DragonCombatStats {
   };
 }
 
+/** Empty equipment: every slot unowned. Pure. */
+export function freshEquipment(): DragonEquipment {
+  const equipment = {} as Record<EquipmentSlotId, boolean>;
+  for (const def of EQUIPMENT_SLOTS) equipment[def.id] = false;
+  return equipment as DragonEquipment;
+}
+
+/**
+ * Coerce an unknown (possibly absent / partial) equipment blob from an
+ * old save into a valid record: unknown slots -> false, non-booleans ->
+ * false. Pure — used by save migration.
+ */
+export function normalizeEquipment(raw: unknown): DragonEquipment {
+  const r = (typeof raw === "object" && raw !== null ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  const equipment = {} as Record<EquipmentSlotId, boolean>;
+  for (const def of EQUIPMENT_SLOTS) {
+    equipment[def.id] = r[def.id] === true;
+  }
+  return equipment as DragonEquipment;
+}
+
+/** Mark one slot owned (buying equipment). Pure — caller persists the result. */
+export function withEquipment(
+  dragon: Dragon,
+  slot: EquipmentSlotId,
+): Dragon {
+  return {
+    ...dragon,
+    equipment: { ...normalizeEquipment(dragon.equipment), [slot]: true },
+  };
+}
+
 /**
  * Fresh unhatched egg: strength 0, full-energy anchor, hidden hatch timer.
  * Pure.
@@ -80,6 +118,7 @@ export function createEggDragon(params: NewEggParams): Dragon {
     hatchedAtMs: null,
     lastEnergyUpdateMs: params.nowMs,
     combatStats: freshCombatStats(),
+    equipment: freshEquipment(),
   };
 }
 

@@ -3,6 +3,7 @@
 // (zeus build only bundles .js; the .ts sources are for vitest.)
 import {
   CONFIG,
+  EQUIPMENT_SLOTS,
   MONSTERS,
   ageDaysForDragonInstance,
   applyEnergyDrain,
@@ -16,8 +17,11 @@ import {
   collectibleCoins,
   collectibleStepCoins,
   collectibleTotalCoins,
+  combatStrengthForDragon,
   drawBreedIndex,
   dragonStage,
+  equipmentBonusForEquipment,
+  equipmentDefForSlot,
   isBeastEligible,
   isDragonHatched,
   isDragonInstanceExpired,
@@ -44,11 +48,14 @@ import {
   createDragonId,
   createEggDragon,
   freshCombatStats,
+  freshEquipment,
   hatchDragonInstance,
   monsterFightLogText,
   normalizeCombatStats,
+  normalizeEquipment,
   screensForRoster,
   withEnergyAnchor,
+  withEquipment,
   withTrainingGain
 } from "./utils.js";
 function createNewGameState(params) {
@@ -122,7 +129,8 @@ function migrateLegacySave(raw, nowMs) {
     hatchAtMs: asFiniteNumber(d.hatchAt) ?? nowMs,
     hatchedAtMs: asFiniteNumber(d.hatchedAt),
     lastEnergyUpdateMs: asFiniteNumber(d.energyTs) ?? nowMs,
-    combatStats: freshCombatStats()
+    combatStats: freshCombatStats(),
+    equipment: freshEquipment()
   }));
   state.beast.currentHp = asFiniteNumber(raw.beastHp) ?? CONFIG.beast.hp;
   state.beast.status = raw.beastStatus === "vanished" ? "vanished" : "alive";
@@ -140,6 +148,9 @@ function coerceLoadedSave(raw, nowMs) {
     for (const d of state.player.dragons) {
       if (typeof d.strength === "number") d.strength = clampStrength(d.strength);
       d.combatStats = normalizeCombatStats(d.combatStats);
+      d.equipment = normalizeEquipment(
+        d.equipment
+      );
     }
     if (asFiniteNumber(state.player.lastCollectedSteps) === null) {
       state.player.lastCollectedSteps = 0;
@@ -441,6 +452,9 @@ function createGameEngine(deps) {
     const s = requireState();
     const breed = breedForDragon(dragon);
     const energy = liveEnergyForDragon(dragon, atMs);
+    const equipmentBonus = equipmentBonusForEquipment(
+      normalizeEquipment(dragon.equipment)
+    );
     return {
       dragon: { ...dragon },
       breed,
@@ -449,6 +463,8 @@ function createGameEngine(deps) {
       ageDays: ageDaysForDragonInstance(dragon, atMs),
       energy,
       strength: dragon.strength,
+      equipmentBonus,
+      combatStrength: dragon.strength + equipmentBonus,
       sellPrice: sellPriceForDragon(dragon, atMs),
       remainingLifespanDays: remainingLifespanForDragon(dragon, atMs),
       expired: isDragonInstanceExpired(dragon, atMs),
@@ -543,6 +559,53 @@ function createGameEngine(deps) {
     save();
     return { ok: true, price };
   }
+  function equipmentPreview(dragonId, slot) {
+    const s = requireState();
+    const dragon = findDragon(dragonId);
+    if (!dragon) {
+      return { canBuy: false, price: 0, bonus: 0, reason: "unknown-dragon" };
+    }
+    const def = equipmentDefForSlot(slot);
+    if (!def) {
+      return { canBuy: false, price: 0, bonus: 0, reason: "unknown-slot" };
+    }
+    if (!isDragonHatched(dragon)) {
+      return { canBuy: false, price: def.price, bonus: def.bonus, reason: "egg" };
+    }
+    const owned = normalizeEquipment(dragon.equipment)[slot] === true;
+    if (owned) {
+      return { canBuy: false, price: def.price, bonus: def.bonus, reason: "already-owned" };
+    }
+    if (s.player.coins < def.price) {
+      return { canBuy: false, price: def.price, bonus: def.bonus, reason: "not-enough-coins" };
+    }
+    return { canBuy: true, price: def.price, bonus: def.bonus, reason: null };
+  }
+  function buyEquipment(dragonId, slot) {
+    const s = requireState();
+    const preview = equipmentPreview(dragonId, slot);
+    if (!preview.canBuy) return { ok: false, reason: preview.reason };
+    const dragon = findDragon(dragonId);
+    if (!dragon) return { ok: false, reason: "unknown-dragon" };
+    s.player.coins -= preview.price;
+    replaceDragon(withEquipment(dragon, slot));
+    const after = findDragon(dragonId);
+    const equipmentBonusAfter = equipmentBonusForEquipment(
+      normalizeEquipment(after?.equipment)
+    );
+    save();
+    return {
+      ok: true,
+      slot,
+      price: preview.price,
+      bonus: preview.bonus,
+      equipmentBonusAfter,
+      combatStrengthAfter: (after?.strength ?? dragon.strength) + equipmentBonusAfter
+    };
+  }
+  function getEquipmentCatalogue() {
+    return EQUIPMENT_SLOTS.map((d) => ({ ...d }));
+  }
   function refreshMonsterSpawn(force = false) {
     const s = requireState();
     const atMs = now();
@@ -590,7 +653,7 @@ function createGameEngine(deps) {
     fightLocked = true;
     try {
       const result = resolveMonsterFight(
-        dragon.strength,
+        combatStrengthForDragon(dragon),
         liveEnergy,
         target,
         rolls?.bonusRand01 ?? rand(),
@@ -699,7 +762,7 @@ function createGameEngine(deps) {
         finalEnergies.set(participant.id, energy);
         while (energy > 0 && !defeated) {
           const turn = resolveBeastTurn(
-            participant.strength,
+            combatStrengthForDragon(participant),
             energy,
             hp,
             rand(),
@@ -803,7 +866,9 @@ function createGameEngine(deps) {
   function setScreen(screen) {
     const s = requireState();
     s.ui.currentScreen = screen;
-    if (screen.kind === "dragon") s.ui.selectedDragonId = screen.dragonId;
+    if (screen.kind === "dragon" || screen.kind === "equipment") {
+      s.ui.selectedDragonId = screen.dragonId;
+    }
     save();
   }
   function selectDragon(dragonId) {
@@ -847,6 +912,10 @@ function createGameEngine(deps) {
     trainDragon,
     sellPreview,
     sellDragon,
+    // equipment
+    equipmentPreview,
+    buyEquipment,
+    getEquipmentCatalogue,
     // monsters
     refreshMonsterSpawn,
     getSpawnedMonsters,
