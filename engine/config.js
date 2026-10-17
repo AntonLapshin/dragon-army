@@ -119,16 +119,18 @@ const CONFIG = {
   },
   beast: {
     name: "Bewilder Beast",
-    // 580 HP + attack 85 (see `fight`): a 3-dragon team of combat-66
-    // dragons wins ~62% of fights (Monte Carlo, balance.test.ts) — no
-    // longer the old 100% guarantee. Two dragons at 66 almost never win;
-    // four fully geared dragons still win reliably (earned, not free).
-    hp: 580,
+    // 850 HP + attack 95 + combat defense 52 (see `fight`): a 3-dragon
+    // team of combat-66 dragons now wins only ~2% of fights (Monte Carlo,
+    // balance.test.ts) — down from ~62% before the buff. Four at 66 win
+    // ~73%, five at 76 win reliably, and three at combat 100 win
+    // reliably: the beast is a late-game team fight, not a 3-dragon
+    // milestone. Two dragons at 66 essentially never win.
+    hp: 850,
     // Beast attack strength for `resolveFightAttack` (defender = the
     // randomly picked dragon's combat strength). A hit lands for
-    // ~85 - combat/2 + bonus, so a combat-66 dragon falls in 2 hits —
+    // ~95 - combat/2 + bonus, so a combat-66 dragon falls in 2 hits —
     // every beast turn threatens a kill, and a miss saves a dragon.
-    attack: 85,
+    attack: 95,
     // Display strength: feeds starsForStrength() for the boss icon /
     // intro / fight header (75 = exactly 3 gold stars). This is the
     // "final boss looks mighty" number shown to the player.
@@ -136,15 +138,13 @@ const CONFIG = {
     // Combat defense: the defender number in `resolveFightAttack()` for
     // dragon blows (damage = combat - defense/2 + bonus). Decoupled from
     // the display value so the boss can LOOK like 3 gold stars while a
-    // combat-66 dragon still deals ~47/hit. Without this split, a
+    // combat-66 dragon still deals ~44/hit. Without this split, a
     // display 75 would zero out every mid-game hit and the beast would
     // be unbeatable.
-    combatDefense: 20,
+    combatDefense: 26,
     // The beast wears the FULL equipment set (all 7 slots, +26), so its
-    // combat defense is 20 + 26 = 46 (see beastCombatDefense()) and its
+    // combat defense is 26 + 26 = 52 (see beastCombatDefense()) and its
     // display strength is 75 + 26 = 101 (see beastDisplayStrength()).
-    // A fully equipped 40-strength dragon (combat 66) hits it exactly as
-    // a bare 40-strength dragon hit the old 20-defense beast.
     equipmentBonus: 26,
     equipmentSlots: [
       "head",
@@ -197,7 +197,74 @@ const CONFIG = {
     easyBeatableAt: "combat ~21 (fresh ~11 wins ~20%; reliable after 3-4 trainings; Easy wears no gear, 42 HP)",
     mediumBeatableAt: "combat ~38-40 (base ~30 + ~8 gear, or base ~40 bare; Medium wears head + leg = +8, 85 HP)",
     hardBeatableAt: "combat ~76-78 (base ~50 + full +26 gear; Hard wears all but one leg = +23, 105 HP)",
-    beastBeatableAt: "3 dragons at combat ~66 win ~62% (e.g. base 40 + full +26 gear; beast wears all gear, defense 46, 580 HP, attack 85); 2 at 66 almost never win; 4 at 66 win reliably"
+    beastBeatableAt: "3 dragons at combat ~66 win ~2% (was ~62% before the buff); 4 at 66 win ~73%; 5 at 76 or 3 at 100 win reliably (beast: 850 HP, attack 95, defense 52)"
+  },
+  // Villages: conquerable settlements, one fleet fight each. Six villages
+  // (2 per tier) are generated at first boot; existing saves generate
+  // them on load, scaled to the player's fleet (see generateVillages).
+  villages: {
+    count: 6,
+    names: [
+      "Ember Hollow",
+      "Mistral Port",
+      "Stonebridge",
+      "Thornwick",
+      "Frostfall",
+      "Sunspire"
+    ],
+    // Fresh-game defender stats (absolute). Easy is beatable by a modest
+    // fleet (2 x combat ~35 win ~95%); Medium wants a mid fleet
+    // (3 x ~50 win ~70-99%); Hard wants a strong/equipped fleet
+    // (4 x 66 win ~70%, 5 x 76 win reliably). HP is the defender's
+    // fight-screen HP pool (player dragons use live energy as HP).
+    tiers: {
+      easy: {
+        label: "Outpost",
+        defenderCountMin: 1,
+        defenderCountMax: 2,
+        combatMin: 28,
+        combatMax: 38,
+        hp: 60,
+        fortuneMin: 60,
+        fortuneMax: 120,
+        // Migration: defender combat = avgPlayerCombat x [min, max].
+        combatScaleMin: 0.55,
+        combatScaleMax: 0.75
+      },
+      medium: {
+        label: "Hamlet",
+        defenderCountMin: 2,
+        defenderCountMax: 3,
+        combatMin: 42,
+        combatMax: 55,
+        hp: 80,
+        fortuneMin: 150,
+        fortuneMax: 260,
+        combatScaleMin: 0.75,
+        combatScaleMax: 0.95
+      },
+      hard: {
+        label: "Stronghold",
+        defenderCountMin: 3,
+        defenderCountMax: 4,
+        combatMin: 60,
+        combatMax: 78,
+        hp: 105,
+        fortuneMin: 300,
+        fortuneMax: 500,
+        combatScaleMin: 0.95,
+        combatScaleMax: 1.15
+      }
+    },
+    // Migration fortune scaling: fortune x clamp(avgCombat / 40, 0.8, 3),
+    // so a strong fleet captures bigger fortunes than a fresh one.
+    fortuneScaleDivisor: 40,
+    fortuneScaleMin: 0.8,
+    fortuneScaleMax: 3,
+    // Survivors of a victorious village attack grow stronger (rolled per
+    // dragon, like a monster win — smaller than a beast win's +2-4).
+    winStrengthGainMin: 1,
+    winStrengthGainMax: 2
   }
 };
 const DRAGONS = [
@@ -608,6 +675,158 @@ function resolveBeastFight(dragonCombats, dragonHps, beastHp, rand01) {
     beastHpAfter: hp
   };
 }
+function villageTierConfig(tier) {
+  return CONFIG.villages.tiers[tier];
+}
+function fleetScalingForDragons(dragons) {
+  const hatched = dragons.filter((d) => d.hatchedAtMs !== null);
+  if (hatched.length === 0) return null;
+  const combats = hatched.map((d) => combatStrengthForDragon(d));
+  const totalCombat = combats.reduce((a, b) => a + b, 0);
+  return { avgCombat: totalCombat / combats.length, totalCombat };
+}
+function generateVillages(rand01, fleetScaling) {
+  const tiers = ["easy", "easy", "medium", "medium", "hard", "hard"];
+  for (let i = tiers.length - 1; i > 0; i--) {
+    const j = Math.floor(rand01() * (i + 1));
+    [tiers[i], tiers[j]] = [tiers[j], tiers[i]];
+  }
+  const names = [...CONFIG.villages.names];
+  for (let i = names.length - 1; i > 0; i--) {
+    const j = Math.floor(rand01() * (i + 1));
+    [names[i], names[j]] = [names[j], names[i]];
+  }
+  const fortuneScale = fleetScaling ? clamp(
+    fleetScaling.avgCombat / CONFIG.villages.fortuneScaleDivisor,
+    CONFIG.villages.fortuneScaleMin,
+    CONFIG.villages.fortuneScaleMax
+  ) : 1;
+  return tiers.map((tier, i) => {
+    const cfg = CONFIG.villages.tiers[tier];
+    const defenderCount = rollIntInclusive(
+      cfg.defenderCountMin,
+      cfg.defenderCountMax,
+      rand01()
+    );
+    const defenders = Array.from({ length: defenderCount }, (_, j) => {
+      const combat = fleetScaling ? Math.max(
+        10,
+        Math.round(
+          fleetScaling.avgCombat * (cfg.combatScaleMin + rand01() * (cfg.combatScaleMax - cfg.combatScaleMin))
+        )
+      ) : rollIntInclusive(cfg.combatMin, cfg.combatMax, rand01());
+      return {
+        id: `village-${i}-def-${j}`,
+        breedId: DRAGONS[drawBreedIndex(rand01())].id,
+        combat,
+        maxHp: cfg.hp
+      };
+    });
+    const fortune = Math.round(
+      rollIntInclusive(cfg.fortuneMin, cfg.fortuneMax, rand01()) * fortuneScale
+    );
+    return {
+      id: `village-${i}`,
+      name: names[i],
+      tier,
+      defenders,
+      fortune,
+      captured: false
+    };
+  });
+}
+function villageViewFor(village) {
+  return {
+    id: village.id,
+    name: village.name,
+    tier: village.tier,
+    tierLabel: CONFIG.villages.tiers[village.tier].label,
+    approxCount: villageApproxCount(village.defenders.length),
+    fortuneHint: villageFortuneHint(village.tier),
+    captured: village.captured
+  };
+}
+function villageApproxCount(defenderCount) {
+  if (defenderCount <= 0) return "no dragons";
+  if (defenderCount === 1) return "a lone dragon";
+  if (defenderCount === 2) return "a few dragons";
+  if (defenderCount <= 4) return "several dragons";
+  return "many dragons";
+}
+function villageFortuneHint(tier) {
+  if (tier === "easy") return "a modest fortune";
+  if (tier === "medium") return "a rich fortune";
+  return "a great fortune";
+}
+function rollVillageWinStrengthGain(rand01) {
+  return rollIntInclusive(
+    CONFIG.villages.winStrengthGainMin,
+    CONFIG.villages.winStrengthGainMax,
+    rand01
+  );
+}
+function resolveFleetFight(playerCombats, playerHps, enemyCombats, enemyHps, rand01) {
+  const turns = [];
+  const pHps = [...playerHps];
+  const eHps = [...enemyHps];
+  const playerMissStreaks = playerCombats.map(() => 0);
+  const enemyMissStreaks = enemyCombats.map(() => 0);
+  const alivePlayers = () => pHps.map((h, i) => h > 0 ? i : -1).filter((i) => i >= 0);
+  const aliveEnemies = () => eHps.map((h, i) => h > 0 ? i : -1).filter((i) => i >= 0);
+  while (eHps.some((h) => h > 0) && pHps.some((h) => h > 0)) {
+    for (const i of alivePlayers()) {
+      const targets = aliveEnemies();
+      if (targets.length === 0) break;
+      const targetIndex = targets[0];
+      const attack = resolveFightAttack(
+        playerCombats[i],
+        eHps[targetIndex],
+        enemyCombats[targetIndex],
+        playerMissStreaks[i] >= 2 ? 0 : rand01(),
+        rand01()
+      );
+      playerMissStreaks[i] = attack.hit ? 0 : playerMissStreaks[i] + 1;
+      turns.push({
+        attackerSide: "player",
+        attackerIndex: i,
+        targetIndex,
+        hit: attack.hit,
+        damage: attack.damage,
+        defenderHpAfter: attack.defenderHpAfter
+      });
+      eHps[targetIndex] = attack.defenderHpAfter;
+    }
+    if (!eHps.some((h) => h > 0)) break;
+    for (const j of aliveEnemies()) {
+      const targets = alivePlayers();
+      if (targets.length === 0) break;
+      const targetIndex = targets[Math.floor(rand01() * targets.length)];
+      const attack = resolveFightAttack(
+        enemyCombats[j],
+        pHps[targetIndex],
+        playerCombats[targetIndex],
+        enemyMissStreaks[j] >= 2 ? 0 : rand01(),
+        rand01()
+      );
+      enemyMissStreaks[j] = attack.hit ? 0 : enemyMissStreaks[j] + 1;
+      turns.push({
+        attackerSide: "village",
+        attackerIndex: j,
+        targetIndex,
+        hit: attack.hit,
+        damage: attack.damage,
+        defenderHpAfter: attack.defenderHpAfter
+      });
+      pHps[targetIndex] = attack.defenderHpAfter;
+    }
+  }
+  return {
+    won: eHps.every((h) => h <= 0),
+    turns,
+    playerHpsAfter: pHps,
+    enemyHpsAfter: eHps
+  };
+}
 function findBreed(breedId) {
   return DRAGONS.find((b) => b.id === breedId);
 }
@@ -695,6 +914,8 @@ export {
   fightHitChance,
   fightHitDamage,
   findBreed,
+  fleetScalingForDragons,
+  generateVillages,
   hasCollectibleCoins,
   isBeastEligible,
   isDragonExpired,
@@ -710,6 +931,7 @@ export {
   remainingLifespanForDragon,
   resolveBeastFight,
   resolveFightAttack,
+  resolveFleetFight,
   resolveMonsterFight,
   rollBaseStrength,
   rollBeastReward,
@@ -720,6 +942,7 @@ export {
   rollMonsterWinStrengthGain,
   rollSpawnedMonsters,
   rollTrainingGain,
+  rollVillageWinStrengthGain,
   sellEnergyFactor,
   sellPrice,
   sellPriceForDragon,
@@ -728,5 +951,9 @@ export {
   stepCoinsForSteps,
   trainingCost,
   trainingCostForDragon,
-  trainingEnergyCost
+  trainingEnergyCost,
+  villageApproxCount,
+  villageFortuneHint,
+  villageTierConfig,
+  villageViewFor
 };

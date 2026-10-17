@@ -8,7 +8,7 @@ check:
 	git diff --quiet -- engine/
 
 # Full data pipeline: raw/ -> assets/ -> assets/default.{b,r,s}
-data: frame icon bg misc sprites coin energy_bar stars equipment fight scale optimize zepp
+data: frame icon bg misc sprites coin energy_bar stars equipment fight villages scale optimize zepp
 
 # frame
 frame:
@@ -62,6 +62,14 @@ fight:
 	cp raw/fight/fireball.png assets/ui/fireball.png
 	cp raw/fight/impact.png assets/ui/impact.png
 
+# 3d) Villages: raw/villages/ -> assets/ui/ (scaled by `scale` per assets.json)
+villages:
+	cp raw/villages/map.png assets/ui/map.png
+	cp raw/villages/checkmark.png assets/ui/checkmark.png
+	cp raw/villages/village-outpost.png assets/ui/village-outpost.png
+	cp raw/villages/village-hamlet.png assets/ui/village-hamlet.png
+	cp raw/villages/village-stronghold.png assets/ui/village-stronghold.png
+
 # 4) Scale all PNGs to their exact widget sizes per assets.json
 # (e.g. dragons/songwing.png -> songwing_60x60.png + songwing_240x240.png),
 # deleting the originals. Must run before optimize so optimize compresses
@@ -96,6 +104,7 @@ help:
 	@echo "  make misc      - copy shadow raw/ -> assets/misc/"
 	@echo "  make sprites   - cut sprite sheets raw/ -> assets/{ui,eggs,dragons,monsters}/"
 	@echo "  make fight     - copy fight FX raw/fight/ -> assets/ui/"
+	@echo "  make villages  - copy village art raw/villages/ -> assets/ui/"
 	@echo "  make scale     - scale PNGs to exact widget sizes per assets.json (deletes originals)"
 	@echo "  make optimize  - optimize PNGs in assets/ in place"
 	@echo "  make zepp      - build assets/default.{b,r,s} device variants"

@@ -92,6 +92,7 @@ import {
   FIGHT_DRAGON_S,
   FIGHT_ENEMY_S,
   FIGHT_ENEMY_X,
+  FIGHT_ENEMY_X_WIDE,
   FIGHT_FIREBALL_S,
   FIGHT_HP_BAR_GAP,
   FIGHT_HP_BAR_H,
@@ -116,6 +117,17 @@ import {
   MODAL_PAD,
   MODAL_TITLE_H,
   MODAL_TITLE_Y,
+  MAP_BTN_S,
+  MAP_BTN_X,
+  MAP_BTN_Y,
+  VILLAGE_GRID_Y,
+  VILLAGE_ROW_H,
+  VILLAGE_ICON_S,
+  VILLAGE_PAGE_ICON_S,
+  VILLAGE_PAGE_ICON_Y,
+  VILLAGE_INFO_Y,
+  VILLAGE_INFO_H,
+  VILLAGE_INFO_GAP,
   MONSTER_FIGHT_BTN_H,
   MONSTER_FIGHT_BTN_W,
   MONSTER_FIGHT_BTN_X,
@@ -195,6 +207,10 @@ import {
 import {
   ASSET_BEAST_72,
   ASSET_BEAST_128,
+  ASSET_CHECKMARK_32,
+  ASSET_MAP_84,
+  VILLAGE_INFO_FONT,
+  VILLAGE_NAME_FONT,
   ASSET_FIREBALL_28,
   ASSET_IMPACT_48,
   ASSET_CLOSE_36,
@@ -208,10 +224,8 @@ import {
   ASSET_DICE_80,
   ASSET_EGG_128,
   ASSET_ENERGY_BAR_250,
-  ASSET_ENERGY_BAR_190,
   ASSET_FRAME_72,
   ASSET_HOME_84,
-  ASSET_LOSS_60,
   ASSET_SELL_84,
   ASSET_SHADOW,
   ASSET_GOLD_STAR_16,
@@ -294,9 +308,11 @@ import {
   eggAsset240,
   eggAsset60,
   monsterAsset72,
+  villageAsset72,
+  villageAsset128,
 } from './index.style.js';
 import { fightBarFill, fightFireballPos, fightUnitRects } from './viewUtils.js';
-import { CONFIG, beastDisplayStrength, breedForIndex, clamp, effectiveMonsterStrength, starsForStrength } from '../engine/config.js';
+import { CONFIG, beastDisplayStrength, breedForIndex, clamp, effectiveMonsterStrength, findBreed, starsForStrength } from '../engine/config.js';
 import { createGameEngine, coerceLoadedSave } from '../engine/engine.js';
 import {
   actionRowPositions,
@@ -375,6 +391,10 @@ let _screenIndex = 0;
 // Equipment page overlay: dragon id while its equipment page is open, else
 // null. _screenIndex is untouched so Back returns to the same dragon page.
 let _equipmentDragonId = null;
+// Villages overlay: null, or { kind: 'list' } for the villages view, or
+// { kind: 'village', villageId } for one village page. Like the equipment
+// overlay it sits on top of the current screen (Home returns to Main).
+let _villagesScreen = null;
 // Modal: null or { kind, ...payload }.
 let _modal = null;
 // Fight screen: null or the replay state for an already-resolved fight
@@ -411,6 +431,7 @@ function currentView() {
 function goTo(index) {
   _screenIndex = clamp(index, 0, roster().length);
   _equipmentDragonId = null;
+  _villagesScreen = null;
   _fight = null;
   closeTimersForScreen();
   if (_page) _page.render();
@@ -418,6 +439,18 @@ function goTo(index) {
 
 function openEquipment(dragonId) {
   _equipmentDragonId = dragonId;
+  _modal = null;
+  if (_page) _page.render();
+}
+
+function openVillagesList() {
+  _villagesScreen = { kind: 'list' };
+  _modal = null;
+  if (_page) _page.render();
+}
+
+function openVillage(villageId) {
+  _villagesScreen = { kind: 'village', villageId };
   _modal = null;
   if (_page) _page.render();
 }
@@ -804,6 +837,68 @@ function startMonsterFight(dragonId, monsterId) {
   });
 }
 
+function startVillageAttack(villageId) {
+  const village = engine.getVillageView(villageId);
+  if (!village || village.captured) return;
+  const participants = engine.getBeastParticipants();
+  const views = participants
+    .map((d) => engine.getDragonView(d.id))
+    .filter((v) => v !== null);
+  if (views.length === 0) return;
+  // Defender portraits + HP bars for the fight screen (the battle itself
+  // is what reveals the enemy fleet — the village page never sees these).
+  const defenders = engine.getVillageDefenders(villageId);
+  if (defenders.length === 0) return;
+  // Snapshot entry HP BEFORE resolving (same anti-cheat rule as monsters).
+  const res = engine.attackVillage(villageId);
+  if (!res.ok) return;
+  const playerCount = views.length;
+  const byId = new Map(views.map((v, i) => [v.dragon.id, i]));
+  const defById = new Map(defenders.map((d, i) => [d.id, i]));
+  openFightScreen({
+    kind: 'village',
+    title: village.name,
+    units: [
+      ...views.map((v) => ({
+        asset: dragonAsset60(v.breed.assetKey),
+        maxHp: v.energy,
+        hp: v.energy,
+        size: FIGHT_DRAGON_S,
+      })),
+      ...defenders.map((d) => ({
+        asset: dragonAsset60((findBreed(d.breedId) || breedForIndex(0)).assetKey),
+        maxHp: d.maxHp,
+        hp: d.maxHp,
+        size: FIGHT_ENEMY_S,
+      })),
+    ],
+    enemyCount: defenders.length,
+    turns: res.turns.map((t) => {
+      if (t.attackerKind === 'dragon') {
+        return {
+          attacker: byId.get(t.attackerId) ?? 0,
+          target: playerCount + (defById.get(t.targetId) ?? 0),
+          hit: t.hit,
+          hpAfter: t.targetHpAfter,
+          text: t.text,
+        };
+      }
+      return {
+        attacker: playerCount + (defById.get(t.attackerId) ?? 0),
+        target: byId.get(t.targetId) ?? 0,
+        hit: t.hit,
+        hpAfter: t.targetHpAfter,
+        text: t.text,
+      };
+    }),
+    outcomeText: res.won
+      ? 'Victory! Captured ' + village.name + ' +' + res.fortune + ' coins'
+      : 'Defeat — dragons lost. The village stands.',
+    returnDragonId: null,
+    returnVillageId: villageId,
+  });
+}
+
 function startBeastFight() {
   if (!engine.canFightBeast().ok) return;
   const participants = engine.getBeastParticipants();
@@ -863,11 +958,17 @@ function startBeastFight() {
 // only after the last turn.
 const FIGHT_PHASE_TICKS = { aim: 2, fly: 4, impact: 5 };
 
-function openFightScreen({ kind, title, units, turns, outcomeText, returnDragonId }) {
+function openFightScreen({ kind, title, units, turns, outcomeText, returnDragonId, enemyCount, returnVillageId }) {
   _modal = null;
   _equipmentDragonId = null;
+  // Player units first, then `enemyCount` enemy units (1 for monster /
+  // beast, 2-4 village defenders). Rects come from fightUnitRects with
+  // the same split, so dragons stay left and enemies stack right.
+  const enemies = enemyCount || 1;
+  const playerCount = units.length - enemies;
   const rects = fightUnitRects({
-    dragonCount: units.length - 1,
+    dragonCount: playerCount,
+    enemyCount: enemies,
     shape: DEVICE.shape,
     arenaY: FIGHT_ARENA_Y,
     arenaH: FIGHT_ARENA_H,
@@ -875,6 +976,7 @@ function openFightScreen({ kind, title, units, turns, outcomeText, returnDragonI
     leftXWide: FIGHT_LEFT_X_WIDE,
     colGap: FIGHT_COL_GAP,
     enemyX: FIGHT_ENEMY_X,
+    enemyXWide: FIGHT_ENEMY_X_WIDE,
     dragonS: FIGHT_DRAGON_S,
     enemyS: FIGHT_ENEMY_S,
     barH: FIGHT_HP_BAR_H,
@@ -882,7 +984,7 @@ function openFightScreen({ kind, title, units, turns, outcomeText, returnDragonI
     rowGap: FIGHT_ROW_GAP,
   });
   units.forEach((u, i) => {
-    u.rect = i < units.length - 1 ? rects.dragons[i] : rects.enemy;
+    u.rect = i < playerCount ? rects.dragons[i] : rects.enemies[i - playerCount];
   });
   _fight = {
     kind,
@@ -891,6 +993,7 @@ function openFightScreen({ kind, title, units, turns, outcomeText, returnDragonI
     turns,
     outcomeText,
     returnDragonId,
+    returnVillageId: returnVillageId || null,
     turnIndex: 0,
     phase: 'aim',
     phaseTicks: 0,
@@ -1004,10 +1107,17 @@ function skipFightScreen() {
 function closeFightScreen() {
   if (!_fight) return;
   const returnId = _fight.returnDragonId;
+  const returnVillageId = _fight.returnVillageId;
   _fight = null;
   if (_fightTimer) {
     clearInterval(_fightTimer);
     _fightTimer = null;
+  }
+  if (returnVillageId) {
+    // Village fight: back to that village's page (shows Captured now).
+    _villagesScreen = { kind: 'village', villageId: returnVillageId };
+    if (_page) _page.render();
+    return;
   }
   if (returnId) {
     const idx = roster().findIndex((d) => d.id === returnId);
@@ -1039,6 +1149,10 @@ function renderMain(width) {
   addIconButton(width - BEAST_BTN_OFFSET_X, BEAST_BTN_Y, BEAST_BTN_S, ASSET_BEAST_128, () => {
     openModal({ kind: 'beast-intro' });
   }, false);
+
+  // Map (villages) — bottom-right, same row as Earn Coins. Opens the
+  // villages view: a grid of villages, each an icon + name.
+  addIconButton(MAP_BTN_X, MAP_BTN_Y, MAP_BTN_S, ASSET_MAP_84, openVillagesList, false);
 
   // Earn Coins — centered horizontally, slightly below the screen center,
   // only when collectible coins exist.
@@ -1175,6 +1289,76 @@ function renderRosterStrip(width) {
 function renderNav(width) {
   // Page indicator (1/2, 2/2) intentionally not rendered.
   renderRosterStrip(width);
+}
+
+// ---------------------------------------------------------------------------
+// Villages (§16): list grid + village page
+// ---------------------------------------------------------------------------
+
+function renderVillagesList(width) {
+  addImg(BG_X, BG_Y, BG_W, BG_H, BG_HOME_SRC);
+  addShade(0, 0, width, DEVICE.height);
+  addBadgeText(0, DRAGON_NAME_Y, width, DRAGON_NAME_H, 'Villages', DRAGON_NAME_FONT, COLOR_WHITE);
+  const villages = engine.getVillages();
+  const sidePad = ACTION_SIDE_PAD;
+  const xs = actionRowPositions(width, sidePad, VILLAGE_ICON_S, 3);
+  villages.forEach((v, i) => {
+    const row = Math.floor(i / 3);
+    const x = xs[i % 3];
+    const y = VILLAGE_GRID_Y + row * VILLAGE_ROW_H;
+    addImg(x, y, VILLAGE_ICON_S, VILLAGE_ICON_S, villageAsset72(v.tier), () => openVillage(v.id));
+    if (v.captured) {
+      // Captured checkmark: small badge at the icon's top-right corner.
+      addImg(x + VILLAGE_ICON_S - 16, y - 8, 32, 32, ASSET_CHECKMARK_32);
+    }
+    addText(x - 24, y + VILLAGE_ICON_S + 2, VILLAGE_ICON_S + 48, 20, v.name, VILLAGE_NAME_FONT, COLOR_WHITE);
+    addText(x - 24, y + VILLAGE_ICON_S + 22, VILLAGE_ICON_S + 48, 20, v.tierLabel, VILLAGE_NAME_FONT, COLOR_MUTED);
+  });
+  const navY = DEVICE.height - ACTION_BOTTOM_PAD - BTN_H;
+  addButton(Math.round((width - BTN_W) / 2), navY, BTN_W, BTN_H, 'Home', () => goTo(0));
+}
+
+function renderVillagePage(width, villageId) {
+  const village = engine.getVillageView(villageId);
+  if (!village) {
+    // Village gone (shouldn't happen — villages never delete) — fall
+    // back to the list instead of rendering a broken page.
+    renderVillagesList(width);
+    return;
+  }
+  addImg(BG_X, BG_Y, BG_W, BG_H, BG_DRAGON_SRC);
+  addShade(0, 0, width, DEVICE.height);
+  addBadgeText(0, DRAGON_NAME_Y, width, DRAGON_NAME_H, village.name, DRAGON_NAME_FONT, COLOR_WHITE);
+  const iconS = VILLAGE_PAGE_ICON_S;
+  const iconX = Math.floor((width - iconS) / 2);
+  const iconY = VILLAGE_PAGE_ICON_Y;
+  addImg(iconX, iconY, iconS, iconS, villageAsset128(village.tier));
+  if (village.captured) {
+    addImg(iconX + iconS - 16, iconY - 8, 32, 32, ASSET_CHECKMARK_32);
+  }
+  // Public info only: tier label, BUCKETED defender count, BUCKETED
+  // fortune hint — never exact counts, strength, HP, or fortune coins.
+  const info = [
+    'Tier: ' + village.tierLabel,
+    'Defenders: ' + village.approxCount,
+    'Fortune: ' + village.fortuneHint,
+  ];
+  info.forEach((line, i) => {
+    addText(0, VILLAGE_INFO_Y + i * VILLAGE_INFO_GAP, width, VILLAGE_INFO_H, line, VILLAGE_INFO_FONT, COLOR_WHITE);
+  });
+  if (village.captured) {
+    addText(0, VILLAGE_INFO_Y + info.length * VILLAGE_INFO_GAP, width, VILLAGE_INFO_H, 'Captured!', VILLAGE_INFO_FONT, COLOR_SUCCESS);
+  }
+  // Bottom nav: Attack + Home. Attack is disabled (grey, no-op) once the
+  // village is captured or no dragon can fight.
+  const navY = DEVICE.height - ACTION_BOTTOM_PAD - BTN_H;
+  const canAttack = !village.captured && engine.getBeastParticipants().length > 0;
+  if (canAttack) {
+    addButton(ACTION_SIDE_PAD, navY, BTN_W, BTN_H, 'Attack', () => startVillageAttack(villageId));
+  } else {
+    addButton(ACTION_SIDE_PAD, navY, BTN_W, BTN_H, 'Attack', null, { normal: COLOR_BTN_DISABLED });
+  }
+  addButton(width - ACTION_SIDE_PAD - BTN_W, navY, BTN_W, BTN_H, 'Home', () => goTo(0));
 }
 
 // ---------------------------------------------------------------------------
@@ -1644,6 +1828,15 @@ Page({
       // Fight screen replaces everything (no nav, no modals) until the
       // replay ends and the player taps Continue.
       renderFightScreen(width);
+    } else if (_villagesScreen) {
+      // Villages overlay (list or one village page) replaces the hub /
+      // dragon pages until Home returns to Main.
+      if (_villagesScreen.kind === 'list') {
+        renderVillagesList(width);
+      } else {
+        renderVillagePage(width, _villagesScreen.villageId);
+      }
+      renderModal();
     } else {
       if (_screenIndex > roster().length) _screenIndex = roster().length;
       const view = currentView();

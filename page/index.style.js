@@ -195,7 +195,12 @@ export const EQUIP_BUY_PRICE_FONT = FONT_20;
 export const EQUIP_BUY_WALLET_FONT = FONT_18;
 
 // ---------------------------------------------------------------------------
-// Assets (every image path used by the page, except the per-device
+// Villages list + village page look
+// ---------------------------------------------------------------------------
+export const VILLAGE_NAME_FONT = FONT_16;
+export const VILLAGE_PAGE_NAME_FONT = FONT_24;
+export const VILLAGE_INFO_FONT = FONT_18;
+export const VILLAGE_CAPTURED_FONT = FONT_18;
 // backgrounds — BG_HOME_SRC / BG_DRAGON_SRC live in ./layouts.js and are
 // picked via refreshLayout(): 390x450 art for Bip 6, 480x480 art for round).
 // ---------------------------------------------------------------------------
@@ -222,6 +227,26 @@ export const ASSET_LOSS_60 = 'ui/loss_60x60.png';
 export const ASSET_CLOSE_36 = 'ui/close_36x36.png';
 export const ASSET_FIREBALL_28 = 'ui/fireball_28x28.png';
 export const ASSET_IMPACT_48 = 'ui/impact_48x48.png';
+export const ASSET_MAP_84 = 'ui/map_84x84.png';
+export const ASSET_CHECKMARK_32 = 'ui/checkmark_32x32.png';
+export const ASSET_VILLAGE_EASY_72 = 'ui/village-outpost_72x72.png';
+export const ASSET_VILLAGE_MEDIUM_72 = 'ui/village-hamlet_72x72.png';
+export const ASSET_VILLAGE_HARD_72 = 'ui/village-stronghold_72x72.png';
+export const ASSET_VILLAGE_EASY_128 = 'ui/village-outpost_128x128.png';
+export const ASSET_VILLAGE_MEDIUM_128 = 'ui/village-hamlet_128x128.png';
+export const ASSET_VILLAGE_HARD_128 = 'ui/village-stronghold_128x128.png';
+
+/** Village icon by tier (72px grid / 128px page). */
+export function villageAsset72(tier) {
+  if (tier === 'medium') return ASSET_VILLAGE_MEDIUM_72;
+  if (tier === 'hard') return ASSET_VILLAGE_HARD_72;
+  return ASSET_VILLAGE_EASY_72;
+}
+export function villageAsset128(tier) {
+  if (tier === 'medium') return ASSET_VILLAGE_MEDIUM_128;
+  if (tier === 'hard') return ASSET_VILLAGE_HARD_128;
+  return ASSET_VILLAGE_EASY_128;
+}
 
 /** Fallback roster thumbnail when a dragon view is unavailable. */
 export const FALLBACK_ROSTER_ICON = 'eggs/night_fury_60x60.png';

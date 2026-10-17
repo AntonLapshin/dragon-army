@@ -31,6 +31,7 @@
 - **Positioning of icons** (fixed, relative to the screen edges):
   - **Buy Egg** – top-left corner. Tapping opens the Egg-Spin Purchase Modal. **Disabled/dimmed when coins are insufficient** (modal shows "Not enough coins", no spin starts).
   - **Bewilder Beast** – top-right corner. Always visible; tapping opens the boss intro modal.
+  - **Map (Villages)** – bottom-right, same row as Earn Coins. Tapping opens the Villages View (§3.9).
   - **Earn Coins** – bottom-left. Tap-to-collect hourly generation; **shown only when collectible coins are available**. Tapping opens the Coin-Earning Summary Modal and credits the coins.
 - **Background** – static scene image and text: "Dragons: N" (how many hatched dragons the user has; eggs may be counted separately or excluded per config — default: dragons only).
 - **Behavior** – tapping a roster-strip thumbnail jumps to that Dragon Detail screen; Buy Egg / Beast icons open their modals.
@@ -90,7 +91,7 @@
 
 #### 3.5 Fight Screen (Monster or Bewilder Beast)
 - **Not a modal** – a dedicated full-screen replay that replaces the whole screen (no nav, no X) until the player taps **Continue** after the last turn.
-- **Layout** – player dragons on the left (1 column up to 3 dragons, 2 columns beyond; up to 12 roster dragons fit, rows overlap slightly at the extreme), the enemy alone on the right. A **green HP bar** sits above every unit.
+- **Layout** – player dragons on the left (1 column up to 3 dragons, 2 columns beyond; up to 12 roster dragons fit, rows overlap slightly at the extreme), the enemy on the right (alone for monster/beast fights; 2–4 stacked defenders for village fights). A **green HP bar** sits above every unit.
 - **Animation** – per turn: the attacker highlights, a fireball flies attacker → target, then an impact burst (hit) or **MISS** text (miss) shows and the target's HP bar steps to its post-turn HP. One turn ≈ 1.1s. One narration line per turn at the bottom ("Gronkle hits monster 1 for 23" / "Gronkle misses monster 1").
 - **Resolution** – the engine resolves the whole fight instantly and persists it (anti-cheat — leaving mid-fight keeps the result); the screen only replays the returned turns. Tapping anywhere skips to the outcome; **Continue** appears only after the last turn. Monster fights return to that dragon's page; beast fights return to Main.
 - **Formula** – every attack rolls hit/miss first (80% on even combat, ±0.4% per combat edge, clamped 55–95%); a landed hit deals `attackerCombat − floor(defenderCombat / 2) + random(0–8)`, floored at 3. At most 2 consecutive misses per combatant (pity rule — fights always terminate, no endless whiffing).
@@ -118,6 +119,15 @@
   - Coins earned – total coins this dragon's victories paid into the wallet.
 - Saves written before this feature get zeroed records on load (old wins are not backfilled).
 
+#### 3.9 Villages View + Village Page (from Main Control)
+- **Villages View** – a full-screen 3×2 grid (not a modal). Each cell shows a village icon (hut / houses / castle by tier: Outpost / Hamlet / Stronghold) + name + tier label. A captured village shows a small checkmark badge at its icon's top-right corner. Tapping a cell opens that village's page. **Home** returns to the Main Control Screen.
+- **Village Page** – full-screen: large village icon (+ checkmark badge when captured), name, and exactly three info lines — **Tier**, **Defenders** (bucketed: "a lone dragon" / "a few dragons" / "several dragons" / "many dragons"), **Fortune** (bucketed: "a modest fortune" / "a rich fortune" / "a great fortune"). Never exact defender counts, strength, HP, or fortune coins. Captured villages show a "Captured!" line.
+- **Attack** – bottom-left button. Sends the whole eligible fleet (hatched dragons with energy > 0, same eligibility as beast fights) into the Fight Screen (§3.5) with the village defenders stacked on the right (player dragons left, defenders right, green HP bars, fireballs, hit/miss). Disabled (grey) when the village is already captured or no dragon can fight.
+- **Home** – bottom-right button, returns to the Main Control Screen.
+- **End conditions:**
+  - **Village captured** – "Victory! Captured [Name] +X coins". The exact fortune is paid into the wallet once; the village shows the checkmark badge and Attack stays disabled (no second fortune).
+  - **Defeat** – "Defeat — dragons lost. The village stands." Dragons dropped to 0 are removed (same death rule as beast fights); survivors keep drained energy; the village stays uncaptured and its defenders stand at full HP next time.
+
 ---
 
 ### 4. Workflow Examples
@@ -143,6 +153,13 @@
 3. Each attack shows a fireball + hit burst / MISS; HP bars step per turn; a dragon at 0 vanishes (removed from the roster).
 4. If the beast's HP reaches 0 → "Bewilder Beast vanishes for a day. Continue." Each dragon that attacked and survived gains +2–4 strength (respawns after a day).
 5. If all dragons are removed → "Defeat — roster lost. Buy a new egg." The beast heals to full HP. Player returns to Main, collects hourly coins if needed, and buys a new egg.
+
+#### D. Conquering a Village
+1. From **Main Control Screen**, taps **Map** (bottom-right). The **Villages View** shows six villages (icon + name + tier; captured ones carry a checkmark).
+2. Taps a village. The **Village Page** shows the tier, a bucketed defender count ("several dragons"), and a bucketed fortune hint ("a rich fortune") — no exact numbers.
+3. Taps **Attack** – the **Fight Screen** replays fleet-vs-fleet turns: player dragons (left) focus the first alive defender, defenders (right) fire back at random player dragons.
+4. **Win** → "Victory! Captured [Name] +X coins". The village shows the checkmark; Attack is disabled (fortune paid once). Survivors keep drained energy and gain +1–2 strength.
+   **Lose** → "Defeat — dragons lost. The village stands." Dragons at 0 are removed; survivors keep drained energy; the village can be attacked again later at full strength.
 
 ---
 *All icons, buttons, and text positions are fixed as described to ensure a predictable, ambiguity-free UI experience.*

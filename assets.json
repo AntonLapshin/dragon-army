@@ -155,6 +155,9 @@
     "72x72",
     "128x128"
   ],
+  "ui/checkmark.png": [
+    "32x32"
+  ],
   "ui/close.png": [
     "36x36"
   ],
@@ -195,6 +198,9 @@
   "ui/loss.png": [
     "60x60"
   ],
+  "ui/map.png": [
+    "84x84"
+  ],
   "ui/sell.png": [
     "84x84"
   ],
@@ -215,6 +221,18 @@
   ],
   "ui/fireball.png": [
     "28x28"
+  ],
+  "ui/village-outpost.png": [
+    "72x72",
+    "128x128"
+  ],
+  "ui/village-hamlet.png": [
+    "72x72",
+    "128x128"
+  ],
+  "ui/village-stronghold.png": [
+    "72x72",
+    "128x128"
   ],
   "ui/impact.png": [
     "48x48"

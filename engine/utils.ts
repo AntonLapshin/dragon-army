@@ -10,10 +10,13 @@
 
 import {
   CONFIG,
+  DRAGONS,
   applyStrengthGain,
   clampStrength,
   collectibleCoins,
   collectibleStepCoins,
+  generateVillages,
+  villageTierConfig,
 } from "./config";
 import type {
   CollectAdvance,
@@ -21,8 +24,13 @@ import type {
   DragonCombatStats,
   DragonEquipment,
   EquipmentSlotId,
+  FleetScaling,
   NewEggParams,
+  Random01,
   ScreenRef,
+  Village,
+  VillageDefender,
+  VillageTier,
 } from "./types";
 import { EQUIPMENT_SLOTS } from "./config";
 
@@ -36,6 +44,22 @@ export type { CollectAdvance, NewEggParams } from "./types";
 export function createDragonId(rand01: number, nowMs: number): string {
   const randPart = Math.floor(rand01 * 36 ** 6).toString(36);
   return `dragon-${nowMs.toString(36)}-${randPart}`;
+}
+
+/**
+ * Deterministic seeded RNG (mulberry32) for pure factories that need
+ * randomness without an injected source (fresh-game village generation,
+ * save migration). Same seed -> same sequence. Pure.
+ */
+export function seededRand01(seed: number): Random01 {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -145,6 +169,82 @@ export function withEnergyAnchor(
 /** Add a training gain to strength (clamped at CONFIG.strength.max). Pure. */
 export function withTrainingGain(dragon: Dragon, gain: number): Dragon {
   return { ...dragon, strength: applyStrengthGain(dragon.strength, gain) };
+}
+
+// ---------------------------------------------------------------------------
+// Villages: normalization / migration (pure)
+// ---------------------------------------------------------------------------
+
+function normalizeVillageDefender(
+  raw: unknown,
+  fallback: VillageDefender,
+): VillageDefender {
+  const r = (typeof raw === "object" && raw !== null ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  const num = (v: unknown, d: number): number =>
+    typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.floor(v) : d;
+  const breedId =
+    typeof r.breedId === "string" &&
+    DRAGONS.some((b) => b.id === r.breedId)
+      ? r.breedId
+      : fallback.breedId;
+  return {
+    id: typeof r.id === "string" ? r.id : fallback.id,
+    breedId,
+    combat: num(r.combat, fallback.combat),
+    maxHp: Math.max(1, num(r.maxHp, fallback.maxHp)),
+  };
+}
+
+/**
+ * Coerce an unknown villages blob from an old save into a valid village
+ * set. A valid non-empty array is normalized in place (clamped, defaults
+ * for corrupt fields); anything else (missing / empty / wrong shape) is
+ * GENERATED via `generateVillages` — fresh ranges when `fleetScaling` is
+ * null, fleet-scaled ranges for migrating saves. Pure.
+ */
+export function normalizeVillages(
+  raw: unknown,
+  rand01: Random01,
+  fleetScaling: FleetScaling | null,
+): Village[] {
+  if (Array.isArray(raw) && raw.length > 0) {
+    return raw.map((entry, i) => {
+      const r = (typeof entry === "object" && entry !== null ? entry : {}) as Record<
+        string,
+        unknown
+      >;
+      const tier: VillageTier =
+        r.tier === "easy" || r.tier === "medium" || r.tier === "hard"
+          ? r.tier
+          : "easy";
+      const cfg = villageTierConfig(tier);
+      const fallbackDefender: VillageDefender = {
+        id: `village-${i}-def-0`,
+        breedId: DRAGONS[0].id,
+        combat: cfg.combatMin,
+        maxHp: cfg.hp,
+      };
+      const defendersRaw = Array.isArray(r.defenders) ? r.defenders : [];
+      const defenders = defendersRaw.map((d, j) =>
+        normalizeVillageDefender(d, { ...fallbackDefender, id: `village-${i}-def-${j}` }),
+      );
+      return {
+        id: typeof r.id === "string" ? r.id : `village-${i}`,
+        name: typeof r.name === "string" && r.name.length > 0 ? r.name : `Village ${i + 1}`,
+        tier,
+        defenders: defenders.length > 0 ? defenders : [fallbackDefender],
+        fortune:
+          typeof r.fortune === "number" && Number.isFinite(r.fortune) && r.fortune >= 0
+            ? Math.floor(r.fortune)
+            : cfg.fortuneMin,
+        captured: r.captured === true,
+      };
+    });
+  }
+  return generateVillages(rand01, fleetScaling);
 }
 
 // ---------------------------------------------------------------------------

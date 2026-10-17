@@ -50,8 +50,8 @@ function mulberry32(seed: number): () => number {
 const HOUR = 60 * 60 * 1000;
 const AVG_TRAINING_GAIN = (CONFIG.training.strengthGainMin + CONFIG.training.strengthGainMax) / 2; // 3.5
 const AVG_BONUS = (CONFIG.fight.damageBonusMin + CONFIG.fight.damageBonusMax) / 2; // 4
-// Beast hit vs a combat-66 dragon: 85 - 33 + 4 = 56 (falls in 2 hits).
-const AVG_BEAST_HIT_VS_66 = 85 - Math.floor(66 / 2) + AVG_BONUS;
+// Beast hit vs a combat-66 dragon: 95 - 33 + 4 = 66 (falls in 2 hits).
+const AVG_BEAST_HIT_VS_66 = 95 - Math.floor(66 / 2) + AVG_BONUS;
 
 /** Monte-Carlo win rate vs a monster at fixed strength. */
 function monsterWinRate(
@@ -309,7 +309,7 @@ describe("orientir: training progression -> Easy / Medium / Hard", () => {
 });
 
 describe("orientir: Bewilder Beast (boss)", () => {
-  it("displays 101 (4 gold stars) with full gear; combat defense 46 = 20 + 26 gear", () => {
+  it("displays 101 (4 gold stars) with full gear; combat defense 52 = 26 + 26 gear", () => {
     // Display value feeds the star UI: 75 base = 3 gold; +26 gear = 101 = 4 gold.
     expect(CONFIG.beast.strengthConstant).toBe(75);
     expect(starsForStrength(CONFIG.beast.strengthConstant)).toEqual({
@@ -318,52 +318,62 @@ describe("orientir: Bewilder Beast (boss)", () => {
     });
     expect(CONFIG.beast.equipmentBonus).toBe(26);
     // Combat math uses the decoupled defense: a fully equipped dragon
-    // (combat = base + 26) hits exactly as a bare dragon hit the old 20.
-    expect(beastCombatDefense()).toBe(46);
+    // (combat = base + 26) still deals ~44/hit.
+    expect(beastCombatDefense()).toBe(52);
+    expect(CONFIG.beast.hp).toBe(850);
+    expect(CONFIG.beast.attack).toBe(95);
   });
 
-  it("documents per-attack math: avg bonus 4, beast hit vs 66 = 56", () => {
+  it("documents per-attack math: avg bonus 4, beast hit vs 66 = 66", () => {
     expect(AVG_BONUS).toBe(4);
-    expect(AVG_BEAST_HIT_VS_66).toBe(56);
+    expect(AVG_BEAST_HIT_VS_66).toBe(66);
     expect(rollFightDamageBonus(0.5)).toBeGreaterThanOrEqual(0);
     expect(rollFightDamageBonus(0.5)).toBeLessThanOrEqual(8);
-    // dragon hit: 66 - 46/2 + 4 = 47 (display 101 is stars-only;
+    // dragon hit: 66 - 52/2 + 4 = 44 (display 101 is stars-only;
     // using it here would shrink every hit to ~20)
-    expect(fightHitDamage(66, beastCombatDefense(), 0.5)).toBe(47);
-    // beast hit: 85 - 66/2 + 4 = 56 — a combat-66 dragon falls in 2 hits
-    expect(fightHitDamage(CONFIG.beast.attack, 66, 0.5)).toBe(56);
+    expect(fightHitDamage(66, beastCombatDefense(), 0.5)).toBe(44);
+    // beast hit: 95 - 66/2 + 4 = 66 — a combat-66 dragon falls in 2 hits
+    expect(fightHitDamage(CONFIG.beast.attack, 66, 0.5)).toBe(66);
   });
 
-  it("a fully equipped base-40 dragon (combat 66) deals ~47/hit, falls in 2 beast hits", () => {
-    // solo-66 lifetime output ≈ 2 landed hits ≈ 94 << 580 HP: solo-66
+  it("a fully equipped base-40 dragon (combat 66) deals ~44/hit, falls in 2 beast hits", () => {
+    // solo-66 lifetime output ≈ 2 landed hits ≈ 88 << 850 HP: solo-66
     // essentially never wins — the beast is a TEAM fight by design.
     expect(beastWinRate([66], 500, 11)).toBeLessThan(0.05);
   });
 
-  it("THREE dragons at combat 66 win ~62% — strong but no longer a guarantee (design target: 3 x fully-equipped base-40)", () => {
-    // Team output/round ≈ 3 x 47 x 0.88 hit ≈ 124; beast needs ~5 rounds
-    // to fall, dealing ~5 x 56 ≈ 280 spread over the team — right at the
-    // edge, so misses and random targeting decide it.
+  it("THREE dragons at combat 66 now win only ~2% — the buff moved the bar (was ~62%)", () => {
+    // Team output/round ≈ 3 x 44 x 0.88 hit ≈ 116; the beast needs ~8
+    // rounds to fall, dealing ~8 x 66 ≈ 528 spread over the team — the
+    // team is wiped first in nearly every run.
     const rate = beastWinRate([66, 66, 66], 1000, 12);
-    expect(rate).toBeGreaterThan(0.5);
-    expect(rate).toBeLessThan(0.75);
+    expect(rate).toBeLessThan(0.1);
+  });
+
+  it("FOUR dragons at combat 66 win ~73% — the new beast-ready bar", () => {
+    const rate = beastWinRate([66, 66, 66, 66], 1000, 17);
+    expect(rate).toBeGreaterThan(0.6);
+    expect(rate).toBeLessThan(0.85);
   });
 
   it("TWO dragons at combat 66 almost never win — the 2-vs-3 threshold is sharp", () => {
     expect(beastWinRate([66, 66], 500, 13)).toBeLessThan(0.1);
   });
 
-  it("TWO dragons at combat 81 (base 55 + full gear) win ~60%; FIVE at combat 76 always win", () => {
+  it("TWO dragons at combat 81 (base 55 + full gear) now win ~0%; FIVE at combat 76 always win", () => {
     const pair = beastWinRate([81, 81], 500, 14);
-    expect(pair).toBeGreaterThan(0.45);
-    expect(pair).toBeLessThan(0.75);
+    expect(pair).toBeLessThan(0.05);
     expect(beastWinRate([76, 76, 76, 76, 76], 200, 15)).toBe(1);
   });
 
+  it("THREE dragons at combat 100 (base 74 + full gear) win reliably — a strong fleet still beats the buffed beast", () => {
+    expect(beastWinRate([100, 100, 100], 500, 18)).toBeGreaterThan(0.95);
+  });
+
   it("a bare base-40 team barely scratches the geared beast (3 x 40 win ~0%)", () => {
-    // 40 - 23 + 4 = 21/hit vs beast's 85 - 20 + 4 = 69/hit back:
-    // the team dies long before 580 HP is gone. Gear is required.
-    expect(fightHitDamage(40, beastCombatDefense(), 0.5)).toBe(21);
+    // 40 - 26 + 4 = 18/hit vs beast's 95 - 20 + 4 = 79/hit back:
+    // the team dies long before 850 HP is gone. Gear is required.
+    expect(fightHitDamage(40, beastCombatDefense(), 0.5)).toBe(18);
     expect(beastWinRate([40, 40, 40], 500, 16)).toBeLessThan(0.05);
   });
 

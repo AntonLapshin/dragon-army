@@ -194,6 +194,40 @@ describe('fightUnitRects', () => {
       );
     }
   });
+
+  it('defaults to one enemy (enemies[0] === enemy, backward compat)', () => {
+    const r = fightUnitRects({ ...BIP6, dragonCount: 2 });
+    expect(r.enemies).toHaveLength(1);
+    expect(r.enemies[0]).toEqual(r.enemy);
+  });
+
+  it('stacks 2-4 village defenders in one right column inside the arena', () => {
+    for (const n of [2, 3, 4]) {
+      const r = fightUnitRects({ ...BIP6, dragonCount: 3, enemyCount: n });
+      expect(r.enemies).toHaveLength(n);
+      expect(r.enemies[0]).toEqual(r.enemy);
+      for (const e of r.enemies) {
+        expect(e.x).toBe(302);
+        expect(e.barY).toBeGreaterThanOrEqual(40);
+        expect(e.y + 72).toBeLessThanOrEqual(40 + 364);
+        expect(e.barY + 8 + 2).toBe(e.y);
+      }
+      // rows are ordered top to bottom, strictly increasing
+      const ys = r.enemies.map((e) => e.barY);
+      for (let i = 1; i < ys.length; i++) {
+        expect(ys[i]).toBeGreaterThan(ys[i - 1]);
+      }
+    }
+  });
+
+  it('stacks village defenders inside the round arena too', () => {
+    const r = fightUnitRects({ ...ROUND, dragonCount: 4, enemyCount: 4 });
+    expect(r.enemies).toHaveLength(4);
+    for (const e of r.enemies) {
+      expect(e.barY).toBeGreaterThanOrEqual(56);
+      expect(e.y + 72).toBeLessThanOrEqual(56 + 384);
+    }
+  });
 });
 
 describe('fightFireballPos', () => {

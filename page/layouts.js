@@ -64,6 +64,16 @@ export const BIP6_LAYOUT = {
   BALANCE_ICON_S: 64, BALANCE_ICON_Y: 8, BALANCE_TEXT_Y: 76, BALANCE_TEXT_H: 35,
   EGG_BTN_X: 12, EGG_BTN_Y: 84, EGG_BTN_S: 128,
   BEAST_BTN_OFFSET_X: 140, BEAST_BTN_Y: 84, BEAST_BTN_S: 128,
+  // Map (villages) button — bottom-right on the main hub, same row as
+  // Earn Coins (centered), clear of the roster strip (starts at 350).
+  MAP_BTN_S: 84, MAP_BTN_X: 290, MAP_BTN_Y: 264,
+  // Villages list: 3x2 grid of 72px village icons + name below each.
+  // Rows at GRID_Y and GRID_Y + ROW_H; bottom nav clears the second row.
+  VILLAGE_GRID_Y: 70, VILLAGE_ROW_H: 150, VILLAGE_ICON_S: 72,
+  // Village page: 128px village icon, then 3 info lines (tier /
+  // defenders / fortune) at INFO_Y + i*INFO_GAP; bottom nav below.
+  VILLAGE_PAGE_ICON_S: 128, VILLAGE_PAGE_ICON_Y: 60,
+  VILLAGE_INFO_Y: 200, VILLAGE_INFO_H: 28, VILLAGE_INFO_GAP: 32,
   EARN_TEXT_Y: 236, EARN_TEXT_H: 24, EARN_ICON_S: 64, EARN_ICON_Y: 264,
   DRAGON_IMG_S: 240, DRAGON_IMG_Y: 134, DRAGON_IMG_HATCHED_OFFSET: 6,
   SHADOW_W: 114, SHADOW_H: 28, SHADOW_Y_OFFSET: -22,
@@ -130,6 +140,10 @@ export const BIP6_LAYOUT = {
   FIGHT_CONTINUE_Y: 348, // == ARENA_Y + ARENA_H - BTN_H - 8
   FIGHT_LEFT_X: 16, FIGHT_LEFT_X_WIDE: 16, FIGHT_COL_GAP: 12,
   FIGHT_ENEMY_X: 302,
+  // Multi-enemy (village) column: rect keeps the outer X; the round
+  // profile shifts inboard (see below) so the stacked defenders' corners
+  // stay inside the circle.
+  FIGHT_ENEMY_X_WIDE: 302,
   FIGHT_DRAGON_S: 60, FIGHT_ENEMY_S: 72,
   FIGHT_HP_BAR_H: 8, FIGHT_HP_BAR_GAP: 2, FIGHT_ROW_GAP: 4,
   FIGHT_FIREBALL_S: 28, FIGHT_IMPACT_S: 48, FIGHT_MISS_H: 24,
@@ -170,6 +184,16 @@ export const ROUND480_LAYOUT = {
   // 292..420 (top outer corners at dist ~230 < 240). OFFSET = 480-292 = 188.
   EGG_BTN_X: 60, EGG_BTN_Y: 96, EGG_BTN_S: 128,
   BEAST_BTN_OFFSET_X: 188, BEAST_BTN_Y: 96, BEAST_BTN_S: 128,
+  // round: right side, same row as Earn Coins (224..288); worst corner
+  // (456,308) is d~=226 from center — inside with margin. Roster strip
+  // starts at abs y=314, so no overlap.
+  MAP_BTN_S: 84, MAP_BTN_X: 372, MAP_BTN_Y: 224,
+  // round: 3x2 grid; rows at 90 and 240, second row ends at 330,
+  // bottom nav starts at 362. Grid corners sit at d~=221 max.
+  VILLAGE_GRID_Y: 90, VILLAGE_ROW_H: 150, VILLAGE_ICON_S: 72,
+  // round: name 44..74, icon 80..208, info 216/248/280, nav at 362.
+  VILLAGE_PAGE_ICON_S: 128, VILLAGE_PAGE_ICON_Y: 80,
+  VILLAGE_INFO_Y: 216, VILLAGE_INFO_H: 28, VILLAGE_INFO_GAP: 32,
   // round: lifted above the roster strip (frames start at abs y=314);
   // keeps clearance above the strip (icon 224..288 vs 314).
   EARN_TEXT_Y: 196, EARN_TEXT_H: 24, EARN_ICON_S: 64, EARN_ICON_Y: 224,
@@ -268,6 +292,9 @@ export const ROUND480_LAYOUT = {
   FIGHT_CONTINUE_Y: 26,
   FIGHT_LEFT_X: 52, FIGHT_LEFT_X_WIDE: 140, FIGHT_COL_GAP: 12,
   FIGHT_ENEMY_X: 356,
+  // round: 4 stacked defenders at 356 leave the circle at the top/bottom
+  // rows (corner d~=248); 316 keeps every defender corner at d<=232.
+  FIGHT_ENEMY_X_WIDE: 316,
   FIGHT_DRAGON_S: 60, FIGHT_ENEMY_S: 72,
   FIGHT_HP_BAR_H: 8, FIGHT_HP_BAR_GAP: 2, FIGHT_ROW_GAP: 4,
   FIGHT_FIREBALL_S: 28, FIGHT_IMPACT_S: 48, FIGHT_MISS_H: 24,
@@ -345,6 +372,17 @@ export let EGG_BTN_S = BIP6_LAYOUT.EGG_BTN_S;
 export let BEAST_BTN_OFFSET_X = BIP6_LAYOUT.BEAST_BTN_OFFSET_X;
 export let BEAST_BTN_Y = BIP6_LAYOUT.BEAST_BTN_Y;
 export let BEAST_BTN_S = BIP6_LAYOUT.BEAST_BTN_S;
+export let MAP_BTN_S = BIP6_LAYOUT.MAP_BTN_S;
+export let MAP_BTN_X = BIP6_LAYOUT.MAP_BTN_X;
+export let MAP_BTN_Y = BIP6_LAYOUT.MAP_BTN_Y;
+export let VILLAGE_GRID_Y = BIP6_LAYOUT.VILLAGE_GRID_Y;
+export let VILLAGE_ROW_H = BIP6_LAYOUT.VILLAGE_ROW_H;
+export let VILLAGE_ICON_S = BIP6_LAYOUT.VILLAGE_ICON_S;
+export let VILLAGE_PAGE_ICON_S = BIP6_LAYOUT.VILLAGE_PAGE_ICON_S;
+export let VILLAGE_PAGE_ICON_Y = BIP6_LAYOUT.VILLAGE_PAGE_ICON_Y;
+export let VILLAGE_INFO_Y = BIP6_LAYOUT.VILLAGE_INFO_Y;
+export let VILLAGE_INFO_H = BIP6_LAYOUT.VILLAGE_INFO_H;
+export let VILLAGE_INFO_GAP = BIP6_LAYOUT.VILLAGE_INFO_GAP;
 export let EARN_TEXT_Y = BIP6_LAYOUT.EARN_TEXT_Y;
 export let EARN_TEXT_H = BIP6_LAYOUT.EARN_TEXT_H;
 export let EARN_ICON_S = BIP6_LAYOUT.EARN_ICON_S;
@@ -473,6 +511,7 @@ export let FIGHT_LEFT_X = BIP6_LAYOUT.FIGHT_LEFT_X;
 export let FIGHT_LEFT_X_WIDE = BIP6_LAYOUT.FIGHT_LEFT_X_WIDE;
 export let FIGHT_COL_GAP = BIP6_LAYOUT.FIGHT_COL_GAP;
 export let FIGHT_ENEMY_X = BIP6_LAYOUT.FIGHT_ENEMY_X;
+export let FIGHT_ENEMY_X_WIDE = BIP6_LAYOUT.FIGHT_ENEMY_X_WIDE;
 export let FIGHT_DRAGON_S = BIP6_LAYOUT.FIGHT_DRAGON_S;
 export let FIGHT_ENEMY_S = BIP6_LAYOUT.FIGHT_ENEMY_S;
 export let FIGHT_HP_BAR_H = BIP6_LAYOUT.FIGHT_HP_BAR_H;
@@ -540,6 +579,17 @@ export function refreshLayout(info) {
   BEAST_BTN_OFFSET_X = L.BEAST_BTN_OFFSET_X;
   BEAST_BTN_Y = L.BEAST_BTN_Y;
   BEAST_BTN_S = L.BEAST_BTN_S;
+  MAP_BTN_S = L.MAP_BTN_S;
+  MAP_BTN_X = L.MAP_BTN_X;
+  MAP_BTN_Y = L.MAP_BTN_Y;
+  VILLAGE_GRID_Y = L.VILLAGE_GRID_Y;
+  VILLAGE_ROW_H = L.VILLAGE_ROW_H;
+  VILLAGE_ICON_S = L.VILLAGE_ICON_S;
+  VILLAGE_PAGE_ICON_S = L.VILLAGE_PAGE_ICON_S;
+  VILLAGE_PAGE_ICON_Y = L.VILLAGE_PAGE_ICON_Y;
+  VILLAGE_INFO_Y = L.VILLAGE_INFO_Y;
+  VILLAGE_INFO_H = L.VILLAGE_INFO_H;
+  VILLAGE_INFO_GAP = L.VILLAGE_INFO_GAP;
   EARN_TEXT_Y = L.EARN_TEXT_Y;
   EARN_TEXT_H = L.EARN_TEXT_H;
   EARN_ICON_S = L.EARN_ICON_S;
@@ -668,6 +718,7 @@ export function refreshLayout(info) {
   FIGHT_LEFT_X_WIDE = L.FIGHT_LEFT_X_WIDE;
   FIGHT_COL_GAP = L.FIGHT_COL_GAP;
   FIGHT_ENEMY_X = L.FIGHT_ENEMY_X;
+  FIGHT_ENEMY_X_WIDE = L.FIGHT_ENEMY_X_WIDE;
   FIGHT_DRAGON_S = L.FIGHT_DRAGON_S;
   FIGHT_ENEMY_S = L.FIGHT_ENEMY_S;
   FIGHT_HP_BAR_H = L.FIGHT_HP_BAR_H;

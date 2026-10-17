@@ -34,9 +34,13 @@ import type {
   EquipmentDef,
   EquipmentSlotId,
   FightAttackResult,
+  FleetFightTurn,
+  FleetScaling,
   LevelThreshold,
   MonsterDef,
   Random01,
+  Village,
+  VillageTier,
 } from "./types";
 
 export const CONFIG = {
@@ -158,16 +162,18 @@ export const CONFIG = {
   },
   beast: {
     name: "Bewilder Beast",
-    // 580 HP + attack 85 (see `fight`): a 3-dragon team of combat-66
-    // dragons wins ~62% of fights (Monte Carlo, balance.test.ts) — no
-    // longer the old 100% guarantee. Two dragons at 66 almost never win;
-    // four fully geared dragons still win reliably (earned, not free).
-    hp: 580,
+    // 850 HP + attack 95 + combat defense 52 (see `fight`): a 3-dragon
+    // team of combat-66 dragons now wins only ~2% of fights (Monte Carlo,
+    // balance.test.ts) — down from ~62% before the buff. Four at 66 win
+    // ~73%, five at 76 win reliably, and three at combat 100 win
+    // reliably: the beast is a late-game team fight, not a 3-dragon
+    // milestone. Two dragons at 66 essentially never win.
+    hp: 850,
     // Beast attack strength for `resolveFightAttack` (defender = the
     // randomly picked dragon's combat strength). A hit lands for
-    // ~85 - combat/2 + bonus, so a combat-66 dragon falls in 2 hits —
+    // ~95 - combat/2 + bonus, so a combat-66 dragon falls in 2 hits —
     // every beast turn threatens a kill, and a miss saves a dragon.
-    attack: 85,
+    attack: 95,
     // Display strength: feeds starsForStrength() for the boss icon /
     // intro / fight header (75 = exactly 3 gold stars). This is the
     // "final boss looks mighty" number shown to the player.
@@ -175,15 +181,13 @@ export const CONFIG = {
     // Combat defense: the defender number in `resolveFightAttack()` for
     // dragon blows (damage = combat - defense/2 + bonus). Decoupled from
     // the display value so the boss can LOOK like 3 gold stars while a
-    // combat-66 dragon still deals ~47/hit. Without this split, a
+    // combat-66 dragon still deals ~44/hit. Without this split, a
     // display 75 would zero out every mid-game hit and the beast would
     // be unbeatable.
-    combatDefense: 20,
+    combatDefense: 26,
     // The beast wears the FULL equipment set (all 7 slots, +26), so its
-    // combat defense is 20 + 26 = 46 (see beastCombatDefense()) and its
+    // combat defense is 26 + 26 = 52 (see beastCombatDefense()) and its
     // display strength is 75 + 26 = 101 (see beastDisplayStrength()).
-    // A fully equipped 40-strength dragon (combat 66) hits it exactly as
-    // a bare 40-strength dragon hit the old 20-defense beast.
     equipmentBonus: 26,
     equipmentSlots: [
       "head",
@@ -236,7 +240,74 @@ export const CONFIG = {
     easyBeatableAt: "combat ~21 (fresh ~11 wins ~20%; reliable after 3-4 trainings; Easy wears no gear, 42 HP)",
     mediumBeatableAt: "combat ~38-40 (base ~30 + ~8 gear, or base ~40 bare; Medium wears head + leg = +8, 85 HP)",
     hardBeatableAt: "combat ~76-78 (base ~50 + full +26 gear; Hard wears all but one leg = +23, 105 HP)",
-    beastBeatableAt: "3 dragons at combat ~66 win ~62% (e.g. base 40 + full +26 gear; beast wears all gear, defense 46, 580 HP, attack 85); 2 at 66 almost never win; 4 at 66 win reliably",
+    beastBeatableAt: "3 dragons at combat ~66 win ~2% (was ~62% before the buff); 4 at 66 win ~73%; 5 at 76 or 3 at 100 win reliably (beast: 850 HP, attack 95, defense 52)",
+  },
+  // Villages: conquerable settlements, one fleet fight each. Six villages
+  // (2 per tier) are generated at first boot; existing saves generate
+  // them on load, scaled to the player's fleet (see generateVillages).
+  villages: {
+    count: 6,
+    names: [
+      "Ember Hollow",
+      "Mistral Port",
+      "Stonebridge",
+      "Thornwick",
+      "Frostfall",
+      "Sunspire",
+    ] as const,
+    // Fresh-game defender stats (absolute). Easy is beatable by a modest
+    // fleet (2 x combat ~35 win ~95%); Medium wants a mid fleet
+    // (3 x ~50 win ~70-99%); Hard wants a strong/equipped fleet
+    // (4 x 66 win ~70%, 5 x 76 win reliably). HP is the defender's
+    // fight-screen HP pool (player dragons use live energy as HP).
+    tiers: {
+      easy: {
+        label: "Outpost",
+        defenderCountMin: 1,
+        defenderCountMax: 2,
+        combatMin: 28,
+        combatMax: 38,
+        hp: 60,
+        fortuneMin: 60,
+        fortuneMax: 120,
+        // Migration: defender combat = avgPlayerCombat x [min, max].
+        combatScaleMin: 0.55,
+        combatScaleMax: 0.75,
+      },
+      medium: {
+        label: "Hamlet",
+        defenderCountMin: 2,
+        defenderCountMax: 3,
+        combatMin: 42,
+        combatMax: 55,
+        hp: 80,
+        fortuneMin: 150,
+        fortuneMax: 260,
+        combatScaleMin: 0.75,
+        combatScaleMax: 0.95,
+      },
+      hard: {
+        label: "Stronghold",
+        defenderCountMin: 3,
+        defenderCountMax: 4,
+        combatMin: 60,
+        combatMax: 78,
+        hp: 105,
+        fortuneMin: 300,
+        fortuneMax: 500,
+        combatScaleMin: 0.95,
+        combatScaleMax: 1.15,
+      },
+    },
+    // Migration fortune scaling: fortune x clamp(avgCombat / 40, 0.8, 3),
+    // so a strong fleet captures bigger fortunes than a fresh one.
+    fortuneScaleDivisor: 40,
+    fortuneScaleMin: 0.8,
+    fortuneScaleMax: 3,
+    // Survivors of a victorious village attack grow stronger (rolled per
+    // dragon, like a monster win — smaller than a beast win's +2-4).
+    winStrengthGainMin: 1,
+    winStrengthGainMax: 2,
   },
 } as const;
 
@@ -855,10 +926,8 @@ export function rollSpawnedMonsters(rand01: Random01): MonsterDef[] {
 // ---------- Bewilder Beast (pure) ----------
 
 /**
- * Effective beast defense used in damage math: base 20 + full-equipment
- * bonus 26 = 46. The beast wears all gear, so a fully equipped dragon
- * (combat = base + 26) hits it exactly as a bare dragon hit the old
- * 20-defense beast; a bare mid-game roster barely scratches it. Pure.
+ * Effective beast defense used in damage math: base 26 + full-equipment
+ * bonus 26 = 52. The beast wears all gear. Pure.
  */
 export function beastCombatDefense(): number {
   return CONFIG.beast.combatDefense + CONFIG.beast.equipmentBonus;
@@ -979,6 +1048,246 @@ export function resolveBeastFight(
     turns,
     dragonHpsAfter: hps,
     beastHpAfter: hp,
+  };
+}
+
+// ---------- Villages (pure) ----------
+
+/** Tier catalogue entry for a village (label + defender/fortune ranges). Pure. */
+export function villageTierConfig(tier: VillageTier) {
+  return CONFIG.villages.tiers[tier];
+}
+
+/**
+ * Fleet-strength anchor for village generation / migration: average and
+ * total combat strength of the player's HATCHED dragons (eggs excluded).
+ * Null when the player has no hatched dragons — the caller then uses the
+ * absolute fresh-game ranges. Pure.
+ */
+export function fleetScalingForDragons(dragons: Dragon[]): FleetScaling | null {
+  const hatched = dragons.filter((d) => d.hatchedAtMs !== null);
+  if (hatched.length === 0) return null;
+  const combats = hatched.map((d) => combatStrengthForDragon(d));
+  const totalCombat = combats.reduce((a, b) => a + b, 0);
+  return { avgCombat: totalCombat / combats.length, totalCombat };
+}
+
+/**
+ * Generate the full village set (2 per tier, names shuffled). Pure —
+ * the caller supplies the random source.
+ *
+ * - `fleetScaling === null` (fresh game / no hatched dragons): absolute
+ *   fresh-game ranges from `CONFIG.villages.tiers` (easy 28-38, medium
+ *   42-55, hard 60-78).
+ * - `fleetScaling !== null` (migration of an existing save): defender
+ *   combat = avgPlayerCombat x the tier's scale band (easy 0.55-0.75,
+ *   medium 0.75-0.95, hard 0.95-1.15), so updating devices with strong
+ *   fleets don't get trivial villages; fortune scales with
+ *   clamp(avgCombat / 40, 0.8, 3). Defender counts and HP are the same
+ *   in both modes — only combat and fortune scale.
+ */
+export function generateVillages(
+  rand01: Random01,
+  fleetScaling: FleetScaling | null,
+): Village[] {
+  const tiers: VillageTier[] = ["easy", "easy", "medium", "medium", "hard", "hard"];
+  // Fisher-Yates shuffle of tiers + names so the tier order and the
+  // name->tier assignment vary per game (not fixed to the catalogue).
+  for (let i = tiers.length - 1; i > 0; i--) {
+    const j = Math.floor(rand01() * (i + 1));
+    [tiers[i], tiers[j]] = [tiers[j], tiers[i]];
+  }
+  const names = [...CONFIG.villages.names];
+  for (let i = names.length - 1; i > 0; i--) {
+    const j = Math.floor(rand01() * (i + 1));
+    [names[i], names[j]] = [names[j], names[i]];
+  }
+  const fortuneScale = fleetScaling
+    ? clamp(
+        fleetScaling.avgCombat / CONFIG.villages.fortuneScaleDivisor,
+        CONFIG.villages.fortuneScaleMin,
+        CONFIG.villages.fortuneScaleMax,
+      )
+    : 1;
+  return tiers.map((tier, i) => {
+    const cfg = CONFIG.villages.tiers[tier];
+    const defenderCount = rollIntInclusive(
+      cfg.defenderCountMin,
+      cfg.defenderCountMax,
+      rand01(),
+    );
+    const defenders = Array.from({ length: defenderCount }, (_, j) => {
+      const combat = fleetScaling
+        ? Math.max(
+            10,
+            Math.round(
+              fleetScaling.avgCombat *
+                (cfg.combatScaleMin +
+                  rand01() * (cfg.combatScaleMax - cfg.combatScaleMin)),
+            ),
+          )
+        : rollIntInclusive(cfg.combatMin, cfg.combatMax, rand01());
+      return {
+        id: `village-${i}-def-${j}`,
+        breedId: DRAGONS[drawBreedIndex(rand01())].id,
+        combat,
+        maxHp: cfg.hp,
+      };
+    });
+    const fortune = Math.round(
+      rollIntInclusive(cfg.fortuneMin, cfg.fortuneMax, rand01()) * fortuneScale,
+    );
+    return {
+      id: `village-${i}`,
+      name: names[i],
+      tier,
+      defenders,
+      fortune,
+      captured: false,
+    };
+  });
+}
+
+/**
+ * Public village view: the ONLY village data the page may show before a
+ * fight. Approximate defender count in words — never the exact count,
+ * never combat / HP / fortune numbers. The fortune hint is a tier word,
+ * not an amount. Pure.
+ */
+export function villageViewFor(village: Village): {
+  id: string;
+  name: string;
+  tier: VillageTier;
+  tierLabel: string;
+  approxCount: string;
+  fortuneHint: string;
+  captured: boolean;
+} {
+  return {
+    id: village.id,
+    name: village.name,
+    tier: village.tier,
+    tierLabel: CONFIG.villages.tiers[village.tier].label,
+    approxCount: villageApproxCount(village.defenders.length),
+    fortuneHint: villageFortuneHint(village.tier),
+    captured: village.captured,
+  };
+}
+
+/** Bucketed defender-count wording: 1 lone, 2 few, 3-4 several, 5+ many. Pure. */
+export function villageApproxCount(defenderCount: number): string {
+  if (defenderCount <= 0) return "no dragons";
+  if (defenderCount === 1) return "a lone dragon";
+  if (defenderCount === 2) return "a few dragons";
+  if (defenderCount <= 4) return "several dragons";
+  return "many dragons";
+}
+
+/** Bucketed fortune wording by tier — never the exact coin amount. Pure. */
+export function villageFortuneHint(tier: VillageTier): string {
+  if (tier === "easy") return "a modest fortune";
+  if (tier === "medium") return "a rich fortune";
+  return "a great fortune";
+}
+
+/** Permanent strength gained by each surviving village-attack winner. Pure. */
+export function rollVillageWinStrengthGain(rand01: number): number {
+  return rollIntInclusive(
+    CONFIG.villages.winStrengthGainMin,
+    CONFIG.villages.winStrengthGainMax,
+    rand01,
+  );
+}
+
+/**
+ * Full fleet-vs-fleet village fight, round-based. Pure — the caller
+ * supplies the random source; the engine drives it with its injected
+ * `rand()`.
+ *
+ * Each round: every alive player dragon attacks the FIRST alive defender
+ * (focus fire, roster order), then — if any defender still stands —
+ * every alive defender fires back at ONE uniformly random alive player
+ * dragon. Same hit/miss + damage model as every other fight
+ * (`resolveFightAttack`), same pity rule (at most 2 consecutive misses
+ * per combatant, then the next attack auto-hits — fights terminate).
+ *
+ * Returns every attack (the fight screen replays them) plus the final
+ * HPs, so the engine can persist survivor energy, removals, and the
+ * captured state. Defenders have no persistent HP: they enter every
+ * attack at full `maxHp` (a lost attack heals nothing — there is nothing
+ * to grind down; the same defenders stand at full strength next time).
+ */
+export function resolveFleetFight(
+  playerCombats: number[],
+  playerHps: number[],
+  enemyCombats: number[],
+  enemyHps: number[],
+  rand01: Random01,
+): {
+  won: boolean;
+  turns: FleetFightTurn[];
+  playerHpsAfter: number[];
+  enemyHpsAfter: number[];
+} {
+  const turns: FleetFightTurn[] = [];
+  const pHps = [...playerHps];
+  const eHps = [...enemyHps];
+  const playerMissStreaks = playerCombats.map(() => 0);
+  const enemyMissStreaks = enemyCombats.map(() => 0);
+  const alivePlayers = () => pHps.map((h, i) => (h > 0 ? i : -1)).filter((i) => i >= 0);
+  const aliveEnemies = () => eHps.map((h, i) => (h > 0 ? i : -1)).filter((i) => i >= 0);
+  while (eHps.some((h) => h > 0) && pHps.some((h) => h > 0)) {
+    for (const i of alivePlayers()) {
+      const targets = aliveEnemies();
+      if (targets.length === 0) break;
+      const targetIndex = targets[0];
+      const attack = resolveFightAttack(
+        playerCombats[i],
+        eHps[targetIndex],
+        enemyCombats[targetIndex],
+        playerMissStreaks[i] >= 2 ? 0 : rand01(),
+        rand01(),
+      );
+      playerMissStreaks[i] = attack.hit ? 0 : playerMissStreaks[i] + 1;
+      turns.push({
+        attackerSide: "player",
+        attackerIndex: i,
+        targetIndex,
+        hit: attack.hit,
+        damage: attack.damage,
+        defenderHpAfter: attack.defenderHpAfter,
+      });
+      eHps[targetIndex] = attack.defenderHpAfter;
+    }
+    if (!eHps.some((h) => h > 0)) break;
+    for (const j of aliveEnemies()) {
+      const targets = alivePlayers();
+      if (targets.length === 0) break;
+      const targetIndex = targets[Math.floor(rand01() * targets.length)];
+      const attack = resolveFightAttack(
+        enemyCombats[j],
+        pHps[targetIndex],
+        playerCombats[targetIndex],
+        enemyMissStreaks[j] >= 2 ? 0 : rand01(),
+        rand01(),
+      );
+      enemyMissStreaks[j] = attack.hit ? 0 : enemyMissStreaks[j] + 1;
+      turns.push({
+        attackerSide: "village",
+        attackerIndex: j,
+        targetIndex,
+        hit: attack.hit,
+        damage: attack.damage,
+        defenderHpAfter: attack.defenderHpAfter,
+      });
+      pHps[targetIndex] = attack.defenderHpAfter;
+    }
+  }
+  return {
+    won: eHps.every((h) => h <= 0),
+    turns,
+    playerHpsAfter: pHps,
+    enemyHpsAfter: eHps,
   };
 }
 

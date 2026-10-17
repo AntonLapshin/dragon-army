@@ -51,6 +51,9 @@ import {
   dragonStage,
   equipmentBonusForEquipment,
   equipmentDefForSlot,
+  findBreed,
+  fleetScalingForDragons,
+  generateVillages,
   isBeastEligible,
   isDragonHatched,
   isDragonInstanceExpired,
@@ -59,18 +62,21 @@ import {
   liveEnergyForDragon,
   remainingLifespanForDragon,
   resolveBeastFight,
+  resolveFleetFight,
   resolveMonsterFight,
   rollBaseStrength,
   rollBeastReward,
   rollBeastWinStrengthGain,
   rollIntInclusive,
   rollMonsterWinStrengthGain,
+  rollVillageWinStrengthGain,
   rollHatchMs,
   rollSpawnedMonsters,
   rollTrainingGain,
   sellPriceForDragon,
   trainingCostForDragon,
   trainingEnergyCost,
+  villageViewFor,
 } from "./config";
 import type {
   BeastBattleTurn,
@@ -98,6 +104,9 @@ import type {
   SellResult,
   TrainPreview,
   TrainResult,
+  VillageAttackOutcome,
+  VillageDefenderView,
+  VillageView,
 } from "./types";
 import {
   advanceCollectAnchor,
@@ -111,7 +120,9 @@ import {
   monsterFightSummaryText,
   normalizeCombatStats,
   normalizeEquipment,
+  normalizeVillages,
   screensForRoster,
+  seededRand01,
   withEnergyAnchor,
   withEquipment,
   withTrainingGain,
@@ -151,6 +162,11 @@ export function createNewGameState(params: NewGameStateParams): GameState {
     },
     beast,
     monsterSpawn: { spawned: [], lastRefreshMs: 0 },
+    // Fresh game: no fleet yet, so villages use the absolute ranges.
+    villages: generateVillages(
+      params.rand01 ?? seededRand01(nowMs),
+      null,
+    ),
     ui: {
       currentScreen: { kind: "main" },
       activeModal: null,
@@ -217,14 +233,27 @@ export function migrateLegacySave(raw: LegacySave, nowMs: number): GameState {
   const spawnedIds = new Set(Array.isArray(raw.spawned) ? raw.spawned : []);
   state.monsterSpawn.spawned = MONSTERS.filter((m) => spawnedIds.has(m.id));
   state.monsterSpawn.lastRefreshMs = asFiniteNumber(raw.spawnTs) ?? 0;
+  // Legacy saves predate villages: generate them scaled to the migrated
+  // fleet (a strong legacy roster must not get trivial villages).
+  state.villages = generateVillages(
+    seededRand01(nowMs),
+    fleetScalingForDragons(state.player.dragons),
+  );
   return state;
 }
 
 /**
  * Accept an engine-shaped save as-is; upgrade the legacy page-owned shape;
  * anything else → null (fresh game). Pure given nowMs.
+ * `rand01` seeds village generation for saves that predate villages
+ * (defaults to a seed from nowMs); existing villages are normalized, never
+ * regenerated.
  */
-export function coerceLoadedSave(raw: unknown, nowMs: number): GameState | null {
+export function coerceLoadedSave(
+  raw: unknown,
+  nowMs: number,
+  rand01?: Random01,
+): GameState | null {
   if (!raw || typeof raw !== "object") return null;
   const candidate = raw as Partial<GameState> & LegacySave;
   if (candidate.player && Array.isArray(candidate.player.dragons)) {
@@ -243,6 +272,13 @@ export function coerceLoadedSave(raw: unknown, nowMs: number): GameState | null 
     if (asFiniteNumber(state.player.lastCollectedSteps) === null) {
       state.player.lastCollectedSteps = 0;
     }
+    // Backfill villages for saves written before they existed: scaled to
+    // the loaded fleet so existing progress isn't handed trivial villages.
+    state.villages = normalizeVillages(
+      (state as { villages?: unknown }).villages,
+      rand01 ?? seededRand01(nowMs),
+      fleetScalingForDragons(state.player.dragons),
+    );
     return state;
   }
   if (typeof candidate.coins === "number" && Array.isArray(candidate.dragons)) {
@@ -396,6 +432,16 @@ export function createGameEngine(deps: CreateEngineDeps) {
       }
       if (!state.monsterSpawn) {
         state.monsterSpawn = { spawned: [], lastRefreshMs: 0 };
+      }
+      if (!Array.isArray(state.villages) || state.villages.length === 0) {
+        // Storage adapters that bypass coerceLoadedSave (or a save that
+        // predates villages): generate with the engine rand, scaled to
+        // the loaded fleet.
+        state.villages = normalizeVillages(
+          state.villages,
+          rand,
+          fleetScalingForDragons(state.player.dragons),
+        );
       }
     } else {
       const atMs = now();
@@ -1144,6 +1190,166 @@ export function createGameEngine(deps: CreateEngineDeps) {
     }
   }
 
+  // -- Villages (§16): fleet-vs-fleet conquest --
+
+  /** Public village list: name / tier / bucketed count / hint / captured only. */
+  function getVillages(): VillageView[] {
+    return requireState().villages.map((v) => villageViewFor(v));
+  }
+
+  function getVillageView(villageId: string): VillageView | null {
+    const village = requireState().villages.find((v) => v.id === villageId);
+    return village ? villageViewFor(village) : null;
+  }
+
+  /**
+   * Defender data the fight screen needs at attack time (portrait + HP
+   * bar). The village page never calls this — the battle itself is what
+   * reveals the enemy fleet.
+   */
+  function getVillageDefenders(villageId: string): VillageDefenderView[] {
+    const village = requireState().villages.find((v) => v.id === villageId);
+    if (!village) return [];
+    return village.defenders.map((d) => ({
+      id: d.id,
+      breedId: d.breedId,
+      maxHp: d.maxHp,
+    }));
+  }
+
+  /**
+   * Attack a village with the whole eligible fleet (same eligibility as
+   * the beast: hatched dragons with live energy > 0). Round-based fleet
+   * fight (see `resolveFleetFight` in config): every alive player dragon
+   * hits the first alive defender, then every alive defender fires back
+   * at one random alive player dragon. 0-HP dragons are REMOVED (same
+   * death rule as beast fights — no separate death system).
+   * Win = village captured + exact fortune paid into the wallet +
+   * +1-2 strength per surviving attacker; survivors keep drained energy.
+   * Loss = removed dragons stay removed, survivors keep drained energy,
+   * village stays uncaptured, defenders stand again at full HP next
+   * time (no grinding). Captured villages refuse a second attack, so
+   * the fortune can be collected exactly once. The fight resolves
+   * instantly and persists (anti-cheat); the fight screen only replays
+   * the returned turns.
+   */
+  function attackVillage(villageId: string): VillageAttackOutcome {
+    tick(now());
+    const s = requireState();
+    const atMs = now();
+    const village = s.villages.find((v) => v.id === villageId);
+    if (!village) return { ok: false, reason: "unknown-village" };
+    if (village.captured) return { ok: false, reason: "already-captured" };
+    const lineup = s.player.dragons.filter((d) => isBeastEligible(d, atMs));
+    if (lineup.length === 0) {
+      return { ok: false, reason: "no-participants" };
+    }
+    fightLocked = true;
+    try {
+      s.ui.activeModal = null;
+      s.ui.fightLog = [];
+
+      const result = resolveFleetFight(
+        lineup.map((d) => combatStrengthForDragon(d)),
+        lineup.map((d) => liveEnergyForDragon(d, atMs)),
+        village.defenders.map((d) => d.combat),
+        village.defenders.map((d) => d.maxHp),
+        rand,
+      );
+      const defeated = result.won;
+      const foughtIds = new Set(
+        result.turns
+          .filter((t) => t.attackerSide === "player")
+          .map((t) => lineup[t.attackerIndex].id),
+      );
+      const removedIds = new Set(
+        lineup
+          .filter((_, i) => result.playerHpsAfter[i] <= 0)
+          .map((d) => d.id),
+      );
+
+      const turns = result.turns.map((t, turnIndex) => {
+        if (t.attackerSide === "player") {
+          const attackerName = breedForDragon(lineup[t.attackerIndex]).name;
+          const defender = village.defenders[t.targetIndex];
+          const targetName = findBreed(defender.breedId)?.name ?? "Dragon";
+          return {
+            turnIndex,
+            attackerKind: "dragon" as const,
+            attackerId: lineup[t.attackerIndex].id,
+            attackerName,
+            // Village fights: the target IS a defender (it has an id),
+            // so the page can map the turn to the right fight-screen unit.
+            targetId: defender.id,
+            targetName,
+            hit: t.hit,
+            damage: t.damage,
+            targetHpAfter: t.defenderHpAfter,
+            text: fightTurnLogText(attackerName, targetName, t.hit, t.damage),
+          };
+        }
+        const defender = village.defenders[t.attackerIndex];
+        const attackerName = findBreed(defender.breedId)?.name ?? "Dragon";
+        const targetName = breedForDragon(lineup[t.targetIndex]).name;
+        return {
+          turnIndex,
+          attackerKind: "enemy" as const,
+          // Village fights: the attacker IS a defender (it has an id).
+          attackerId: defender.id,
+          attackerName,
+          targetId: lineup[t.targetIndex].id,
+          targetName,
+          hit: t.hit,
+          damage: t.damage,
+          targetHpAfter: t.defenderHpAfter,
+          text: fightTurnLogText(attackerName, targetName, t.hit, t.damage),
+        };
+      });
+
+      let fortune = 0;
+      const strengthGains: Record<string, number> = {};
+      if (defeated) {
+        fortune = village.fortune;
+        village.captured = true;
+        s.player.coins += fortune;
+        s.player.totalCoinsEarned += fortune;
+      }
+
+      for (let i = 0; i < lineup.length; i++) {
+        const participant = lineup[i];
+        if (removedIds.has(participant.id)) continue;
+        const current = s.player.dragons.find((d) => d.id === participant.id);
+        if (!current) continue;
+        const energy = result.playerHpsAfter[i];
+        if (defeated && foughtIds.has(participant.id)) {
+          const gain = rollVillageWinStrengthGain(rand());
+          strengthGains[participant.id] = gain;
+          replaceDragon({
+            ...current,
+            strength: applyStrengthGain(current.strength, gain),
+            energy,
+            lastEnergyUpdateMs: atMs,
+          });
+        } else {
+          replaceDragon(withEnergyAnchor(current, energy, atMs));
+        }
+      }
+      removeDragons(removedIds);
+      s.ui.fightLog = turns;
+      save();
+      return {
+        ok: true,
+        won: defeated,
+        turns,
+        fortune,
+        removedDragonIds: [...removedIds],
+        strengthGains,
+      };
+    } finally {
+      fightLocked = false;
+    }
+  }
+
   // -- UI slice (transient; fight modals lock while resolving) --
 
   function openModal(kind: ModalKind): void {
@@ -1229,6 +1435,11 @@ export function createGameEngine(deps: CreateEngineDeps) {
     canFightBeast,
     openBeastIntro,
     fightBeast,
+    // villages
+    getVillages,
+    getVillageView,
+    getVillageDefenders,
+    attackVillage,
     // ui
     openModal,
     closeModal,

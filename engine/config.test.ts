@@ -637,8 +637,8 @@ describe("battle", () => {
       expect(rollFightDamageBonus(0.999999)).toBe(CONFIG.fight.damageBonusMax);
     });
     it("damage = attacker - defender/2 + bonus, floored at 3", () => {
-      // 66 vs beast defense 46, bonus 4 (rand 0.5): 66 - 23 + 4 = 47
-      expect(fightHitDamage(66, 46, 0.5)).toBe(47);
+      // 66 vs beast defense 52, bonus 4 (rand 0.5): 66 - 26 + 4 = 44
+      expect(fightHitDamage(66, 52, 0.5)).toBe(44);
       // weakest hit still chips: 1 vs 78 would be negative -> floor 3
       expect(fightHitDamage(1, 78, 0)).toBe(CONFIG.fight.minDamage);
       expect(fightHitDamage(11, 19, 0)).toBe(3);
@@ -647,19 +647,19 @@ describe("battle", () => {
 
   describe("resolveFightAttack", () => {
     it("a roll above the hit chance misses: 0 damage, HP unchanged", () => {
-      const res = resolveFightAttack(66, 580, 46, 0.99, 0.5);
+      const res = resolveFightAttack(66, 850, 52, 0.99, 0.5);
       expect(res.hit).toBe(false);
       expect(res.damage).toBe(0);
-      expect(res.defenderHpAfter).toBe(580);
+      expect(res.defenderHpAfter).toBe(850);
     });
     it("a roll below the hit chance hits for full damage", () => {
-      const res = resolveFightAttack(66, 580, 46, 0.1, 0.5);
+      const res = resolveFightAttack(66, 850, 52, 0.1, 0.5);
       expect(res.hit).toBe(true);
-      expect(res.damage).toBe(47);
-      expect(res.defenderHpAfter).toBe(533);
+      expect(res.damage).toBe(44);
+      expect(res.defenderHpAfter).toBe(806);
     });
     it("clamps defender HP at 0 on overkill", () => {
-      const res = resolveFightAttack(200, 10, 46, 0, 0.999);
+      const res = resolveFightAttack(200, 10, 52, 0, 0.999);
       expect(res.defenderHpAfter).toBe(0);
     });
   });
@@ -775,10 +775,10 @@ describe("bewilder beast", () => {
     });
 
     it("the beast fires back at one random alive dragon per round", () => {
-      // 3 weak dragons vs a 580-HP beast: nobody kills it in round 1,
+      // 3 weak dragons vs an 850-HP beast: nobody kills it in round 1,
       // so the beast gets exactly one retaliation per round, aimed at
       // a single dragon — the other two take no damage that round.
-      const res = resolveBeastFight([10, 10, 10], [100, 100, 100], 580, () => 0.5);
+      const res = resolveBeastFight([10, 10, 10], [100, 100, 100], 850, () => 0.5);
       expect(res.won).toBe(false);
       const enemyTurns = res.turns.filter((t) => t.attackerKind === "enemy");
       expect(enemyTurns.length).toBeGreaterThan(0);
@@ -791,15 +791,15 @@ describe("bewilder beast", () => {
       expect(res.beastHpAfter).toBeGreaterThan(0);
     });
 
-    it("damage uses beastCombatDefense (46), not the 101 display value", () => {
-      // 66 - 23 + 4 = 47/hit; with the display value it would be
+    it("damage uses beastCombatDefense (52), not the 101 display value", () => {
+      // 66 - 26 + 4 = 44/hit; with the display value it would be
       // 66 - 50 + 4 = 20/hit. First turn of a 3x66 team vs full HP:
-      const res = resolveBeastFight([66, 66, 66], [100, 100, 100], 580, () => 0.5);
-      expect(res.turns[0].damage).toBe(47);
+      const res = resolveBeastFight([66, 66, 66], [100, 100, 100], 850, () => 0.5);
+      expect(res.turns[0].damage).toBe(44);
     });
 
     it("pity rule: always-miss rolls still terminate", () => {
-      const res = resolveBeastFight([66, 66], [100, 100], 580, () => 0.999);
+      const res = resolveBeastFight([66, 66], [100, 100], 850, () => 0.999);
       expect(res.turns.length).toBeLessThan(500);
       expect(res.turns.length).toBeGreaterThan(0);
     });
@@ -816,8 +816,8 @@ describe("bewilder beast", () => {
     });
   });
 
-  describe("bewilder beast display vs combat (full gear: 101 display, 46 defense)", () => {
-    it("shows 3 gold stars base, 4 gold with full gear; defense = 20 + 26 gear", () => {
+  describe("bewilder beast display vs combat (full gear: 101 display, 52 defense)", () => {
+    it("shows 3 gold stars base, 4 gold with full gear; defense = 26 + 26 gear", () => {
       expect(CONFIG.beast.strengthConstant).toBe(75);
       expect(starsForStrength(CONFIG.beast.strengthConstant)).toEqual({
         gold: 3,
@@ -832,7 +832,7 @@ describe("bewilder beast", () => {
       expect(beastCombatDefense()).toBe(
         CONFIG.beast.combatDefense + CONFIG.beast.equipmentBonus,
       );
-      expect(beastCombatDefense()).toBe(46);
+      expect(beastCombatDefense()).toBe(52);
     });
   });
 

@@ -143,16 +143,111 @@ export interface FightAttackResult {
   defenderHpAfter: number;
 }
 
+/** One attack in a fleet-vs-fleet village fight (`resolveFleetFight`). */
+export interface FleetFightTurn {
+  /** Which side threw the fireball. */
+  attackerSide: "player" | "village";
+  /** Attacker's index within its own side (roster order / defender order). */
+  attackerIndex: number;
+  /** Target's index within the OTHER side. */
+  targetIndex: number;
+  hit: boolean;
+  damage: number;
+  /** Target HP after this attack (clamped at 0). */
+  defenderHpAfter: number;
+}
+
+/** Village difficulty tier (easy < medium < hard). */
+export type VillageTier = "easy" | "medium" | "hard";
+
+/**
+ * One village defender: an enemy dragon in the village fleet. Persisted
+ * per village; `combat` is its combat strength, `maxHp` its fight-screen
+ * HP pool (defenders always enter an attack at full HP — a lost attack
+ * heals nothing, so there is nothing to grind down). `breedId` picks
+ * the fight-screen portrait + log name only; it never enters formulas.
+ */
+export interface VillageDefender {
+  /** Stable id (`village-<i>-def-<j>`), used to map fight turns to units. */
+  id: string;
+  /** Foreign key into the `DRAGONS` catalogue (portrait + name only). */
+  breedId: string;
+  /** Combat strength used in `resolveFightAttack`. */
+  combat: number;
+  /** Fight-screen HP pool at attack entry. */
+  maxHp: number;
+}
+
+/**
+ * One village: a conquerable settlement. `fortune` is the exact coin
+ * payout on capture — never shown on the village page (only the tier
+ * fortune hint); revealed as the reward when the attack is won.
+ * `captured` villages cannot be re-attacked for fortune again.
+ */
+export interface Village {
+  /** Stable id (`village-<i>`). */
+  id: string;
+  /** Display name (e.g. "Ember Hollow"). */
+  name: string;
+  tier: VillageTier;
+  /** The village fleet (1-4 defenders, tier-dependent). */
+  defenders: VillageDefender[];
+  /** Exact coin fortune paid into the wallet on capture. */
+  fortune: number;
+  /** True once the player's fleet has captured this village. */
+  captured: boolean;
+}
+
+/**
+ * Public village view: the ONLY village data shown before a fight —
+ * name, tier label, bucketed defender count, bucketed fortune hint,
+ * captured flag. No exact defender count, combat, HP, or fortune.
+ */
+export interface VillageView {
+  id: string;
+  name: string;
+  tier: VillageTier;
+  /** Tier display label: Outpost / Hamlet / Stronghold. */
+  tierLabel: string;
+  /** Bucketed wording ("a lone dragon" / "a few dragons" / ...). */
+  approxCount: string;
+  /** Bucketed wording ("a modest fortune" / "a rich fortune" / ...). */
+  fortuneHint: string;
+  captured: boolean;
+}
+
+/**
+ * Defender data the fight screen needs at attack time (portrait + HP
+ * bar). Exposed only when an attack starts — the village page never
+ * sees it, so the battle itself is what reveals the enemy fleet.
+ */
+export interface VillageDefenderView {
+  id: string;
+  breedId: string;
+  maxHp: number;
+}
+
+/** Fleet-strength anchor for village generation / migration scaling. */
+export interface FleetScaling {
+  /** Mean combat strength of the player's hatched dragons. */
+  avgCombat: number;
+  /** Total combat strength of the player's hatched dragons. */
+  totalCombat: number;
+}
+
 /** One replayable attack in a fight (monster 1v1 or beast round-based). */
 export interface FightTurn {
   turnIndex: number;
   /** Who threw the fireball: a dragon, or the enemy (monster / beast). */
   attackerKind: "dragon" | "enemy";
-  /** Attacking dragon's roster-entry id (null for enemy attacks). */
+  /** Attacking dragon's roster-entry id (null for enemy attacks — except
+   * village fights, where it carries the attacking defender's id). */
   attackerId: string | null;
   /** Display name of the attacker (dragon breed or enemy name). */
   attackerName: string;
-  /** Dragon hit by an enemy attack (null for dragon attacks — they hit the enemy). */
+  /** Dragon hit by an enemy attack (null for dragon attacks — they hit the
+   * enemy — except village fights, where it carries the target
+   * defender's id). */
   targetId: string | null;
   /** Display name of the target. */
   targetName: string;
@@ -362,7 +457,9 @@ export type ModalKind =
 export type ScreenRef =
   | { kind: "main" }
   | { kind: "dragon"; dragonId: string }
-  | { kind: "equipment"; dragonId: string };
+  | { kind: "equipment"; dragonId: string }
+  | { kind: "villages" }
+  | { kind: "village"; villageId: string };
 
 /** One auto-resolved fight-log line shown on the fight screen. */
 export interface FightLogEntry extends FightTurn {}
@@ -395,6 +492,8 @@ export interface GameState {
   player: Player;
   beast: BeastState;
   monsterSpawn: MonsterSpawnState;
+  /** Villages: generated at first boot, migrated on load for old saves. */
+  villages: Village[];
   ui: UiState;
   /** Current game clock (epoch ms). Advanced by the tick loop. */
   nowMs: number;
@@ -408,6 +507,8 @@ export interface NewGameStateParams {
   nowMs: number;
   configVersion: number;
   beastMaxHp: number;
+  /** Random source for village generation (defaults to a seed from nowMs). */
+  rand01?: Random01;
 }
 
 // ---------------------------------------------------------------------------
@@ -542,6 +643,23 @@ export type BeastBattleOutcome =
       strengthGains: Record<string, number>;
     }
   | { ok: false; reason: "beast-vanished" | "no-participants" };
+
+export type VillageAttackOutcome =
+  | {
+      ok: true;
+      won: boolean;
+      /** Every attack in order — the fight screen replays these. */
+      turns: FightTurn[];
+      /** Exact fortune paid into the wallet (0 on loss). */
+      fortune: number;
+      removedDragonIds: string[];
+      /** Permanent strength gained per surviving dragon id (only on win). */
+      strengthGains: Record<string, number>;
+    }
+  | {
+      ok: false;
+      reason: "unknown-village" | "already-captured" | "no-participants";
+    };
 
 /** Derived per-dragon view model for the detail screen (§2). */
 export interface DragonView {

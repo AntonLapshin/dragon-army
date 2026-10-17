@@ -44,7 +44,24 @@ generated `engine/*.js` files are fresh — zeus bundles `.js` only, never
    random dragon** per round. Dragons dropped to 0 are removed. Winning
    vanishes the beast for a day and grants every dragon that attacked
    **+2–4 permanent strength** plus 300 coins. Losing heals the beast back
-   to full HP — no grinding it down across attempts.
+   to full HP — no grinding it down across attempts. The beast is a
+   late-game team fight: 850 HP, attack 95, combat defense 52 — four
+   fully equipped base-40 dragons (combat 66) win ~73%; three at 66 win
+   only ~2%.
+6. **Conquer villages** — tap the **Map** icon (bottom-right) for the
+   villages view: six villages (2 Outposts, 2 Hamlets, 2 Strongholds),
+   each an icon + name. A village page shows only the tier, a bucketed
+   defender count ("a few / several / many dragons" — never exact), and
+   a bucketed fortune hint. **Attack** sends the whole eligible fleet
+   into a fleet-vs-fleet fight (player dragons left, village defenders
+   right, same hit/miss + HP-bar fight screen); **Home** returns.
+   Winning captures the village (checkmark badge) and pays its exact
+   fortune into the wallet, once — captured villages can't be
+   re-attacked. Losing removes dragons dropped to 0 (same death rule as
+   beast fights) and the village stands at full strength. Villages are
+   generated at first boot; saves written before villages existed
+   generate them scaled to the player's fleet, so a strong roster
+   doesn't get trivial villages.
 6. **Equip a dragon** — tap the equipment icon (top-left on a hatched
    dragon's page) for its 7 slots: Dragon Helm (+5, 100c), Wing Guards
    (+5, 100c), Tail Guard (+4, 80c), and one Leg Guard per leg (+3, 60c
@@ -53,9 +70,9 @@ generated `engine/*.js` files are fresh — zeus bundles `.js` only, never
    are unchanged); selling a geared dragon refunds 50% of its gear cost.
    Monsters wear gear too — Easy none, Medium head + leg (+8), Hard all but
    one leg (+23) — and the Beast wears the full set (display 101 = 4 gold
-   stars, combat defense 46). A bare base-40 dragon barely scratches it;
-   three fully equipped base-40 dragons (combat 66) win ~62% of fights —
-   strong but no longer a guarantee; two at 66 almost never win.
+   stars, combat defense 52). A bare base-40 dragon barely scratches it;
+   four fully equipped base-40 dragons (combat 66) win ~73% of fights;
+   three at 66 win only ~2%; two at 66 almost never win.
 7. **Earn Coins** — hourly coins accrue but are credited only by tapping the
    coin icon when it appears. Energy recovers passively (10/hour).
 
@@ -137,7 +154,7 @@ action: page → engine method → pure formula (config.ts) → state update
        → storage.save(JSON) → page re-renders from engine views
 ```
 
-Saves are one JSON object (`GameState`: player + beast + spawn + UI slice).
+Saves are one JSON object (`GameState`: player + beast + spawn + villages + UI slice).
 Old saves are upgraded on load: pre-engine `{ coins, dragons }` shapes are
 migrated, and missing fields (`combatStats`, `equipment`,
 `lastCollectedSteps`) are backfilled — old progress is never dropped.
@@ -170,7 +187,8 @@ make clean     # remove generated assets
   `WxH` sizes it is displayed at (e.g. dragons → `60x60` + `240x240`).
   Entries with an empty list (unused art) are deleted by `scale`.
 - `raw/icon_source.png` is the un-cropped icon source; `raw/equipment/`
-  holds the equipment art, `raw/fight/` the fireball + impact FX.
+  holds the equipment art, `raw/fight/` the fireball + impact FX,
+  `raw/villages/` the map + village + checkmark art.
   `store/` holds the app-store listing assets.
 - `assets/` (including `default.{b,r,s}`) is generated but committed — the
   watch build reads it directly. `web/public/images` is a symlink to
@@ -185,8 +203,10 @@ make clean     # remove generated assets
 | Train | coins (8 + 0.8×str) + 15 energy | +2–5 strength (max 125) |
 | Monster win | ~⅓ of the HP bar (damage taken) | coins + strength (+1–2 / +1–2 / +2–4) |
 | Monster loss | energy → 0 | strength unchanged |
-| Beast win | HP lost to ~56-damage beast hits | 300 coins + 2–4 strength per attacker |
+| Beast win | HP lost to ~66-damage beast hits | 300 coins + 2–4 strength per attacker |
 | Beast loss | whole team removed | beast heals to full HP |
+| Village win (Easy / Medium / Hard) | HP lost to defender hits | fortune 60–120 / 150–260 / 300–500 + 1–2 strength per attacker |
+| Village loss | dragons at 0 removed | village stands at full strength, no fortune |
 | Equipment (full set) | 520 coins | +26 combat strength (helm 100, wings 100, tail 80, legs 60×4) |
 
 ## Testing
@@ -200,6 +220,7 @@ npm run test:watch
 |---|---|
 | `engine/config.test.ts` | Every pure formula: economy, hatch, energy, stars, training, selling, equipment, battle math. |
 | `engine/engine.test.ts` | Session flow: boot/migration, egg/train/sell, coins, monster + beast fights, tick idempotency. |
+| `engine/villages.test.ts` | Village generation (fresh + migration scaling), public-view leak checks, fleet fight, capture/fortune, loss deaths. |
 | `engine/balance.test.ts`, `engine/finetune.test.ts` | Playability targets: fresh dragons vs Easy, gear vs Medium/Hard/Beast, economy pacing. |
 | `page/layouts.test.mjs` | Layout tables share keys, art-bound sizes never shrink, round-480 geometry stays inside the circle, `refreshLayout` covers every key. |
 | `page/viewUtils.test.mjs` | Pure view math: name formatting, energy segments, roster window, action-row positions, fight-screen geometry. |

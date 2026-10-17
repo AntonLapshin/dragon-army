@@ -3,15 +3,28 @@
 // (zeus build only bundles .js; the .ts sources are for vitest.)
 import {
   CONFIG,
+  DRAGONS,
   applyStrengthGain,
   clampStrength,
   collectibleCoins,
-  collectibleStepCoins
+  collectibleStepCoins,
+  generateVillages,
+  villageTierConfig
 } from "./config.js";
 import { EQUIPMENT_SLOTS } from "./config.js";
 function createDragonId(rand01, nowMs) {
   const randPart = Math.floor(rand01 * 36 ** 6).toString(36);
   return `dragon-${nowMs.toString(36)}-${randPart}`;
+}
+function seededRand01(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = a + 1831565813 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
 }
 function freshCombatStats() {
   return { easyWins: 0, mediumWins: 0, hardWins: 0, beastWins: 0, coinsEarned: 0 };
@@ -68,6 +81,45 @@ function withEnergyAnchor(dragon, energy, nowMs) {
 }
 function withTrainingGain(dragon, gain) {
   return { ...dragon, strength: applyStrengthGain(dragon.strength, gain) };
+}
+function normalizeVillageDefender(raw, fallback) {
+  const r = typeof raw === "object" && raw !== null ? raw : {};
+  const num = (v, d) => typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.floor(v) : d;
+  const breedId = typeof r.breedId === "string" && DRAGONS.some((b) => b.id === r.breedId) ? r.breedId : fallback.breedId;
+  return {
+    id: typeof r.id === "string" ? r.id : fallback.id,
+    breedId,
+    combat: num(r.combat, fallback.combat),
+    maxHp: Math.max(1, num(r.maxHp, fallback.maxHp))
+  };
+}
+function normalizeVillages(raw, rand01, fleetScaling) {
+  if (Array.isArray(raw) && raw.length > 0) {
+    return raw.map((entry, i) => {
+      const r = typeof entry === "object" && entry !== null ? entry : {};
+      const tier = r.tier === "easy" || r.tier === "medium" || r.tier === "hard" ? r.tier : "easy";
+      const cfg = villageTierConfig(tier);
+      const fallbackDefender = {
+        id: `village-${i}-def-0`,
+        breedId: DRAGONS[0].id,
+        combat: cfg.combatMin,
+        maxHp: cfg.hp
+      };
+      const defendersRaw = Array.isArray(r.defenders) ? r.defenders : [];
+      const defenders = defendersRaw.map(
+        (d, j) => normalizeVillageDefender(d, { ...fallbackDefender, id: `village-${i}-def-${j}` })
+      );
+      return {
+        id: typeof r.id === "string" ? r.id : `village-${i}`,
+        name: typeof r.name === "string" && r.name.length > 0 ? r.name : `Village ${i + 1}`,
+        tier,
+        defenders: defenders.length > 0 ? defenders : [fallbackDefender],
+        fortune: typeof r.fortune === "number" && Number.isFinite(r.fortune) && r.fortune >= 0 ? Math.floor(r.fortune) : cfg.fortuneMin,
+        captured: r.captured === true
+      };
+    });
+  }
+  return generateVillages(rand01, fleetScaling);
 }
 function advanceCollectAnchor(lastCoinCollectMs, nowMs) {
   const elapsed = Math.max(0, nowMs - lastCoinCollectMs);
@@ -126,7 +178,9 @@ export {
   monsterFightSummaryText,
   normalizeCombatStats,
   normalizeEquipment,
+  normalizeVillages,
   screensForRoster,
+  seededRand01,
   withEnergyAnchor,
   withEquipment,
   withTrainingGain

@@ -109,8 +109,13 @@ export function fightBarFill(barW, hp, maxHp) {
  * @param {number} p.barH - HP bar height above each unit
  * @param {number} p.barGap - gap between the bar and the unit
  * @param {number} p.rowGap - gap between dragon rows
+ * @param {number} [p.enemyCount] - enemy units on the right (default 1:
+ *   monster / beast). Village fights pass 2-4 defenders, stacked in one
+ *   column with the same row pitch as the dragons.
  * @returns {{ dragons: Array<{x,y,barX,barY,barW,size}>,
- *            enemy: {x,y,barX,barY,barW,size} }}
+ *            enemy: {x,y,barX,barY,barW,size},
+ *            enemies: Array<{x,y,barX,barY,barW,size}> }}
+ *   `enemy` is `enemies[0]` (backward compat for single-enemy fights).
  */
 export function fightUnitRects(p) {
   const rowH = p.barH + p.barGap + p.dragonS;
@@ -143,19 +148,45 @@ export function fightUnitRects(p) {
     });
   }
 
-  const enemyTotalH = p.barH + p.barGap + p.enemyS;
-  const enemyBarY = p.arenaY + Math.max(0, (p.arenaH - enemyTotalH) / 2);
-  return {
-    dragons,
-    enemy: {
-      x: p.enemyX,
+  // Enemies: one column on the right. Same row pitch as the dragons so
+  // 2-4 village defenders stack evenly; a single enemy (monster/beast)
+  // keeps the old vertically-centered position. Multi-enemy fights use
+  // `enemyXWide` (round: shifted toward the circle's center — at the
+  // outer enemyX the top/bottom defenders' corners leave the circle).
+  const enemyCount = Math.max(1, p.enemyCount || 1);
+  const enemyX = enemyCount > 1 && p.enemyXWide !== undefined ? p.enemyXWide : p.enemyX;
+  const enemyRowH = p.barH + p.barGap + p.enemyS;
+  const enemies = [];
+  if (enemyCount === 1) {
+    const enemyBarY = p.arenaY + Math.max(0, (p.arenaH - enemyRowH) / 2);
+    enemies.push({
+      x: enemyX,
       y: enemyBarY + p.barH + p.barGap,
-      barX: p.enemyX,
+      barX: enemyX,
       barY: enemyBarY,
       barW: p.enemyS,
       size: p.enemyS,
-    },
-  };
+    });
+  } else {
+    const enemyPitch =
+      enemyCount <= 1
+        ? enemyRowH
+        : Math.min(enemyRowH + p.rowGap, (p.arenaH - enemyRowH) / (enemyCount - 1));
+    const enemyBlockH = (enemyCount - 1) * enemyPitch + enemyRowH;
+    const enemyTopY = p.arenaY + Math.max(0, (p.arenaH - enemyBlockH) / 2);
+    for (let i = 0; i < enemyCount; i++) {
+      const rowY = enemyTopY + i * enemyPitch;
+      enemies.push({
+        x: enemyX,
+        y: rowY + p.barH + p.barGap,
+        barX: enemyX,
+        barY: rowY,
+        barW: p.enemyS,
+        size: p.enemyS,
+      });
+    }
+  }
+  return { dragons, enemy: enemies[0], enemies };
 }
 
 /**

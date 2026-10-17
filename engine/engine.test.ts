@@ -996,7 +996,7 @@ describe("beast", () => {
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.won).toBe(false);
-    // dragon chip (3 dmg), then the beast's 89-damage retaliation kills it
+    // dragon chip (3 dmg), then the beast's 99-damage retaliation kills it
     expect(res.turns).toHaveLength(2);
     expect(res.removedDragonIds).toEqual(["weak"]);
     expect(res.reward).toBe(0);

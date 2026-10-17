@@ -188,7 +188,7 @@ describe("progression journey: the Bewilder Beast", () => {
     };
   }
 
-  it("the documented beast-ready roster (3 x base-40 + full gear = combat 66) wins ~62% — strong, not a guarantee", () => {
+  it("the old beast-ready roster (3 x base-40 + full gear = combat 66) now wins only ~2% — the buff moved the bar", () => {
     let wins = 0;
     const N = 300;
     for (let i = 0; i < N; i++) {
@@ -199,9 +199,24 @@ describe("progression journey: the Bewilder Beast", () => {
       ]);
       if (r.won) wins++;
     }
+    expect(wins / N).toBeLessThan(0.1);
+  });
+
+  it("four combat-66 dragons win ~73% — the new beast-ready bar (strong, not a guarantee)", () => {
+    let wins = 0;
+    const N = 300;
+    for (let i = 0; i < N; i++) {
+      const r = beastRosterFight(5500 + i, [
+        { strength: 40, geared: true },
+        { strength: 40, geared: true },
+        { strength: 40, geared: true },
+        { strength: 40, geared: true },
+      ]);
+      if (r.won) wins++;
+    }
     const rate = wins / N;
-    expect(rate).toBeGreaterThan(0.5);
-    expect(rate).toBeLessThan(0.75);
+    expect(rate).toBeGreaterThan(0.6);
+    expect(rate).toBeLessThan(0.85);
   });
 
   it("two combat-66 dragons almost never win (the fight needs a team)", () => {
@@ -232,7 +247,7 @@ describe("progression journey: the Bewilder Beast", () => {
   });
 
   it("a lost beast fight removes the whole team AND heals the beast to full", () => {
-    // Weak team: guaranteed loss (3 x combat 10 vs 580 HP).
+    // Weak team: guaranteed loss (3 x combat 10 vs 850 HP).
     const engine = makeEngine(8000, [
       dragon({ id: "d0", strength: 10 }),
       dragon({ id: "d1", strength: 10 }),

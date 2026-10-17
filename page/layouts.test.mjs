@@ -197,6 +197,24 @@ describe('round480 circle containment', () => {
     expect(rows).toBe(3);
   });
 
+  it('keeps the map (villages) button + village grid inside the circle', async () => {
+    const { actionRowPositions } = await import('./viewUtils.js');
+    // Map button: 84px icon at MAP_BTN_X/Y.
+    expect(rectInsideCircle(L.MAP_BTN_X, L.MAP_BTN_Y, L.MAP_BTN_S, L.MAP_BTN_S, 4)).toBe(true);
+    // Villages list: 3x2 grid of 72px icons + name line, same column
+    // math as the page (actionRowPositions, ACTION_SIDE_PAD).
+    for (let row = 0; row < 2; row++) {
+      const y = L.VILLAGE_GRID_Y + row * L.VILLAGE_ROW_H;
+      const xs = actionRowPositions(prof.width, L.ACTION_SIDE_PAD, 72, 3);
+      for (const x of xs) {
+        expect(rectInsideCircle(x, y, 72, 72, 4), `village row ${row}`).toBe(true);
+      }
+    }
+    // Village page: 128px icon centered + info lines, inside the circle.
+    const iconX = Math.floor((prof.width - L.VILLAGE_PAGE_ICON_S) / 2);
+    expect(rectInsideCircle(iconX, L.VILLAGE_PAGE_ICON_Y, L.VILLAGE_PAGE_ICON_S, L.VILLAGE_PAGE_ICON_S, 4)).toBe(true);
+  });
+
   it('keeps the fight screen inside the circle (dragons left, enemy right)', async () => {
     const { fightUnitRects } = await import('./viewUtils.js');
     const params = {
@@ -207,6 +225,7 @@ describe('round480 circle containment', () => {
       leftXWide: L.FIGHT_LEFT_X_WIDE,
       colGap: L.FIGHT_COL_GAP,
       enemyX: L.FIGHT_ENEMY_X,
+      enemyXWide: L.FIGHT_ENEMY_X_WIDE,
       dragonS: L.FIGHT_DRAGON_S,
       enemyS: L.FIGHT_ENEMY_S,
       barH: L.FIGHT_HP_BAR_H,
@@ -222,6 +241,12 @@ describe('round480 circle containment', () => {
       }
       expect(rectInsideCircle(r.enemy.barX, r.enemy.barY, r.enemy.barW, L.FIGHT_HP_BAR_H, 4), `enemy bar ${count}`).toBe(true);
       expect(rectInsideCircle(r.enemy.x, r.enemy.y, r.enemy.size, r.enemy.size, 4), `enemy ${count}`).toBe(true);
+    }
+    // Village fight: 4 defenders stacked on the right, all inside.
+    const v = fightUnitRects({ ...params, dragonCount: 4, enemyCount: 4 });
+    for (const e of v.enemies) {
+      expect(rectInsideCircle(e.barX, e.barY, e.barW, L.FIGHT_HP_BAR_H, 4), 'village defender bar').toBe(true);
+      expect(rectInsideCircle(e.x, e.y, e.size, e.size, 4), 'village defender').toBe(true);
     }
     // Continue button (drawn like index.js: centered, FIGHT_CONTINUE_Y).
     const btnX = Math.floor((prof.width - L.BTN_W) / 2);
